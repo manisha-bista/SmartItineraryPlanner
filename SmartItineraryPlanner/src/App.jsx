@@ -1,24 +1,24 @@
-import { useState } from 'react'
-import './App.css'
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom'
-import Login from './pages/Login.jsx'
-import Signup from './pages/Signup.jsx'
-import Dashboard from './pages/Dashboard.jsx'
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+import Landing from './pages/Landing';
+import Login from './pages/Login';
+import Register from './pages/Signup'; // Assuming you haven't renamed file yet, but prefer Register
+import Dashboard from './pages/Dashboard';
 
 function App() {
-
   return (
-    <div>
     <Router>
       <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<Landing />} />
         <Route path="/login" element={<Login />} />
-        <Route path="/signup" element={<Signup />} />
-        <Route path="/" element={<Navigate to="/login" replace />} />
-        <Route path="/dashboard" element={<Dashboard />}/>
+        <Route path="/register" element={<Register />} /> {/* Updated URL to /register */}
+
+        {/* Private Routes (We will protect these later) */}
+        <Route path="/dashboard" element={<Dashboard />} />
       </Routes>
     </Router>
-    </div>
-  )
+  );
 }
 
-export default App
+export default App;

@@ -1,162 +1,171 @@
-import React from 'react';
-import {
-    Box, Typography, AppBar, Toolbar, IconButton, 
-    CssBaseline, Container, Button, Stack, useTheme, useMediaQuery
+import React, { useState } from 'react';
+import { 
+    Button, 
+    TextField, 
+    Typography, 
+    Paper,
+    Link,
+    Box,
+    Stack,
+    Container,
+    CssBaseline
 } from '@mui/material';
+import { useNavigate } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
+const Signup = () => {
+    const navigate = useNavigate();
+    const [formData, setFormData] = useState({
+        firstName: '',
+        lastName: '',
+        email: '',
+        password: ''
+    });
 
-import TerrainIcon from '@mui/icons-material/Terrain';
-import AccountCircle from '@mui/icons-material/AccountCircle';
-import LuggageIcon from '@mui/icons-material/Luggage';
-import MapIcon from '@mui/icons-material/Map';
-import WbSunnyIcon from '@mui/icons-material/WbSunny';
-import PeopleIcon from '@mui/icons-material/People';
-
-
-const menuItems = [
-    { text: 'Itineraries', icon: <LuggageIcon /> },
-    { text: 'Maps', icon: <MapIcon /> },
-    { text: 'Weather', icon: <WbSunnyIcon /> },
-    { text: 'Community', icon: <PeopleIcon /> },
-];
-
-const Dashboard = () => {
-    const theme = useTheme();
-
-
-    const [selectedItem, setSelectedItem] = React.useState('Itineraries');
-
-    // Only changes state for visual effect;
-    const handleItemClick = (text) => {
-        setSelectedItem(text);
+    const handleChange = (e) => {
+        setFormData({ ...formData, [e.target.name]: e.target.value });
     };
-    
-    // Generateing the content title based on the active menu item
-    const getContentTitle = (item) => {
-        return `Manisha's ${item} Page`;
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        console.log('Register Data:', formData);
     };
 
     return (
-        <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+        <>
             <CssBaseline />
-
-            <AppBar
-                position="fixed"
-                sx={{
-                    backgroundColor: 'primary.main',
-                    boxShadow: 3
-                }}
-            >
-        
-                <Toolbar sx={{ justifyContent: 'space-between' }}>
+            <Box 
+                sx={{ 
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100vw',
+                    height: '100vh',
                     
-                    <Stack 
-                        direction="row" 
-                        alignItems="center" 
-                        spacing={1}
-                    >
-                        <TerrainIcon sx={{ fontSize: 32 }} />
-                        <Typography 
-                            variant="h6" 
-                            noWrap 
-                            component="div" 
-                            sx={{ fontWeight: 700 }}
-                        >
-                            Smart Itinerary App
-                        </Typography>
-                    </Stack>
-
-                    <IconButton color="inherit" size="large">
-                        <AccountCircle />
-                    </IconButton>
-                </Toolbar>
-
-                <Toolbar 
-                    component={Box}
-                    sx={{ 
-                        minHeight: 48,
-                        backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                        justifyContent: 'flex-start',
-                        py: 0,
-                        overflowX: 'auto',
-                        width: '100%',
-                    }}
-                >
-                    <Stack direction="row" spacing={{ xs: 1, md: 4 }}>
-                        {menuItems.map((item) => (
-                            <Button
-                                key={item.text}
-                                color="inherit"
-                                onClick={() => handleItemClick(item.text)}
-                                startIcon={item.icon}
-                                sx={{ 
-                                    fontWeight: selectedItem === item.text ? 700 : 500,
-                                    // Highlight active item
-                                    borderBottom: selectedItem === item.text ? '3px solid white' : 'none',
-                                    borderRadius: 0,
-                                    py: 1,
-                                    px: { xs: 1, sm: 2 },
-                                    minWidth: 'auto',
-                                    textTransform: 'none',
-                                }}
-                            >
-                                {item.text}
-                            </Button>
-                        ))}
-                    </Stack>
-                </Toolbar>
-            </AppBar>
-
-        
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
-                    p: 2,
-                    mt: { xs: '120px', md: '120px' }, 
-                    backgroundColor: '#f4f6f8',
-                    minHeight: 'calc(100vh - 186px)',
-                    width: 'calc(100vw - 96px)',
+                    /* --- NEW IMAGE LINK (Trekkers on a mountain ridge) --- */
+                    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url("https://images.unsplash.com/photo-1533130061792-64b345e4a833?q=80&w=2070&auto=format&fit=crop")`,
+                    
+                    backgroundRepeat: 'no-repeat',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center',
+                    
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflowY: 'auto'
                 }}
             >
-                <Container>
-                    {/* Welcome Message */}
-                    <Typography variant="h4" gutterBottom sx={{ fontWeight: 700, mb: 3 }}>
-                        Welcome Back, Manisha!
-                    </Typography>
-
-                    {/* Placeholder Content Area */}
-                    <Box 
+                <Container maxWidth="sm">
+                    <Paper 
+                        elevation={12} 
                         sx={{ 
                             p: 4, 
-                            textAlign: 'center', 
-                            backgroundColor: 'white', 
-                            borderRadius: 2, 
-                            boxShadow: 1,
-                            minHeight: '50vh',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            justifyContent: 'center',
-                            alignItems: 'center'
+                            borderRadius: 3,
+                            bgcolor: 'rgba(255, 255, 255, 0.95)', 
+                            backdropFilter: 'blur(4px)'
                         }}
                     >
-                        {/* Dynamic Content Title */}
-                        <Typography variant="h5" color="text.primary" sx={{ fontWeight: 600 }}>
-                            {getContentTitle(selectedItem)}
-                        </Typography>
-                    </Box>
-                    
-                    {/* Footer */}
-                    <Box sx={{ textAlign: 'center', py: 4, mt: 4, borderTop: '1px solid #ccc' }}>
-                        <Typography variant="caption" color="text.secondary">
-                            Smart Itinerary App v1.0
-                        </Typography>
-                    </Box>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                            
+                            <Button 
+                                startIcon={<ArrowBackIcon />} 
+                                onClick={() => navigate('/')}
+                                sx={{ alignSelf: 'flex-start', mb: 1, color: 'text.secondary' }}
+                            >
+                                Home
+                            </Button>
 
+                            <Typography component="h1" variant="h4" fontWeight="800" sx={{ mb: 4 }}>
+                                Create Account
+                            </Typography>
+                            
+                            {/* Description text is removed as requested */}
+
+                            <Box component="form" noValidate onSubmit={handleSubmit} sx={{ width: '100%' }}>
+                                <Stack spacing={2}>
+                                    
+                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                        <TextField
+                                            name="firstName"
+                                            required
+                                            fullWidth
+                                            id="firstName"
+                                            label="First Name"
+                                            autoFocus
+                                            value={formData.firstName}
+                                            onChange={handleChange}
+                                        />
+                                        <TextField
+                                            required
+                                            fullWidth
+                                            id="lastName"
+                                            label="Last Name"
+                                            name="lastName"
+                                            value={formData.lastName}
+                                            onChange={handleChange}
+                                        />
+                                    </Stack>
+
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        id="email"
+                                        label="Email Address"
+                                        name="email"
+                                        value={formData.email}
+                                        onChange={handleChange}
+                                    />
+
+                                    <TextField
+                                        required
+                                        fullWidth
+                                        name="password"
+                                        label="Password"
+                                        type="password"
+                                        id="password"
+                                        value={formData.password}
+                                        onChange={handleChange}
+                                    />
+
+                                    <Button
+                                        type="submit"
+                                        fullWidth
+                                        variant="contained"
+                                        size="large"
+                                        sx={{ 
+                                            mt: 2,
+                                            py: 1.5,
+                                            fontSize: '1rem',
+                                            bgcolor: '#ffb74d',
+                                            color: 'black',
+                                            fontWeight: 'bold',
+                                            '&:hover': { bgcolor: '#ffa726' }
+                                        }}
+                                    >
+                                        Sign Up
+                                    </Button>
+                                </Stack>
+                                
+                                <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mt: 3 }}>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Already have an account?
+                                    </Typography>
+                                    <Link 
+                                        component="button"
+                                        variant="body2"
+                                        onClick={() => navigate('/login')}
+                                        sx={{ fontWeight: 'bold', textDecoration: 'none', color: '#ef6c00' }}
+                                    >
+                                        Log in
+                                    </Link>
+                                </Stack>
+                            </Box>
+                        </Box>
+                    </Paper>
                 </Container>
             </Box>
-        </Box>
+        </>
     );
 };
 
-export default Dashboard;
+export default Signup;
