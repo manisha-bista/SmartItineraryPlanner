@@ -14,6 +14,8 @@ import {
     Stack
 } from '@mui/material';
 import { Visibility, VisibilityOff } from '@mui/icons-material';
+import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
@@ -143,154 +145,226 @@ const Login = () => {
     };
 
     return (
-        <Box 
-            sx={{ 
-                backgroundImage: 'linear-gradient(rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.7)), url("https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=2071&auto=format&fit=crop")',
-                backgroundSize: 'cover',
-                backgroundPosition: 'center',
-                minHeight: '100vh',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                py: 4
-            }}
-        >
-            <Container maxWidth="xs">
-                <Paper 
-                    elevation={6} 
-                    sx={{ 
-                        p: 4, 
-                        display: 'flex', 
-                        flexDirection: 'column', 
-                        alignItems: 'center',
-                        borderRadius: 3,
-                        bgcolor: 'rgba(255, 255, 255, 0.95)'
-                    }}
-                >
-                    <Typography component="h1" variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
-                        Welcome Back
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                        Login to continue your adventure
-                    </Typography>
-
-                    {/* Error Alert */}
-                    {error && (
-                        <Alert severity="error" sx={{ width: '100%', mb: 2 }} onClose={() => setError('')}>
-                            {error}
-                        </Alert>
-                    )}
-
-                    <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            id="email"
-                            label="Email Address"
-                            name="email"
-                            autoComplete="email"
-                            autoFocus
-                            type="email"
-                            value={formData.email}
-                            onChange={handleChange}
-                            error={Boolean(validationErrors.email)}
-                            helperText={validationErrors.email}
-                            disabled={loading}
-                        />
-                        <TextField
-                            margin="normal"
-                            required
-                            fullWidth
-                            name="password"
-                            label="Password"
-                            type={showPassword ? 'text' : 'password'}
-                            id="password"
-                            autoComplete="current-password"
-                            value={formData.password}
-                            onChange={handleChange}
-                            error={Boolean(validationErrors.password)}
-                            helperText={validationErrors.password}
-                            disabled={loading}
-                            InputProps={{
-                                endAdornment: (
-                                    <InputAdornment position="end">
-                                        <IconButton
-                                            aria-label="toggle password visibility"
-                                            onClick={handleClickShowPassword}
-                                            edge="end"
-                                            disabled={loading}
-                                        >
-                                            {showPassword ? <VisibilityOff /> : <Visibility />}
-                                        </IconButton>
-                                    </InputAdornment>
-                                ),
+        <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+            <Container maxWidth="md" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', py: 4 }}>
+                <Box sx={{ 
+                    display: 'grid', 
+                    gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, 
+                    gap: 0, 
+                    width: '100%', 
+                    alignItems: 'stretch'
+                }}>
+                    
+                    {/* Left Side - Image */}
+                    <Box
+                        sx={{
+                            display: { xs: 'none', md: 'flex' },
+                            borderRadius: '10px',
+                            overflow: 'hidden',
+                            boxShadow: 3,
+                            maxHeight: '90vh'
+                        }}
+                    >
+                        <Box
+                            component="img"
+                            src="https://images.unsplash.com/photo-1720810757170-c2bd2c6ed335"
+                            alt="Mountain landscape"
+                            sx={{
+                                width: '100%',
+                                height: '100%',
+                                objectFit: 'cover'
                             }}
                         />
-                        
-                        <Button
-                            type="submit"
-                            fullWidth
-                            variant="contained"
-                            disabled={loading}
-                            sx={{ 
-                                mt: 3, 
-                                mb: 2, 
-                                py: 1.5,
-                                bgcolor: '#ffb74d',
-                                color: 'black',
-                                fontWeight: 'bold',
-                                '&:hover': { bgcolor: '#ffa726' },
-                                '&:disabled': { 
-                                    bgcolor: 'grey.300',
-                                    color: 'grey.600'
-                                }
-                            }}
-                        >
-                            {loading ? (
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    <CircularProgress size={20} color="inherit" />
-                                    <span>Signing In...</span>
-                                </Stack>
-                            ) : (
-                                "Sign In"
-                            )}
-                        </Button>
-                        
-                        <Box sx={{ textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 1 }}>
-                            <Link 
-                                component="button"
-                                variant="body2" 
-                                type="button"
-                                onClick={() => navigate('/register')}
-                                sx={{ 
-                                    textDecoration: 'none', 
-                                    color: 'primary.main', 
-                                    fontWeight: 'bold',
-                                    '&:hover': { textDecoration: 'underline' }
-                                }}
-                                disabled={loading}
-                            >
-                                Don't have an account? Sign Up
-                            </Link>
-                            
-                            <Link 
-                                component="button"
-                                variant="caption" 
-                                type="button"
-                                onClick={() => navigate('/')}
-                                sx={{ 
-                                    textDecoration: 'none', 
-                                    color: 'grey.600',
-                                    '&:hover': { textDecoration: 'underline' }
-                                }}
-                                disabled={loading}
-                            >
-                                ← Back to Home
-                            </Link>
-                        </Box>
                     </Box>
-                </Paper>
+
+                    {/* Right Side - Form */}
+                    <Paper 
+                        elevation={0}
+                        sx={{ 
+                            p: 5,
+                            display: 'flex', 
+                            flexDirection: 'column',
+                            bgcolor: 'white',
+                            width: '100%',
+                            maxHeight: '90vh',
+                            overflow: 'auto'
+                        }}
+                    >
+                        <Typography component="h1" variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                            Welcome Back !
+                        </Typography>
+                        <Typography variant="body2" color="text.secondary" sx={{ mb: 4 }}>
+                            To explore exciting travel destination and adventures
+                        </Typography>
+
+                        {/* Error Alert */}
+                        {error && (
+                            <Alert severity="error" sx={{ width: '100%', mb: 2 }} onClose={() => setError('')}>
+                                {error}
+                            </Alert>
+                        )}
+
+                        <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                id="email"
+                                placeholder="Email Address"
+                                name="email"
+                                autoComplete="email"
+                                autoFocus
+                                type="email"
+                                value={formData.email}
+                                onChange={handleChange}
+                                error={Boolean(validationErrors.email)}
+                                helperText={validationErrors.email}
+                                disabled={loading}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <EmailIcon sx={{ color: 'text.secondary' }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <TextField
+                                margin="normal"
+                                required
+                                fullWidth
+                                name="password"
+                                placeholder="Enter Your Password"
+                                type={showPassword ? 'text' : 'password'}
+                                id="password"
+                                autoComplete="current-password"
+                                value={formData.password}
+                                onChange={handleChange}
+                                error={Boolean(validationErrors.password)}
+                                helperText={validationErrors.password}
+                                disabled={loading}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <LockIcon sx={{ color: 'text.secondary' }} />
+                                        </InputAdornment>
+                                    ),
+                                    endAdornment: (
+                                        <InputAdornment position="end">
+                                            <IconButton
+                                                aria-label="toggle password visibility"
+                                                onClick={handleClickShowPassword}
+                                                edge="end"
+                                                disabled={loading}
+                                            >
+                                                {showPassword ? <VisibilityOff /> : <Visibility />}
+                                            </IconButton>
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            
+                            {/* Forgot Password Link */}
+                            <Box sx={{ textAlign: 'right', mt: -1, mb: 1 }}>
+                                <Typography
+                                    variant="body2"
+                                    sx={{
+                                        color: 'text.secondary',
+                                        cursor: 'not-allowed',
+                                        fontSize: '0.875rem'
+                                    }}
+                                >
+                                    Forgot Password?
+                                </Typography>
+                            </Box>
+                            
+                            <Button
+                                type="submit"
+                                fullWidth
+                                variant="contained"
+                                disabled={loading}
+                                sx={{ 
+                                    mt: 3, 
+                                    mb: 2, 
+                                    py: 1.5,
+                                    bgcolor: '#ffb74d',
+                                    color: 'black',
+                                    fontWeight: 'bold',
+                                    '&:hover': { bgcolor: '#ffa726' },
+                                    '&:disabled': { 
+                                        bgcolor: 'grey.300',
+                                        color: 'grey.600'
+                                    }
+                                }}
+                            >
+                                {loading ? (
+                                    <Stack direction="row" spacing={1} alignItems="center">
+                                        <CircularProgress size={20} color="inherit" />
+                                        <span>Signing In...</span>
+                                    </Stack>
+                                ) : (
+                                    "Sign In"
+                                )}
+                            </Button>
+                            
+                            {/* Divider with "Or" text */}
+                            <Box sx={{ display: 'flex', alignItems: 'center', my: 3 }}>
+                                <Box sx={{ flexGrow: 1, height: '1px', bgcolor: 'divider' }} />
+                                <Typography variant="body2" sx={{ mx: 2, color: 'text.secondary' }}>
+                                    Or
+                                </Typography>
+                                <Box sx={{ flexGrow: 1, height: '1px', bgcolor: 'divider' }} />
+                            </Box>
+
+                            {/* Google Sign In Button */}
+                            <Button
+                                fullWidth
+                                variant="outlined"
+                                disabled={loading}
+                                startIcon={
+                                    <Box
+                                        component="img"
+                                        src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                        alt="Google"
+                                        sx={{ width: 20, height: 20 }}
+                                    />
+                                }
+                                sx={{
+                                    py: 1.5,
+                                    borderColor: 'divider',
+                                    color: 'text.primary',
+                                    textTransform: 'none',
+                                    fontSize: '1rem',
+                                    '&:hover': {
+                                        borderColor: 'primary.main',
+                                        bgcolor: 'grey.50'
+                                    }
+                                }}
+                            >
+                                Continue With Google
+                            </Button>
+                            
+                            <Box sx={{ textAlign: 'center', mt: 3 }}>
+                                <Typography variant="body2" color="text.secondary">
+                                    Don't Have an Account?{' '}
+                                    <Link
+                                        component="button"
+                                        type="button"
+                                        onClick={() => navigate('/register')}
+                                        sx={{
+                                            fontWeight: 'bold',
+                                            textDecoration: 'underline',
+                                            color: 'text.primary',
+                                            '&:hover': { color: 'primary.main' }
+                                        }}
+                                        disabled={loading}
+                                    >
+                                        Sign Up
+                                    </Link>
+                                </Typography>
+                            </Box>
+                        </Box>
+                    </Paper>
+                </Box>
             </Container>
         </Box>
     );

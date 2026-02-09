@@ -1,9 +1,3 @@
-"""
-Database Migration Script
-This script will safely update your database schema to match the new models.
-Run this ONCE after replacing models.py
-"""
-
 from sqlalchemy import create_engine, inspect, text
 from database import SQLALCHEMY_DATABASE_URL
 import os
@@ -21,15 +15,15 @@ def migrate_database():
     print(f"Found tables: {existing_tables}")
     
     # Ask for confirmation
-    print("\n⚠️  WARNING: This will DROP all existing tables and recreate them.")
+    print("\n  WARNING: This will DROP all existing tables and recreate them.")
     print("   All existing data will be LOST!")
     response = input("\nType 'YES' to continue or anything else to cancel: ")
     
     if response != 'YES':
-        print("❌ Migration cancelled.")
+        print(" Migration cancelled.")
         return
     
-    print("\n🗑️  Dropping all tables...")
+    print("\n  Dropping all tables...")
     
     with engine.connect() as conn:
         # Drop tables in reverse order of dependencies
@@ -53,23 +47,18 @@ def migrate_database():
         
         conn.commit()
     
-    print("\n📦 Creating new tables with updated schema...")
+    print("\n Creating new tables with updated schema...")
     
     # Import models after dropping tables
     import models
     models.Base.metadata.create_all(bind=engine)
     
-    print("\n✅ Migration completed successfully!")
+    print("\n Migration completed successfully!")
     print("\n📋 New tables created:")
     inspector = inspect(engine)
     for table in inspector.get_table_names():
         print(f"   ✓ {table}")
     
-    print("\n🎯 You can now:")
-    print("   1. Create a new account (signup)")
-    print("   2. Login with new account")
-    print("   3. Create itineraries")
-
 if __name__ == "__main__":
     print("=" * 60)
     print("  Smart Itinerary - Database Migration")

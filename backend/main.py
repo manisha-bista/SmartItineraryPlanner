@@ -1,13 +1,13 @@
-from fastapi import FastAPI, Depends, HTTPException, status
+from fastapi import FastAPI, Depends, HTTPException, status, Query
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
-from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy import func, or_
 from database import engine, get_db
 import models, schemas
 from passlib.context import CryptContext
-from datetime import date, timedelta
+from datetime import datetime
 import logging
-from typing import List
+from typing import List, Optional
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -23,7 +23,9 @@ except Exception as e:
 app = FastAPI(
     title="Smart Itinerary API",
     description="Comprehensive API for Nepal Adventure Smart Itinerary Planner",
-    version="2.0.0"
+    version="3.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc"
 )
 
 # CORS Configuration
@@ -45,24 +47,37 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
 
-
+# ============================================
 # ROOT & HEALTH ENDPOINTS
+# ============================================
 @app.get("/")
 def read_root():
     return {
         "message": "Welcome to Smart Itinerary API",
-        "version": "2.0.0",
-        "features": ["Nested Itineraries", "Activities", "Accommodations", "Transportation"],
-        "status": "running"
+        "version": "3.0.0",
+        "features": [
+            "User Management",
+            "Nested Itineraries",
+            "Activities with Google Places Integration",
+            "Accommodations",
+            "Transportation",
+            "Weather Integration",
+            "Community Updates",
+            "Comments & Tags"
+        ],
+        "status": "running",
+        "documentation": "/docs"
     }
 
 @app.get("/health")
-def health_check():
+def health_check(db: Session = Depends(get_db)):
     try:
-        db = next(get_db())
         db.execute("SELECT 1")
-        db.close()
-        return {"status": "healthy", "database": "connected"}
+        return {
+            "status": "healthy",
+            "database": "connected",
+            "timestamp": datetime.utcnow().isoformat()
+        }
     except Exception as e:
         logger.error(f"Health check failed: {e}")
         raise HTTPException(
@@ -71,23 +86,27 @@ def health_check():
         )
 
 
+# ============================================
 # USER ENDPOINTS
+# ============================================
 @app.post("/register", response_model=schemas.UserOut, status_code=status.HTTP_201_CREATED)
 def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
+    """Register a new user"""
     try:
+        # Validation
         if not user.name or len(user.name.strip()) < 2:
             raise HTTPException(status_code=400, detail="Name must be at least 2 characters long")
-        if not user.email or "@" not in user.email:
-            raise HTTPException(status_code=400, detail="Please provide a valid email address")
         if not user.password or len(user.password) < 6:
             raise HTTPException(status_code=400, detail="Password must be at least 6 characters long")
 
         email_lower = user.email.strip().lower()
-        existing_user = db.query(models.User).filter(models.User.email == email_lower).first()
         
+        # Check if user exists
+        existing_user = db.query(models.User).filter(models.User.email == email_lower).first()
         if existing_user:
             raise HTTPException(status_code=400, detail="Email already registered")
         
+        # Create user
         hashed_password = get_password_hash(user.password)
         new_user = models.User(
             name=user.name.strip(),
@@ -111,12 +130,17 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
 
 @app.post("/login", response_model=schemas.UserOut)
 def login_user(user_credentials: schemas.UserLogin, db: Session = Depends(get_db)):
+    """Login user"""
     try:
         email_lower = user_credentials.email.strip().lower()
         user = db.query(models.User).filter(models.User.email == email_lower).first()
         
         if not user or not verify_password(user_credentials.password, user.hashed_password):
             raise HTTPException(status_code=401, detail="Invalid email or password")
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.commit()
         
         logger.info(f"User logged in: {user.email}")
         return user
@@ -126,11 +150,44 @@ def login_user(user_credentials: schemas.UserLogin, db: Session = Depends(get_db
         logger.error(f"Login error: {e}")
         raise HTTPException(status_code=500, detail="Login failed")
 
+@app.get("/users/{user_id}", response_model=schemas.UserOut)
+def get_user(user_id: int, db: Session = Depends(get_db)):
+    """Get user by ID"""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user
 
+@app.put("/users/{user_id}", response_model=schemas.UserOut)
+def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Depends(get_db)):
+    """Update user profile"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        update_data = user_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(user, field, value)
+        
+        db.commit()
+        db.refresh(user)
+        return user
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update user")
+
+
+# ============================================
 # ITINERARY ENDPOINTS
+# ============================================
 @app.post("/itineraries", response_model=schemas.ItineraryOut, status_code=status.HTTP_201_CREATED)
 def create_itinerary(itinerary: schemas.ItineraryCreate, db: Session = Depends(get_db)):
-    """Create a new itinerary (simple version without nested data)"""
+    """Create a new itinerary (simple version)"""
     try:
         # Verify user exists
         user = db.query(models.User).filter(models.User.id == itinerary.user_id).first()
@@ -138,19 +195,7 @@ def create_itinerary(itinerary: schemas.ItineraryCreate, db: Session = Depends(g
             raise HTTPException(status_code=404, detail="User not found")
         
         # Create itinerary
-        new_itinerary = models.Itinerary(
-            title=itinerary.title.strip(),
-            destination=itinerary.destination.strip(),
-            description=itinerary.description,
-            start_date=itinerary.start_date,
-            end_date=itinerary.end_date,
-            estimated_budget=itinerary.estimated_budget,
-            actual_budget=itinerary.actual_budget,
-            currency=itinerary.currency,
-            status=itinerary.status,
-            is_public=itinerary.is_public,
-            user_id=itinerary.user_id
-        )
+        new_itinerary = models.Itinerary(**itinerary.dict())
         
         db.add(new_itinerary)
         db.commit()
@@ -177,59 +222,33 @@ def create_complete_itinerary(itinerary: schemas.ItineraryCreateWithDays, db: Se
             raise HTTPException(status_code=404, detail="User not found")
         
         # Create main itinerary
-        new_itinerary = models.Itinerary(
-            title=itinerary.title.strip(),
-            destination=itinerary.destination.strip(),
-            description=itinerary.description,
-            start_date=itinerary.start_date,
-            end_date=itinerary.end_date,
-            estimated_budget=itinerary.estimated_budget,
-            currency=itinerary.currency,
-            status=itinerary.status,
-            is_public=itinerary.is_public,
-            user_id=itinerary.user_id
-        )
+        itinerary_data = itinerary.dict(exclude={'days', 'accommodations', 'transportation', 'tags'})
+        new_itinerary = models.Itinerary(**itinerary_data)
         db.add(new_itinerary)
-        db.flush()  # Get the ID without committing
+        db.flush()
         
-        # Add days if provided
+        # Add days
         for day_data in itinerary.days:
-            new_day = models.ItineraryDay(
-                day_number=day_data.day_number,
-                date=day_data.date,
-                title=day_data.title,
-                description=day_data.description,
-                estimated_cost=day_data.estimated_cost,
-                itinerary_id=new_itinerary.id
-            )
+            day_dict = day_data.dict(exclude={'activities'}) if hasattr(day_data, 'dict') else day_data
+            new_day = models.ItineraryDay(**day_dict, itinerary_id=new_itinerary.id)
             db.add(new_day)
         
-        # Add accommodations if provided
+        # Add accommodations
         for acc_data in itinerary.accommodations:
-            new_acc = models.Accommodation(
-                name=acc_data.name,
-                type=acc_data.type,
-                address=acc_data.address,
-                check_in_date=acc_data.check_in_date,
-                check_out_date=acc_data.check_out_date,
-                cost_per_night=acc_data.cost_per_night,
-                total_cost=acc_data.total_cost,
-                itinerary_id=new_itinerary.id
-            )
+            acc_dict = acc_data.dict() if hasattr(acc_data, 'dict') else acc_data
+            new_acc = models.Accommodation(**acc_dict, itinerary_id=new_itinerary.id)
             db.add(new_acc)
         
-        # Add transportation if provided
+        # Add transportation
         for trans_data in itinerary.transportation:
-            new_trans = models.Transportation(
-                type=trans_data.type,
-                from_location=trans_data.from_location,
-                to_location=trans_data.to_location,
-                departure_datetime=trans_data.departure_datetime,
-                arrival_datetime=trans_data.arrival_datetime,
-                cost=trans_data.cost,
-                itinerary_id=new_itinerary.id
-            )
+            trans_dict = trans_data.dict() if hasattr(trans_data, 'dict') else trans_data
+            new_trans = models.Transportation(**trans_dict, itinerary_id=new_itinerary.id)
             db.add(new_trans)
+        
+        # Add tags
+        for tag_str in itinerary.tags:
+            new_tag = models.ItineraryTag(tag=tag_str, itinerary_id=new_itinerary.id)
+            db.add(new_tag)
         
         db.commit()
         db.refresh(new_itinerary)
@@ -246,23 +265,62 @@ def create_complete_itinerary(itinerary: schemas.ItineraryCreateWithDays, db: Se
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/itineraries/user/{user_id}", response_model=List[schemas.ItineraryOut])
-def get_user_itineraries(user_id: int, db: Session = Depends(get_db)):
-    """Get all itineraries for a user"""
+def get_user_itineraries(
+    user_id: int,
+    status_filter: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """Get all itineraries for a user with optional status filter"""
     try:
         user = db.query(models.User).filter(models.User.id == user_id).first()
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
         
-        itineraries = db.query(models.Itinerary).filter(
-            models.Itinerary.user_id == user_id
-        ).order_by(models.Itinerary.start_date.desc()).all()
+        query = db.query(models.Itinerary).filter(models.Itinerary.user_id == user_id)
         
+        if status_filter:
+            query = query.filter(models.Itinerary.status == status_filter)
+        
+        itineraries = query.order_by(models.Itinerary.start_date.desc()).all()
         return itineraries
+        
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error fetching itineraries: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch itineraries")
+
+@app.get("/itineraries/public", response_model=List[schemas.ItinerarySummary])
+def get_public_itineraries(
+    destination: Optional[str] = Query(None),
+    limit: int = Query(20, le=100),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db)
+):
+    """Get public itineraries with optional filters"""
+    try:
+        query = db.query(models.Itinerary).filter(models.Itinerary.is_public == True)
+        
+        if destination:
+            query = query.filter(models.Itinerary.destination.ilike(f"%{destination}%"))
+        
+        itineraries = query.order_by(
+            models.Itinerary.view_count.desc()
+        ).offset(offset).limit(limit).all()
+        
+        # Add computed fields
+        result = []
+        for itin in itineraries:
+            itin_dict = schemas.ItinerarySummary.from_orm(itin).dict()
+            itin_dict['total_days'] = len(itin.days)
+            itin_dict['total_activities'] = sum(len(day.activities) for day in itin.days)
+            result.append(schemas.ItinerarySummary(**itin_dict))
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error fetching public itineraries: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch public itineraries")
 
 @app.get("/itineraries/{itinerary_id}", response_model=schemas.ItineraryDetailOut)
 def get_itinerary_detail(itinerary_id: int, db: Session = Depends(get_db)):
@@ -275,7 +333,12 @@ def get_itinerary_detail(itinerary_id: int, db: Session = Depends(get_db)):
         if not itinerary:
             raise HTTPException(status_code=404, detail="Itinerary not found")
         
+        # Increment view count
+        itinerary.view_count += 1
+        db.commit()
+        
         return itinerary
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -283,14 +346,21 @@ def get_itinerary_detail(itinerary_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to fetch itinerary")
 
 @app.put("/itineraries/{itinerary_id}", response_model=schemas.ItineraryOut)
-def update_itinerary(itinerary_id: int, itinerary_update: schemas.ItineraryUpdate, db: Session = Depends(get_db)):
+def update_itinerary(
+    itinerary_id: int,
+    itinerary_update: schemas.ItineraryUpdate,
+    db: Session = Depends(get_db)
+):
     """Update an itinerary"""
     try:
-        itinerary = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
+        itinerary = db.query(models.Itinerary).filter(
+            models.Itinerary.id == itinerary_id
+        ).first()
+        
         if not itinerary:
             raise HTTPException(status_code=404, detail="Itinerary not found")
         
-        # Update fields if provided
+        # Update fields
         update_data = itinerary_update.dict(exclude_unset=True)
         for field, value in update_data.items():
             setattr(itinerary, field, value)
@@ -298,6 +368,7 @@ def update_itinerary(itinerary_id: int, itinerary_update: schemas.ItineraryUpdat
         db.commit()
         db.refresh(itinerary)
         return itinerary
+        
     except HTTPException:
         db.rollback()
         raise
@@ -310,13 +381,17 @@ def update_itinerary(itinerary_id: int, itinerary_update: schemas.ItineraryUpdat
 def delete_itinerary(itinerary_id: int, db: Session = Depends(get_db)):
     """Delete an itinerary and all its nested data"""
     try:
-        itinerary = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
+        itinerary = db.query(models.Itinerary).filter(
+            models.Itinerary.id == itinerary_id
+        ).first()
+        
         if not itinerary:
             raise HTTPException(status_code=404, detail="Itinerary not found")
         
         db.delete(itinerary)
         db.commit()
         logger.info(f"Itinerary deleted: {itinerary_id}")
+        
     except HTTPException:
         db.rollback()
         raise
@@ -326,28 +401,79 @@ def delete_itinerary(itinerary_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to delete itinerary")
 
 
-
+# ============================================
 # DAY & ACTIVITY ENDPOINTS
+# ============================================
 @app.post("/itinerary-days", response_model=schemas.ItineraryDayOut, status_code=status.HTTP_201_CREATED)
 def create_itinerary_day(day: schemas.ItineraryDayCreate, db: Session = Depends(get_db)):
     """Add a day to an itinerary"""
     try:
-        new_day = models.ItineraryDay(**day.dict(exclude={'activities'}))
+        day_data = day.dict(exclude={'activities'})
+        new_day = models.ItineraryDay(**day_data)
         db.add(new_day)
         db.flush()
         
         # Add activities if provided
         for activity_data in day.activities:
-            new_activity = models.Activity(**activity_data.dict(), day_id=new_day.id)
+            activity_dict = activity_data.dict() if hasattr(activity_data, 'dict') else activity_data
+            new_activity = models.Activity(**activity_dict, day_id=new_day.id)
             db.add(new_activity)
         
         db.commit()
         db.refresh(new_day)
         return new_day
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating day: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.put("/itinerary-days/{day_id}", response_model=schemas.ItineraryDayOut)
+def update_itinerary_day(
+    day_id: int,
+    day_update: schemas.ItineraryDayUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an itinerary day"""
+    try:
+        day = db.query(models.ItineraryDay).filter(models.ItineraryDay.id == day_id).first()
+        if not day:
+            raise HTTPException(status_code=404, detail="Day not found")
+        
+        update_data = day_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(day, field, value)
+        
+        db.commit()
+        db.refresh(day)
+        return day
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating day: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update day")
+
+@app.delete("/itinerary-days/{day_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_itinerary_day(day_id: int, db: Session = Depends(get_db)):
+    """Delete an itinerary day"""
+    try:
+        day = db.query(models.ItineraryDay).filter(models.ItineraryDay.id == day_id).first()
+        if not day:
+            raise HTTPException(status_code=404, detail="Day not found")
+        
+        db.delete(day)
+        db.commit()
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting day: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete day")
 
 @app.post("/activities", response_model=schemas.ActivityOut, status_code=status.HTTP_201_CREATED)
 def create_activity(activity: schemas.ActivityCreate, db: Session = Depends(get_db)):
@@ -358,6 +484,7 @@ def create_activity(activity: schemas.ActivityCreate, db: Session = Depends(get_
         db.commit()
         db.refresh(new_activity)
         return new_activity
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating activity: {e}")
@@ -371,13 +498,62 @@ def get_day_activities(day_id: int, db: Session = Depends(get_db)):
             models.Activity.day_id == day_id
         ).order_by(models.Activity.start_time).all()
         return activities
+        
     except Exception as e:
         logger.error(f"Error fetching activities: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch activities")
 
+@app.put("/activities/{activity_id}", response_model=schemas.ActivityOut)
+def update_activity(
+    activity_id: int,
+    activity_update: schemas.ActivityUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an activity"""
+    try:
+        activity = db.query(models.Activity).filter(models.Activity.id == activity_id).first()
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+        
+        update_data = activity_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(activity, field, value)
+        
+        db.commit()
+        db.refresh(activity)
+        return activity
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating activity: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update activity")
+
+@app.delete("/activities/{activity_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_activity(activity_id: int, db: Session = Depends(get_db)):
+    """Delete an activity"""
+    try:
+        activity = db.query(models.Activity).filter(models.Activity.id == activity_id).first()
+        if not activity:
+            raise HTTPException(status_code=404, detail="Activity not found")
+        
+        db.delete(activity)
+        db.commit()
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting activity: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete activity")
 
 
+# ============================================
 # ACCOMMODATION ENDPOINTS
+# ============================================
 @app.post("/accommodations", response_model=schemas.AccommodationOut, status_code=status.HTTP_201_CREATED)
 def create_accommodation(accommodation: schemas.AccommodationCreate, db: Session = Depends(get_db)):
     """Add accommodation to an itinerary"""
@@ -387,6 +563,7 @@ def create_accommodation(accommodation: schemas.AccommodationCreate, db: Session
         db.commit()
         db.refresh(new_acc)
         return new_acc
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating accommodation: {e}")
@@ -400,13 +577,68 @@ def get_itinerary_accommodations(itinerary_id: int, db: Session = Depends(get_db
             models.Accommodation.itinerary_id == itinerary_id
         ).all()
         return accommodations
+        
     except Exception as e:
         logger.error(f"Error fetching accommodations: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch accommodations")
 
+@app.put("/accommodations/{accommodation_id}", response_model=schemas.AccommodationOut)
+def update_accommodation(
+    accommodation_id: int,
+    accommodation_update: schemas.AccommodationUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update an accommodation"""
+    try:
+        accommodation = db.query(models.Accommodation).filter(
+            models.Accommodation.id == accommodation_id
+        ).first()
+        
+        if not accommodation:
+            raise HTTPException(status_code=404, detail="Accommodation not found")
+        
+        update_data = accommodation_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(accommodation, field, value)
+        
+        db.commit()
+        db.refresh(accommodation)
+        return accommodation
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating accommodation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update accommodation")
+
+@app.delete("/accommodations/{accommodation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_accommodation(accommodation_id: int, db: Session = Depends(get_db)):
+    """Delete an accommodation"""
+    try:
+        accommodation = db.query(models.Accommodation).filter(
+            models.Accommodation.id == accommodation_id
+        ).first()
+        
+        if not accommodation:
+            raise HTTPException(status_code=404, detail="Accommodation not found")
+        
+        db.delete(accommodation)
+        db.commit()
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting accommodation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete accommodation")
 
 
+# ============================================
 # TRANSPORTATION ENDPOINTS
+# ============================================
 @app.post("/transportation", response_model=schemas.TransportationOut, status_code=status.HTTP_201_CREATED)
 def create_transportation(transportation: schemas.TransportationCreate, db: Session = Depends(get_db)):
     """Add transportation to an itinerary"""
@@ -416,13 +648,82 @@ def create_transportation(transportation: schemas.TransportationCreate, db: Sess
         db.commit()
         db.refresh(new_trans)
         return new_trans
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating transportation: {e}")
         raise HTTPException(status_code=500, detail="Failed to create transportation")
 
+@app.get("/itineraries/{itinerary_id}/transportation", response_model=List[schemas.TransportationOut])
+def get_itinerary_transportation(itinerary_id: int, db: Session = Depends(get_db)):
+    """Get all transportation for an itinerary"""
+    try:
+        transportation = db.query(models.Transportation).filter(
+            models.Transportation.itinerary_id == itinerary_id
+        ).order_by(models.Transportation.departure_datetime).all()
+        return transportation
+        
+    except Exception as e:
+        logger.error(f"Error fetching transportation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch transportation")
 
+@app.put("/transportation/{transportation_id}", response_model=schemas.TransportationOut)
+def update_transportation(
+    transportation_id: int,
+    transportation_update: schemas.TransportationUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update transportation"""
+    try:
+        transportation = db.query(models.Transportation).filter(
+            models.Transportation.id == transportation_id
+        ).first()
+        
+        if not transportation:
+            raise HTTPException(status_code=404, detail="Transportation not found")
+        
+        update_data = transportation_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(transportation, field, value)
+        
+        db.commit()
+        db.refresh(transportation)
+        return transportation
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating transportation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update transportation")
+
+@app.delete("/transportation/{transportation_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_transportation(transportation_id: int, db: Session = Depends(get_db)):
+    """Delete transportation"""
+    try:
+        transportation = db.query(models.Transportation).filter(
+            models.Transportation.id == transportation_id
+        ).first()
+        
+        if not transportation:
+            raise HTTPException(status_code=404, detail="Transportation not found")
+        
+        db.delete(transportation)
+        db.commit()
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting transportation: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete transportation")
+
+
+# ============================================
 # TRIP NOTES ENDPOINTS
+# ============================================
 @app.post("/trip-notes", response_model=schemas.TripNoteOut, status_code=status.HTTP_201_CREATED)
 def create_trip_note(note: schemas.TripNoteCreate, db: Session = Depends(get_db)):
     """Add a note to an itinerary"""
@@ -432,14 +733,158 @@ def create_trip_note(note: schemas.TripNoteCreate, db: Session = Depends(get_db)
         db.commit()
         db.refresh(new_note)
         return new_note
+        
     except Exception as e:
         db.rollback()
         logger.error(f"Error creating note: {e}")
         raise HTTPException(status_code=500, detail="Failed to create note")
 
+@app.get("/itineraries/{itinerary_id}/notes", response_model=List[schemas.TripNoteOut])
+def get_itinerary_notes(itinerary_id: int, db: Session = Depends(get_db)):
+    """Get all notes for an itinerary"""
+    try:
+        notes = db.query(models.TripNote).filter(
+            models.TripNote.itinerary_id == itinerary_id
+        ).order_by(models.TripNote.created_at.desc()).all()
+        return notes
+        
+    except Exception as e:
+        logger.error(f"Error fetching notes: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch notes")
+
+@app.put("/trip-notes/{note_id}", response_model=schemas.TripNoteOut)
+def update_trip_note(
+    note_id: int,
+    note_update: schemas.TripNoteUpdate,
+    db: Session = Depends(get_db)
+):
+    """Update a trip note"""
+    try:
+        note = db.query(models.TripNote).filter(models.TripNote.id == note_id).first()
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+        
+        update_data = note_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(note, field, value)
+        
+        db.commit()
+        db.refresh(note)
+        return note
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating note: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update note")
+
+@app.delete("/trip-notes/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_trip_note(note_id: int, db: Session = Depends(get_db)):
+    """Delete a trip note"""
+    try:
+        note = db.query(models.TripNote).filter(models.TripNote.id == note_id).first()
+        if not note:
+            raise HTTPException(status_code=404, detail="Note not found")
+        
+        db.delete(note)
+        db.commit()
+        
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting note: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete note")
 
 
+# ============================================
+# COMMENTS ENDPOINTS
+# ============================================
+@app.post("/comments", response_model=schemas.CommentOut, status_code=status.HTTP_201_CREATED)
+def create_comment(comment: schemas.CommentCreate, user_id: int, db: Session = Depends(get_db)):
+    """Add a comment to an itinerary"""
+    try:
+        new_comment = models.ItineraryComment(**comment.dict(), user_id=user_id)
+        db.add(new_comment)
+        db.commit()
+        db.refresh(new_comment)
+        return new_comment
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating comment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create comment")
+
+@app.get("/itineraries/{itinerary_id}/comments", response_model=List[schemas.CommentOut])
+def get_itinerary_comments(itinerary_id: int, db: Session = Depends(get_db)):
+    """Get all comments for an itinerary"""
+    try:
+        comments = db.query(models.ItineraryComment).filter(
+            models.ItineraryComment.itinerary_id == itinerary_id
+        ).order_by(models.ItineraryComment.created_at.desc()).all()
+        return comments
+        
+    except Exception as e:
+        logger.error(f"Error fetching comments: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch comments")
+
+
+# ============================================
+# COMMUNITY UPDATES ENDPOINTS
+# ============================================
+@app.post("/community-updates", response_model=schemas.CommunityUpdateOut, status_code=status.HTTP_201_CREATED)
+def create_community_update(update: schemas.CommunityUpdateCreate, user_id: int, db: Session = Depends(get_db)):
+    """Create a community update"""
+    try:
+        new_update = models.CommunityUpdate(**update.dict(), user_id=user_id)
+        db.add(new_update)
+        db.commit()
+        db.refresh(new_update)
+        return new_update
+        
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating community update: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create update")
+
+@app.get("/community-updates", response_model=List[schemas.CommunityUpdateOut])
+def get_community_updates(
+    location: Optional[str] = Query(None),
+    update_type: Optional[str] = Query(None),
+    active_only: bool = Query(True),
+    limit: int = Query(50, le=100),
+    db: Session = Depends(get_db)
+):
+    """Get community updates with filters"""
+    try:
+        query = db.query(models.CommunityUpdate)
+        
+        if active_only:
+            query = query.filter(models.CommunityUpdate.is_active == True)
+        
+        if location:
+            query = query.filter(models.CommunityUpdate.location.ilike(f"%{location}%"))
+        
+        if update_type:
+            query = query.filter(models.CommunityUpdate.update_type == update_type)
+        
+        updates = query.order_by(
+            models.CommunityUpdate.created_at.desc()
+        ).limit(limit).all()
+        
+        return updates
+        
+    except Exception as e:
+        logger.error(f"Error fetching community updates: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch updates")
+
+
+# ============================================
 # DEBUG ENDPOINTS
+# ============================================
 @app.get("/debug/users")
 def get_all_users(db: Session = Depends(get_db)):
     """Debug: View all users"""

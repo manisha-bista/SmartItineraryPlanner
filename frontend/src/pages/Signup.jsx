@@ -16,9 +16,11 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import Visibility from '@mui/icons-material/Visibility';
 import VisibilityOff from '@mui/icons-material/VisibilityOff';
+import PersonIcon from '@mui/icons-material/Person';
+import EmailIcon from '@mui/icons-material/Email';
+import LockIcon from '@mui/icons-material/Lock';
 
 const Signup = () => {
     const navigate = useNavigate();
@@ -190,230 +192,290 @@ const Signup = () => {
     return (
         <>
             <CssBaseline />
-            <Box 
-                sx={{ 
-                    position: 'fixed',
-                    top: 0, 
-                    left: 0, 
-                    width: '100vw', 
-                    height: '100vh',
-                    backgroundImage: `linear-gradient(rgba(0, 0, 0, 0.4), rgba(0, 0, 0, 0.6)), url("https://images.unsplash.com/photo-1533130061792-64b345e4a833?q=80&w=2070&auto=format&fit=crop")`,
-                    backgroundRepeat: 'no-repeat',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflowY: 'auto',
-                    py: 4
-                }}
-            >
-                <Container maxWidth="sm">
-                    <Paper 
-                        elevation={12} 
-                        sx={{ 
-                            p: 4, 
-                            borderRadius: 3,
-                            bgcolor: 'rgba(255, 255, 255, 0.95)', 
-                            backdropFilter: 'blur(4px)'
-                        }}
-                    >
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-                            
-                            <Button 
-                                startIcon={<ArrowBackIcon />} 
-                                onClick={() => navigate('/')}
-                                sx={{ 
-                                    alignSelf: 'flex-start', 
-                                    mb: 1, 
-                                    color: 'text.secondary',
-                                    '&:hover': { bgcolor: 'rgba(0,0,0,0.05)' }
+            <Box sx={{ bgcolor: '#f5f5f5', minHeight: '100vh' }}>
+                <Container maxWidth="md" sx={{ minHeight: '100vh', display: 'flex', alignItems: 'center', py: 4 }}>
+                    <Box sx={{ 
+                        display: 'grid', 
+                        gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, 
+                        gap: 0, 
+                        width: '100%', 
+                        alignItems: 'stretch'
+                    }}>
+                        
+                        {/* Left Side - Image */}
+                        <Box
+                            sx={{
+                                display: { xs: 'none', md: 'flex' },
+                                borderRadius: '10px',
+                                overflow: 'hidden',
+                                boxShadow: 3,
+                                maxHeight: '90vh'
+                            }}
+                        >
+                            <Box
+                                component="img"
+                                src="https://images.unsplash.com/photo-1765784607434-69bfa9f53b4b"
+                                alt="Temple with prayer flags"
+                                sx={{
+                                    width: '100%',
+                                    height: '100%',
+                                    objectFit: 'cover'
                                 }}
-                            >
-                                Home
-                            </Button>
+                            />
+                        </Box>
 
-                            <Typography component="h1" variant="h4" fontWeight="800" sx={{ mb: 1 }}>
-                                Create Account
-                            </Typography>
-                            
-                            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-                                Join us to start planning your adventures
-                            </Typography>
-                            
-                            {/* Error Alert */}
-                            {error && (
-                                <Alert severity="error" sx={{ width: '100%', mb: 3 }} onClose={() => setError('')}>
-                                    {error}
-                                </Alert>
-                            )}
+                        {/* Right Side - Form */}
+                        <Paper 
+                            elevation={0}
+                            sx={{ 
+                                p: 4,
+                                bgcolor: 'white',
+                                width: '100%',
+                                maxHeight: '90vh',
+                                overflow: 'auto'
+                            }}
+                        >
+                            <Box sx={{ display: 'flex', flexDirection: 'column' }}>
+                                <Typography component="h1" variant="h4" fontWeight="bold" sx={{ mb: 1 }}>
+                                    Create Your Account
+                                </Typography>
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                    To explore exciting travel destination and adventures
+                                </Typography>
 
-                            <Box component="form" noValidate onSubmit={handleSubmit} sx={{ width: '100%' }}>
-                                <Stack spacing={2.5}>
-                                    
-                                    {/* Name Fields */}
-                                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                {/* Error Alert */}
+                                {error && (
+                                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                                        {error}
+                                    </Alert>
+                                )}
+
+                                <Box component="form" noValidate onSubmit={handleSubmit} sx={{ width: '100%' }}>
+                                    <Stack spacing={2}>
+                                        
+                                        {/* Name Fields */}
+                                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                                            <TextField
+                                                name="firstName"
+                                                required
+                                                fullWidth
+                                                id="firstName"
+                                                placeholder="Full Name"
+                                                autoFocus
+                                                value={formData.firstName}
+                                                onChange={handleChange}
+                                                error={Boolean(validationErrors.firstName)}
+                                                helperText={validationErrors.firstName}
+                                                disabled={loading}
+                                                inputProps={{ maxLength: 50 }}
+                                                InputProps={{
+                                                    startAdornment: (
+                                                        <InputAdornment position="start">
+                                                            <PersonIcon sx={{ color: 'text.secondary' }} />
+                                                        </InputAdornment>
+                                                    ),
+                                                }}
+                                            />
+                                            <TextField
+                                                required
+                                                fullWidth
+                                                id="lastName"
+                                                placeholder="Last Name"
+                                                name="lastName"
+                                                value={formData.lastName}
+                                                onChange={handleChange}
+                                                error={Boolean(validationErrors.lastName)}
+                                                helperText={validationErrors.lastName}
+                                                disabled={loading}
+                                                inputProps={{ maxLength: 50 }}
+                                            />
+                                        </Stack>
+
+                                        {/* Email Field */}
                                         <TextField
-                                            name="firstName"
                                             required
                                             fullWidth
-                                            id="firstName"
-                                            label="First Name"
-                                            autoFocus
-                                            value={formData.firstName}
+                                            id="email"
+                                            placeholder="Email Address"
+                                            name="email"
+                                            autoComplete="email"
+                                            type="email"
+                                            value={formData.email}
                                             onChange={handleChange}
-                                            error={Boolean(validationErrors.firstName)}
-                                            helperText={validationErrors.firstName}
+                                            error={Boolean(validationErrors.email)}
+                                            helperText={validationErrors.email}
                                             disabled={loading}
-                                            inputProps={{ maxLength: 50 }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <EmailIcon sx={{ color: 'text.secondary' }} />
+                                                    </InputAdornment>
+                                                ),
+                                            }}
                                         />
+
+                                        {/* Password Field */}
                                         <TextField
                                             required
                                             fullWidth
-                                            id="lastName"
-                                            label="Last Name"
-                                            name="lastName"
-                                            value={formData.lastName}
+                                            name="password"
+                                            placeholder="Enter Your Password"
+                                            type={showPassword ? 'text' : 'password'}
+                                            id="password"
+                                            autoComplete="new-password"
+                                            value={formData.password}
                                             onChange={handleChange}
-                                            error={Boolean(validationErrors.lastName)}
-                                            helperText={validationErrors.lastName}
+                                            error={Boolean(validationErrors.password)}
+                                            helperText={validationErrors.password || 'Must be at least 6 characters'}
                                             disabled={loading}
-                                            inputProps={{ maxLength: 50 }}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <LockIcon sx={{ color: 'text.secondary' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton
+                                                            aria-label="toggle password visibility"
+                                                            onClick={handleClickShowPassword}
+                                                            edge="end"
+                                                            disabled={loading}
+                                                        >
+                                                            {showPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
                                         />
+
+                                        {/* Confirm Password Field */}
+                                        <TextField
+                                            required
+                                            fullWidth
+                                            name="confirmPassword"
+                                            placeholder="Confirm Password"
+                                            type={showConfirmPassword ? 'text' : 'password'}
+                                            id="confirmPassword"
+                                            autoComplete="new-password"
+                                            value={formData.confirmPassword}
+                                            onChange={handleChange}
+                                            error={Boolean(validationErrors.confirmPassword)}
+                                            helperText={validationErrors.confirmPassword}
+                                            disabled={loading}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <LockIcon sx={{ color: 'text.secondary' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                endAdornment: (
+                                                    <InputAdornment position="end">
+                                                        <IconButton
+                                                            aria-label="toggle confirm password visibility"
+                                                            onClick={handleClickShowConfirmPassword}
+                                                            edge="end"
+                                                            disabled={loading}
+                                                        >
+                                                            {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
+                                                        </IconButton>
+                                                    </InputAdornment>
+                                                ),
+                                            }}
+                                        />
+
+                                        {/* Submit Button */}
+                                        <Button
+                                            type="submit"
+                                            fullWidth
+                                            variant="contained"
+                                            size="large"
+                                            disabled={loading}
+                                            sx={{ 
+                                                mt: 1,
+                                                py: 1.5,
+                                                fontSize: '1rem',
+                                                bgcolor: '#ffb74d',
+                                                color: 'black',
+                                                fontWeight: 'bold',
+                                                '&:hover': { bgcolor: '#ffa726' },
+                                                '&:disabled': { 
+                                                    bgcolor: 'grey.300',
+                                                    color: 'grey.600'
+                                                }
+                                            }}
+                                        >
+                                            {loading ? (
+                                                <Stack direction="row" spacing={1} alignItems="center">
+                                                    <CircularProgress size={20} color="inherit" />
+                                                    <span>Creating Account...</span>
+                                                </Stack>
+                                            ) : (
+                                                'Sign Up'
+                                            )}
+                                        </Button>
                                     </Stack>
+                                    
+                                    {/* Divider with "Or" text */}
+                                    <Box sx={{ display: 'flex', alignItems: 'center', my: 2 }}>
+                                        <Box sx={{ flexGrow: 1, height: '1px', bgcolor: 'divider' }} />
+                                        <Typography variant="body2" sx={{ mx: 2, color: 'text.secondary' }}>
+                                            Or
+                                        </Typography>
+                                        <Box sx={{ flexGrow: 1, height: '1px', bgcolor: 'divider' }} />
+                                    </Box>
 
-                                    {/* Email Field */}
-                                    <TextField
-                                        required
-                                        fullWidth
-                                        id="email"
-                                        label="Email Address"
-                                        name="email"
-                                        autoComplete="email"
-                                        type="email"
-                                        value={formData.email}
-                                        onChange={handleChange}
-                                        error={Boolean(validationErrors.email)}
-                                        helperText={validationErrors.email}
-                                        disabled={loading}
-                                    />
-
-                                    {/* Password Field */}
-                                    <TextField
-                                        required
-                                        fullWidth
-                                        name="password"
-                                        label="Password"
-                                        type={showPassword ? 'text' : 'password'}
-                                        id="password"
-                                        autoComplete="new-password"
-                                        value={formData.password}
-                                        onChange={handleChange}
-                                        error={Boolean(validationErrors.password)}
-                                        helperText={validationErrors.password || 'Must be at least 6 characters'}
-                                        disabled={loading}
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton
-                                                        aria-label="toggle password visibility"
-                                                        onClick={handleClickShowPassword}
-                                                        edge="end"
-                                                        disabled={loading}
-                                                    >
-                                                        {showPassword ? <VisibilityOff /> : <Visibility />}
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    />
-
-                                    {/* Confirm Password Field */}
-                                    <TextField
-                                        required
-                                        fullWidth
-                                        name="confirmPassword"
-                                        label="Confirm Password"
-                                        type={showConfirmPassword ? 'text' : 'password'}
-                                        id="confirmPassword"
-                                        autoComplete="new-password"
-                                        value={formData.confirmPassword}
-                                        onChange={handleChange}
-                                        error={Boolean(validationErrors.confirmPassword)}
-                                        helperText={validationErrors.confirmPassword}
-                                        disabled={loading}
-                                        InputProps={{
-                                            endAdornment: (
-                                                <InputAdornment position="end">
-                                                    <IconButton
-                                                        aria-label="toggle confirm password visibility"
-                                                        onClick={handleClickShowConfirmPassword}
-                                                        edge="end"
-                                                        disabled={loading}
-                                                    >
-                                                        {showConfirmPassword ? <VisibilityOff /> : <Visibility />}
-                                                    </IconButton>
-                                                </InputAdornment>
-                                            ),
-                                        }}
-                                    />
-
-                                    {/* Submit Button */}
+                                    {/* Google Sign Up Button */}
                                     <Button
-                                        type="submit"
                                         fullWidth
-                                        variant="contained"
-                                        size="large"
+                                        variant="outlined"
                                         disabled={loading}
-                                        sx={{ 
-                                            mt: 2,
+                                        startIcon={
+                                            <Box
+                                                component="img"
+                                                src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+                                                alt="Google"
+                                                sx={{ width: 20, height: 20 }}
+                                            />
+                                        }
+                                        sx={{
                                             py: 1.5,
+                                            borderColor: 'divider',
+                                            color: 'text.primary',
+                                            textTransform: 'none',
                                             fontSize: '1rem',
-                                            bgcolor: '#ffb74d',
-                                            color: 'black',
-                                            fontWeight: 'bold',
-                                            '&:hover': { bgcolor: '#ffa726' },
-                                            '&:disabled': { 
-                                                bgcolor: 'grey.300',
-                                                color: 'grey.600'
+                                            '&:hover': {
+                                                borderColor: 'primary.main',
+                                                bgcolor: 'grey.50'
                                             }
                                         }}
                                     >
-                                        {loading ? (
-                                            <Stack direction="row" spacing={1} alignItems="center">
-                                                <CircularProgress size={20} color="inherit" />
-                                                <span>Creating Account...</span>
-                                            </Stack>
-                                        ) : (
-                                            'Sign Up'
-                                        )}
+                                        Continue With Google
                                     </Button>
-                                </Stack>
-                                
-                                {/* Login Link */}
-                                <Stack direction="row" spacing={0.5} justifyContent="center" sx={{ mt: 3 }}>
-                                    <Typography variant="body2" color="text.secondary">
-                                        Already have an account?
-                                    </Typography>
-                                    <Link 
-                                        component="button"
-                                        variant="body2"
-                                        type="button"
-                                        onClick={() => navigate('/login')}
-                                        sx={{ 
-                                            fontWeight: 'bold', 
-                                            textDecoration: 'none', 
-                                            color: '#ef6c00',
-                                            '&:hover': { textDecoration: 'underline' }
-                                        }}
-                                        disabled={loading}
-                                    >
-                                        Log in
-                                    </Link>
-                                </Stack>
+                                    
+                                    <Box sx={{ textAlign: 'center', mt: 2 }}>
+                                        <Typography variant="body2" color="text.secondary">
+                                            Already Have an Account?{' '}
+                                            <Link
+                                                component="button"
+                                                type="button"
+                                                onClick={() => navigate('/login')}
+                                                sx={{
+                                                    fontWeight: 'bold',
+                                                    textDecoration: 'underline',
+                                                    color: 'text.primary',
+                                                    '&:hover': { color: 'primary.main' }
+                                                }}
+                                                disabled={loading}
+                                            >
+                                                Sign In
+                                            </Link>
+                                        </Typography>
+                                    </Box>
+                                </Box>
                             </Box>
-                        </Box>
-                    </Paper>
+                        </Paper>
+                    </Box>
                 </Container>
             </Box>
         </>
