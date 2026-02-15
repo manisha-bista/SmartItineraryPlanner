@@ -1,0 +1,22 @@
+/* Ensure this is in your index.css */
+.features-container {
+    display: flex;
+    justify-content: center;
+    align-items: stretch;
+    flex-wrap: wrap;
+    gap: 2rem;
+    width: 100%;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.feature-card {
+    flex: 1 1 250px;   /* 250px min-width base */
+    min-width: 250px;
+    max-width: 400px;
+    background: white;
+    padding: 2rem;
+    box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    border-radius: 8px;
+    text-align: center;
+}
