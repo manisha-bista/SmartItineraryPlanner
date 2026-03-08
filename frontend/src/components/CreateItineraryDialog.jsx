@@ -34,12 +34,62 @@ import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import axios from 'axios';
 
+// Design System Colors
+const COLORS = {
+    brand: '#33CCCC',
+    background: '#141627',
+    cardPrimary: '#252845',
+    cardSecondary: 'rgba(255, 255, 255, 0.08)',
+    headings: '#B0D2EB',
+    subheadings: '#C0D2EB',
+    text: '#D0D2EB',
+    fadedText: '#7B809A',
+    icons: '#B0D2EB',
+    error: '#ff6b6b',
+    border: 'rgba(255, 255, 255, 0.08)',
+};
+
+// Shared input field styles
+const inputSx = {
+    '& .MuiOutlinedInput-root': {
+        bgcolor: COLORS.cardSecondary,
+        borderRadius: 3,
+        color: COLORS.text,
+        '& fieldset': { borderColor: 'transparent' },
+        '&:hover fieldset': { borderColor: COLORS.brand },
+        '&.Mui-focused fieldset': { borderColor: COLORS.brand },
+    },
+    '& .MuiInputBase-input::placeholder': {
+        color: COLORS.fadedText,
+        opacity: 1,
+    },
+    '& .MuiInputLabel-root': { color: COLORS.fadedText },
+    '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand },
+    '& .MuiFormHelperText-root': { color: COLORS.fadedText },
+    '& .MuiInputBase-input': { color: COLORS.text },
+    '& .MuiSelect-icon': { color: COLORS.fadedText },
+    '& .MuiInputBase-input[type=date]::-webkit-calendar-picker-indicator': {
+        filter: 'invert(0.6)',
+    },
+    '& .MuiInputBase-input[type=time]::-webkit-calendar-picker-indicator': {
+        filter: 'invert(0.6)',
+    },
+};
+
+const errorInputSx = (hasError) => ({
+    ...inputSx,
+    '& .MuiOutlinedInput-root': {
+        ...inputSx['& .MuiOutlinedInput-root'],
+        '& fieldset': { borderColor: hasError ? COLORS.error : 'transparent' },
+    },
+    '& .MuiFormHelperText-root': { color: hasError ? COLORS.error : COLORS.fadedText },
+});
+
 const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
-    // Step 1: Basic Trip Info (simplified - only title and dates)
     const [tripInfo, setTripInfo] = useState({
         title: '',
         start_date: '',
@@ -48,13 +98,11 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         currency: 'NPR'
     });
 
-    // Step 2: Days with destinations
     const [days, setDays] = useState([]);
     const [validationErrors, setValidationErrors] = useState({});
 
     const steps = ['Trip Details', 'Plan Destinations', 'Review & Save'];
 
-    // Calculate number of days
     const calculateDays = (startDate, endDate) => {
         if (!startDate || !endDate) return 0;
         const start = new Date(startDate);
@@ -64,17 +112,14 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         return diffDays;
     };
 
-    // Generate days when dates change
     useEffect(() => {
         if (tripInfo.start_date && tripInfo.end_date) {
             const numDays = calculateDays(tripInfo.start_date, tripInfo.end_date);
-            
             if (numDays > 0 && numDays <= 365) {
                 const startDate = new Date(tripInfo.start_date);
                 const newDays = Array.from({ length: numDays }, (_, index) => {
                     const dayDate = new Date(startDate);
                     dayDate.setDate(startDate.getDate() + index);
-                    
                     return {
                         day_number: index + 1,
                         date: dayDate.toISOString().split('T')[0],
@@ -96,11 +141,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
     const handleAddDestination = (dayIndex) => {
         const newDays = [...days];
-        newDays[dayIndex].destinations.push({
-            location: '',
-            time: '',
-            description: ''
-        });
+        newDays[dayIndex].destinations.push({ location: '', time: '', description: '' });
         setDays(newDays);
     };
 
@@ -118,45 +159,28 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
     const validateStep1 = () => {
         const errors = {};
-        
-        if (!tripInfo.title.trim()) {
-            errors.title = 'Trip title is required';
-        } else if (tripInfo.title.trim().length < 3) {
-            errors.title = 'Title must be at least 3 characters';
-        }
-
-        if (!tripInfo.start_date) {
-            errors.start_date = 'Start date is required';
-        }
-
-        if (!tripInfo.end_date) {
-            errors.end_date = 'End date is required';
-        } else if (tripInfo.start_date && tripInfo.end_date < tripInfo.start_date) {
+        if (!tripInfo.title.trim()) errors.title = 'Trip title is required';
+        else if (tripInfo.title.trim().length < 3) errors.title = 'Title must be at least 3 characters';
+        if (!tripInfo.start_date) errors.start_date = 'Start date is required';
+        if (!tripInfo.end_date) errors.end_date = 'End date is required';
+        else if (tripInfo.start_date && tripInfo.end_date < tripInfo.start_date)
             errors.end_date = 'End date must be after start date';
-        }
-
         setValidationErrors(errors);
         return Object.keys(errors).length === 0;
     };
 
     const handleNext = () => {
-        if (activeStep === 0) {
-            if (!validateStep1()) return;
-        }
-        setActiveStep((prevStep) => prevStep + 1);
+        if (activeStep === 0 && !validateStep1()) return;
+        setActiveStep((prev) => prev + 1);
     };
 
-    const handleBack = () => {
-        setActiveStep((prevStep) => prevStep - 1);
-    };
+    const handleBack = () => setActiveStep((prev) => prev - 1);
 
     const handleSubmit = async () => {
         setSubmitting(true);
         setError('');
-
         try {
             const budget = parseFloat(tripInfo.estimated_budget) || 0;
-
             const itineraryPayload = {
                 title: tripInfo.title.trim(),
                 destination: tripInfo.title.trim(),
@@ -179,19 +203,14 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 transportation: []
             };
 
-            const itineraryResponse = await axios.post(
-                'http://127.0.0.1:8000/itineraries/complete',
-                itineraryPayload
-            );
+            const itineraryResponse = await axios.post('http://127.0.0.1:8000/itineraries/complete', itineraryPayload);
 
-            // Add destinations as activities
             for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
                 const day = days[dayIndex];
                 const createdDay = itineraryResponse.data.days[dayIndex];
-
                 for (const destination of day.destinations) {
                     if (destination.location.trim()) {
-                        const activityPayload = {
+                        await axios.post('http://127.0.0.1:8000/activities', {
                             title: destination.location.trim(),
                             description: destination.description.trim() || null,
                             location: destination.location.trim(),
@@ -202,25 +221,17 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                             priority: 'medium',
                             is_completed: false,
                             day_id: createdDay.id
-                        };
-
-                        await axios.post('http://127.0.0.1:8000/activities', activityPayload);
+                        });
                     }
                 }
             }
 
             onSuccess();
             handleClose();
-
         } catch (err) {
-            console.error('Error creating itinerary:', err);
-            if (err.code === 'ERR_NETWORK') {
-                setError('Cannot connect to server.');
-            } else if (err.response) {
-                setError(err.response.data.detail || 'Failed to create trip.');
-            } else {
-                setError('An unexpected error occurred.');
-            }
+            if (err.code === 'ERR_NETWORK') setError('Cannot connect to server.');
+            else if (err.response) setError(err.response.data.detail || 'Failed to create trip.');
+            else setError('An unexpected error occurred.');
         } finally {
             setSubmitting(false);
         }
@@ -229,13 +240,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     const handleClose = () => {
         if (!submitting) {
             setActiveStep(0);
-            setTripInfo({
-                title: '',
-                start_date: '',
-                end_date: '',
-                estimated_budget: '',
-                currency: 'NPR'
-            });
+            setTripInfo({ title: '', start_date: '', end_date: '', estimated_budget: '', currency: 'NPR' });
             setDays([]);
             setValidationErrors({});
             setError('');
@@ -249,27 +254,69 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     };
 
     return (
-        <Dialog 
-            open={open} 
+        <Dialog
+            open={open}
             onClose={handleClose}
             maxWidth="md"
             fullWidth
-            PaperProps={{ sx: { minHeight: '80vh' } }}
+            PaperProps={{
+                sx: {
+                    minHeight: '80vh',
+                    bgcolor: COLORS.background,
+                    backgroundImage: 'linear-gradient(135deg, rgba(51,204,204,0.04) 0%, transparent 60%)',
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 4,
+                    boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${COLORS.border}`,
+                }
+            }}
         >
-            <DialogTitle sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', pb: 1 }}>
+            {/* Dialog Title */}
+            <DialogTitle
+                sx={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    pb: 1,
+                    borderBottom: `1px solid ${COLORS.border}`,
+                    bgcolor: 'transparent',
+                }}
+            >
                 <Box>
-                    <Typography variant="h5" fontWeight="bold">Create New Trip</Typography>
-                    <Typography variant="caption" color="text.secondary">
+                    <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>
+                        Create New Trip
+                    </Typography>
+                    <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
                         Plan your itinerary
                     </Typography>
                 </Box>
-                <IconButton onClick={handleClose} disabled={submitting}>
+                <IconButton
+                    onClick={handleClose}
+                    disabled={submitting}
+                    sx={{
+                        color: COLORS.fadedText,
+                        borderRadius: 2,
+                        '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' }
+                    }}
+                >
                     <CloseIcon />
                 </IconButton>
             </DialogTitle>
 
-            <Box sx={{ px: 3, pt: 2 }}>
-                <Stepper activeStep={activeStep}>
+            {/* Stepper */}
+            <Box sx={{ px: 3, pt: 2.5 }}>
+                <Stepper
+                    activeStep={activeStep}
+                    sx={{
+                        '& .MuiStepLabel-label': { color: '#FFFFFF', fontSize: '0.85rem', opacity: 0.75 },
+                        '& .MuiStepLabel-label.Mui-active': { color: COLORS.brand, fontWeight: 'bold', opacity: 1 },
+                        '& .MuiStepLabel-label.Mui-completed': { color: '#FFFFFF', opacity: 1 },
+                        '& .MuiStepIcon-root': { color: 'rgba(255,255,255,0.18)' },
+                        '& .MuiStepIcon-root.Mui-active': { color: COLORS.brand },
+                        '& .MuiStepIcon-root.Mui-completed': { color: COLORS.brand },
+                        '& .MuiStepIcon-text': { fill: '#FFFFFF', fontWeight: 'bold' },
+                        '& .MuiStepConnector-line': { borderColor: COLORS.border },
+                    }}
+                >
                     {steps.map((label) => (
                         <Step key={label}>
                             <StepLabel>{label}</StepLabel>
@@ -278,14 +325,36 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 </Stepper>
             </Box>
 
-            <DialogContent dividers sx={{ minHeight: '500px' }}>
+            {/* Dialog Content */}
+            <DialogContent
+                dividers
+                sx={{
+                    minHeight: '500px',
+                    borderColor: COLORS.border,
+                    bgcolor: 'transparent',
+                    '&::-webkit-scrollbar': { width: 6 },
+                    '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+                    '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 3 },
+                }}
+            >
                 {error && (
-                    <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
+                    <Alert
+                        severity="error"
+                        sx={{
+                            mb: 2,
+                            bgcolor: 'rgba(255,107,107,0.1)',
+                            color: COLORS.error,
+                            border: `1px solid rgba(255,107,107,0.3)`,
+                            borderRadius: 2,
+                            '& .MuiAlert-icon': { color: COLORS.error },
+                        }}
+                        onClose={() => setError('')}
+                    >
                         {error}
                     </Alert>
                 )}
 
-                {/* STEP 1 */}
+                {/* ── STEP 1: Trip Details ── */}
                 {activeStep === 0 && (
                     <Stack spacing={3} sx={{ mt: 2 }}>
                         <TextField
@@ -297,6 +366,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                             error={Boolean(validationErrors.title)}
                             helperText={validationErrors.title || 'e.g., "Trip To Annapurna"'}
                             placeholder="Enter trip name"
+                            sx={errorInputSx(Boolean(validationErrors.title))}
                         />
 
                         <Grid container spacing={2}>
@@ -311,6 +381,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     error={Boolean(validationErrors.start_date)}
                                     helperText={validationErrors.start_date}
                                     InputLabelProps={{ shrink: true }}
+                                    sx={errorInputSx(Boolean(validationErrors.start_date))}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={6}>
@@ -324,12 +395,22 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     error={Boolean(validationErrors.end_date)}
                                     helperText={validationErrors.end_date}
                                     InputLabelProps={{ shrink: true }}
+                                    sx={errorInputSx(Boolean(validationErrors.end_date))}
                                 />
                             </Grid>
                         </Grid>
 
                         {tripInfo.start_date && tripInfo.end_date && (
-                            <Alert severity="info" icon={<CheckCircleIcon />}>
+                            <Alert
+                                icon={<CheckCircleIcon sx={{ color: COLORS.brand }} />}
+                                sx={{
+                                    bgcolor: 'rgba(51,204,204,0.08)',
+                                    color: COLORS.brand,
+                                    border: `1px solid rgba(51,204,204,0.25)`,
+                                    borderRadius: 2,
+                                    '& .MuiAlert-icon': { alignItems: 'center' },
+                                }}
+                            >
                                 Your trip will be {calculateDays(tripInfo.start_date, tripInfo.end_date)} days long
                             </Alert>
                         )}
@@ -345,6 +426,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     onChange={handleTripInfoChange}
                                     helperText="Total budget (optional)"
                                     placeholder="10000"
+                                    sx={inputSx}
                                 />
                             </Grid>
                             <Grid item xs={12} sm={4}>
@@ -356,6 +438,17 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     value={tripInfo.currency}
                                     onChange={handleTripInfoChange}
                                     SelectProps={{ native: true }}
+                                    sx={{
+                                        ...inputSx,
+                                        '& select': {
+                                            bgcolor: 'transparent',
+                                            color: COLORS.text,
+                                            '& option': {
+                                                bgcolor: COLORS.cardPrimary,
+                                                color: COLORS.text,
+                                            }
+                                        }
+                                    }}
                                 >
                                     <option value="NPR">NPR</option>
                                     <option value="USD">USD</option>
@@ -367,51 +460,96 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     </Stack>
                 )}
 
-                {/* STEP 2 */}
+                {/* ── STEP 2: Plan Destinations ── */}
                 {activeStep === 1 && (
                     <Box sx={{ mt: 2 }}>
-                        <Typography variant="h6" gutterBottom sx={{ mb: 3 }}>
+                        <Typography variant="h6" gutterBottom sx={{ mb: 3, color: COLORS.headings, fontWeight: 'bold' }}>
                             Plan Your {days.length} Days
                         </Typography>
 
                         <Stack spacing={2}>
                             {days.map((day, dayIndex) => (
-                                <Accordion 
+                                <Accordion
                                     key={dayIndex}
                                     defaultExpanded={dayIndex === 0}
-                                    sx={{ border: '1px solid #e0e0e0', '&:before': { display: 'none' } }}
+                                    sx={{
+                                        bgcolor: COLORS.cardPrimary,
+                                        borderRadius: '12px !important',
+                                        border: `1px solid ${COLORS.border}`,
+                                        '&:before': { display: 'none' },
+                                        boxShadow: 'none',
+                                        '&.Mui-expanded': {
+                                            boxShadow: `0 4px 20px rgba(51,204,204,0.08)`,
+                                        },
+                                        overflow: 'hidden',
+                                    }}
                                 >
-                                    <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                                    <AccordionSummary
+                                        expandIcon={<ExpandMoreIcon sx={{ color: COLORS.brand }} />}
+                                        sx={{
+                                            bgcolor: 'transparent',
+                                            '&:hover': { bgcolor: COLORS.cardSecondary },
+                                        }}
+                                    >
                                         <Stack direction="row" spacing={2} alignItems="center">
-                                            <Typography variant="subtitle1" fontWeight="bold" color="primary">
+                                            <Box
+                                                sx={{
+                                                    width: 32,
+                                                    height: 32,
+                                                    borderRadius: 2,
+                                                    bgcolor: 'rgba(51,204,204,0.15)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                }}
+                                            >
+                                                <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.brand }}>
+                                                    {day.day_number}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: COLORS.subheadings }}>
                                                 Day {day.day_number}
                                             </Typography>
-                                            <Typography variant="body2" color="text.secondary">
+                                            <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
                                                 {formatDate(day.date)}
                                             </Typography>
                                             {day.destinations.length > 0 && (
-                                                <Typography variant="caption" color="text.secondary">
+                                                <Typography variant="caption" sx={{ color: COLORS.brand }}>
                                                     • {day.destinations.length} destination{day.destinations.length !== 1 ? 's' : ''}
                                                 </Typography>
                                             )}
                                         </Stack>
                                     </AccordionSummary>
-                                    <AccordionDetails>
+                                    <AccordionDetails sx={{ bgcolor: 'transparent', pt: 0 }}>
                                         <Stack spacing={2}>
                                             {day.destinations.map((destination, destIndex) => (
-                                                <Paper key={destIndex} variant="outlined" sx={{ p: 2, bgcolor: '#fafafa' }}>
+                                                <Paper
+                                                    key={destIndex}
+                                                    variant="outlined"
+                                                    sx={{
+                                                        p: 2,
+                                                        bgcolor: COLORS.cardSecondary,
+                                                        borderColor: COLORS.border,
+                                                        borderRadius: 3,
+                                                        boxShadow: 'none',
+                                                    }}
+                                                >
                                                     <Stack spacing={2}>
                                                         <Stack direction="row" justifyContent="space-between" alignItems="center">
                                                             <Stack direction="row" spacing={1} alignItems="center">
-                                                                <LocationOnIcon fontSize="small" color="primary" />
-                                                                <Typography variant="subtitle2" color="text.secondary">
+                                                                <LocationOnIcon fontSize="small" sx={{ color: COLORS.error }} />
+                                                                <Typography variant="subtitle2" sx={{ color: COLORS.fadedText }}>
                                                                     Destination {destIndex + 1}
                                                                 </Typography>
                                                             </Stack>
-                                                            <IconButton 
-                                                                size="small" 
+                                                            <IconButton
+                                                                size="small"
                                                                 onClick={() => handleRemoveDestination(dayIndex, destIndex)}
-                                                                color="error"
+                                                                sx={{
+                                                                    color: COLORS.fadedText,
+                                                                    borderRadius: 1.5,
+                                                                    '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' }
+                                                                }}
                                                             >
                                                                 <DeleteIcon fontSize="small" />
                                                             </IconButton>
@@ -426,6 +564,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'location', e.target.value)}
                                                                     placeholder="e.g., Kathmandu, Annapurna Base Camp"
                                                                     size="small"
+                                                                    sx={inputSx}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12} sm={4}>
@@ -437,6 +576,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'time', e.target.value)}
                                                                     InputLabelProps={{ shrink: true }}
                                                                     size="small"
+                                                                    sx={inputSx}
                                                                 />
                                                             </Grid>
                                                             <Grid item xs={12}>
@@ -449,6 +589,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     size="small"
                                                                     multiline
                                                                     rows={2}
+                                                                    sx={inputSx}
                                                                 />
                                                             </Grid>
                                                         </Grid>
@@ -460,13 +601,14 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                 startIcon={<AddIcon />}
                                                 onClick={() => handleAddDestination(dayIndex)}
                                                 variant="outlined"
-                                                sx={{ 
+                                                sx={{
                                                     borderStyle: 'dashed',
-                                                    borderColor: '#ffb74d',
-                                                    color: '#ffb74d',
+                                                    borderColor: `rgba(51,204,204,0.4)`,
+                                                    color: COLORS.brand,
+                                                    borderRadius: 3,
                                                     '&:hover': {
-                                                        borderColor: '#ffa726',
-                                                        bgcolor: 'rgba(255, 183, 77, 0.05)'
+                                                        borderColor: COLORS.brand,
+                                                        bgcolor: 'rgba(51,204,204,0.06)',
                                                     }
                                                 }}
                                             >
@@ -480,25 +622,40 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     </Box>
                 )}
 
-                {/* STEP 3 */}
+                {/* ── STEP 3: Review & Save ── */}
                 {activeStep === 2 && (
                     <Box sx={{ mt: 2 }}>
                         <Stack spacing={3}>
-                            <Alert severity="success" icon={<CheckCircleIcon />}>
+                            <Alert
+                                icon={<CheckCircleIcon sx={{ color: COLORS.brand }} />}
+                                sx={{
+                                    bgcolor: 'rgba(51,204,204,0.08)',
+                                    color: COLORS.brand,
+                                    border: `1px solid rgba(51,204,204,0.25)`,
+                                    borderRadius: 2,
+                                }}
+                            >
                                 Review your itinerary
                             </Alert>
 
-                            <Card variant="outlined">
+                            <Card
+                                sx={{
+                                    bgcolor: COLORS.cardPrimary,
+                                    border: `1px solid ${COLORS.border}`,
+                                    borderRadius: 3,
+                                    boxShadow: 'none',
+                                }}
+                            >
                                 <CardContent>
-                                    <Typography variant="h5" gutterBottom fontWeight="bold">
+                                    <Typography variant="h5" gutterBottom fontWeight="bold" sx={{ color: COLORS.headings }}>
                                         {tripInfo.title}
                                     </Typography>
                                     <Stack spacing={1}>
-                                        <Typography variant="body2" color="text.secondary">
-                                            {formatDate(tripInfo.start_date)} - {formatDate(tripInfo.end_date)} ({days.length} days)
+                                        <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
+                                            {formatDate(tripInfo.start_date)} – {formatDate(tripInfo.end_date)} ({days.length} days)
                                         </Typography>
                                         {tripInfo.estimated_budget && (
-                                            <Typography variant="body2" fontWeight="medium">
+                                            <Typography variant="body2" fontWeight="medium" sx={{ color: COLORS.brand }}>
                                                 Estimated Budget: {tripInfo.currency} {parseFloat(tripInfo.estimated_budget).toLocaleString()}
                                             </Typography>
                                         )}
@@ -507,34 +664,66 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                             </Card>
 
                             {days.map((day, index) => (
-                                <Card key={index} variant="outlined" sx={{ bgcolor: '#fafafa' }}>
+                                <Card
+                                    key={index}
+                                    sx={{
+                                        bgcolor: COLORS.cardSecondary,
+                                        border: `1px solid ${COLORS.border}`,
+                                        borderRadius: 3,
+                                        boxShadow: 'none',
+                                    }}
+                                >
                                     <CardContent>
-                                        <Typography variant="subtitle1" fontWeight="bold" gutterBottom>
-                                            Day {day.day_number}
-                                        </Typography>
-                                        <Typography variant="caption" color="text.secondary" display="block" sx={{ mb: 2 }}>
-                                            {formatDate(day.date)}
-                                        </Typography>
-                                        
+                                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mb: 1 }}>
+                                            <Box
+                                                sx={{
+                                                    width: 28,
+                                                    height: 28,
+                                                    borderRadius: 1.5,
+                                                    bgcolor: 'rgba(51,204,204,0.15)',
+                                                    display: 'flex',
+                                                    alignItems: 'center',
+                                                    justifyContent: 'center',
+                                                    flexShrink: 0,
+                                                }}
+                                            >
+                                                <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.brand, fontSize: '0.65rem' }}>
+                                                    {day.day_number}
+                                                </Typography>
+                                            </Box>
+                                            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: COLORS.subheadings }}>
+                                                Day {day.day_number}
+                                            </Typography>
+                                            <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
+                                                {formatDate(day.date)}
+                                            </Typography>
+                                        </Stack>
+
                                         {day.destinations.length > 0 ? (
-                                            <Stack spacing={1.5}>
+                                            <Stack spacing={1.5} sx={{ pl: 0.5 }}>
                                                 {day.destinations.map((dest, idx) => (
-                                                    <Box key={idx} sx={{ pl: 2, borderLeft: '3px solid #ffb74d' }}>
+                                                    <Box
+                                                        key={idx}
+                                                        sx={{
+                                                            pl: 2,
+                                                            borderLeft: `3px solid rgba(51,204,204,0.5)`,
+                                                        }}
+                                                    >
                                                         <Stack direction="row" spacing={2} alignItems="center">
-                                                            <Typography variant="body2" fontWeight="medium">
+                                                            <Typography variant="body2" fontWeight="medium" sx={{ color: COLORS.text }}>
                                                                 {dest.location}
                                                             </Typography>
                                                             {dest.time && (
                                                                 <Stack direction="row" spacing={0.5} alignItems="center">
-                                                                    <AccessTimeIcon fontSize="small" sx={{ fontSize: 14 }} />
-                                                                    <Typography variant="caption" color="text.secondary">
+                                                                    <AccessTimeIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
+                                                                    <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
                                                                         {dest.time}
                                                                     </Typography>
                                                                 </Stack>
                                                             )}
                                                         </Stack>
                                                         {dest.description && (
-                                                            <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
+                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mt: 0.5 }}>
                                                                 {dest.description}
                                                             </Typography>
                                                         )}
@@ -542,7 +731,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                 ))}
                                             </Stack>
                                         ) : (
-                                            <Typography variant="caption" color="text.secondary">
+                                            <Typography variant="caption" sx={{ color: COLORS.fadedText, pl: 0.5 }}>
                                                 No destinations added
                                             </Typography>
                                         )}
@@ -554,20 +743,63 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 )}
             </DialogContent>
 
-            <DialogActions sx={{ px: 3, py: 2 }}>
-                <Button onClick={handleClose} disabled={submitting}>Cancel</Button>
+            {/* Dialog Actions */}
+            <DialogActions
+                sx={{
+                    px: 3,
+                    py: 2,
+                    borderTop: `1px solid ${COLORS.border}`,
+                    bgcolor: 'transparent',
+                    gap: 1,
+                }}
+            >
+                <Button
+                    onClick={handleClose}
+                    disabled={submitting}
+                    sx={{
+                        color: COLORS.fadedText,
+                        borderRadius: 2.5,
+                        '&:hover': { color: COLORS.text, bgcolor: COLORS.cardSecondary },
+                    }}
+                >
+                    Cancel
+                </Button>
+
                 <Box sx={{ flex: '1 1 auto' }} />
+
                 {activeStep > 0 && (
-                    <Button onClick={handleBack} disabled={submitting} startIcon={<NavigateBeforeIcon />}>
+                    <Button
+                        onClick={handleBack}
+                        disabled={submitting}
+                        startIcon={<NavigateBeforeIcon />}
+                        sx={{
+                            color: COLORS.subheadings,
+                            borderRadius: 2.5,
+                            '&:hover': { color: COLORS.text, bgcolor: COLORS.cardSecondary },
+                        }}
+                    >
                         Back
                     </Button>
                 )}
+
                 {activeStep < steps.length - 1 ? (
                     <Button
                         variant="contained"
                         onClick={handleNext}
                         endIcon={<NavigateNextIcon />}
-                        sx={{ bgcolor: '#ffb74d', color: 'black', fontWeight: 'bold', '&:hover': { bgcolor: '#ffa726' } }}
+                        sx={{
+                            bgcolor: COLORS.brand,
+                            color: COLORS.background,
+                            fontWeight: 'bold',
+                            borderRadius: 2.5,
+                            px: 3,
+                            '&:hover': {
+                                bgcolor: '#2db8b8',
+                                transform: 'translateY(-2px)',
+                                boxShadow: `0 4px 12px rgba(51,204,204,0.4)`,
+                            },
+                            transition: 'all 0.3s',
+                        }}
                     >
                         Next
                     </Button>
@@ -576,11 +808,27 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                         variant="contained"
                         onClick={handleSubmit}
                         disabled={submitting}
-                        sx={{ bgcolor: '#ffb74d', color: 'black', fontWeight: 'bold', '&:hover': { bgcolor: '#ffa726' } }}
+                        sx={{
+                            bgcolor: COLORS.brand,
+                            color: COLORS.background,
+                            fontWeight: 'bold',
+                            borderRadius: 2.5,
+                            px: 3,
+                            '&:hover': {
+                                bgcolor: '#2db8b8',
+                                transform: 'translateY(-2px)',
+                                boxShadow: `0 4px 12px rgba(51,204,204,0.4)`,
+                            },
+                            '&:disabled': {
+                                bgcolor: COLORS.cardSecondary,
+                                color: COLORS.fadedText,
+                            },
+                            transition: 'all 0.3s',
+                        }}
                     >
                         {submitting ? (
                             <Stack direction="row" spacing={1} alignItems="center">
-                                <CircularProgress size={20} color="inherit" />
+                                <CircularProgress size={18} sx={{ color: COLORS.background }} />
                                 <span>Creating...</span>
                             </Stack>
                         ) : 'Create Trip'}
