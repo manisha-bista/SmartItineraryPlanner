@@ -32,9 +32,6 @@ import CancelOutlinedIcon from '@mui/icons-material/CancelOutlined';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
-import GroupIcon from '@mui/icons-material/Group';
-import ExploreIcon from '@mui/icons-material/Explore';
-import MapIcon from '@mui/icons-material/Map';
 import PersonOutlineIcon from '@mui/icons-material/PersonOutline';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 
@@ -201,7 +198,9 @@ const AdminDashboard = () => {
     useEffect(() => {
         const userId = localStorage.getItem('userId');
         const userName = localStorage.getItem('userName');
+        const userRole = localStorage.getItem('userRole');
         if (!userId) { navigate('/login'); return; }
+        if (userRole !== 'admin') { navigate('/dashboard'); return; }
         setAdmin({ name: userName || 'Admin', initial: (userName || 'A')[0].toUpperCase() });
         loadAll();
     }, [navigate]);
@@ -308,10 +307,6 @@ const AdminDashboard = () => {
     // Sidebar nav
     const sidebarMenu = [
         { text: 'Admin Dashboard', icon: <AdminPanelSettingsIcon />, active: true,  path: '/admin' },
-        { text: 'Dashboard',       icon: <DashboardIcon />,          active: false, path: '/dashboard' },
-        { text: 'My Itineraries',  icon: <ExploreIcon />,            active: false, path: '/itineraries' },
-        { text: 'Interactive Map', icon: <MapIcon />,                 active: false, path: '/dashboard' },
-        { text: 'Community Feed',  icon: <GroupIcon />,               active: false, path: '/community' },
     ];
 
     const tabLabels = [

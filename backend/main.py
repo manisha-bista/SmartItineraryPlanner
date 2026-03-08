@@ -46,6 +46,15 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
+def require_admin(user_id: int, db: Session):
+    """Helper to verify a user has admin role. Call from any admin-only endpoint."""
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    return user
+
 
 # ============================================
 # ROOT & HEALTH ENDPOINTS
@@ -180,6 +189,35 @@ def update_user(user_id: int, user_update: schemas.UserUpdate, db: Session = Dep
         db.rollback()
         logger.error(f"Error updating user: {e}")
         raise HTTPException(status_code=500, detail="Failed to update user")
+
+@app.get("/users/", response_model=List[schemas.UserOut])
+def list_users(db: Session = Depends(get_db)):
+    """List all users (for admin dashboard)"""
+    try:
+        users = db.query(models.User).order_by(models.User.created_at.desc()).all()
+        return users
+    except Exception as e:
+        logger.error(f"Error listing users: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list users")
+
+@app.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user(user_id: int, db: Session = Depends(get_db)):
+    """Delete a user"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        db.delete(user)
+        db.commit()
+        logger.info(f"User deleted: {user_id}")
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting user: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete user")
 
 
 # ============================================
@@ -883,18 +921,156 @@ def get_community_updates(
 
 
 # ============================================
+# COMPLAINTS ENDPOINTS
+# ============================================
+@app.post("/complaints", response_model=schemas.ComplaintOut, status_code=status.HTTP_201_CREATED)
+def create_complaint(complaint: schemas.ComplaintCreate, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Submit a complaint"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        new_complaint = models.Complaint(**complaint.dict(), user_id=user_id)
+        db.add(new_complaint)
+        db.commit()
+        db.refresh(new_complaint)
+        return new_complaint
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating complaint: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create complaint")
+
+@app.get("/complaints/", response_model=List[schemas.ComplaintOut])
+def list_complaints(
+    status_filter: Optional[str] = Query(None),
+    db: Session = Depends(get_db)
+):
+    """List all complaints (for admin dashboard)"""
+    try:
+        query = db.query(models.Complaint)
+        if status_filter:
+            query = query.filter(models.Complaint.status == status_filter)
+        complaints = query.order_by(models.Complaint.created_at.desc()).all()
+        return complaints
+    except Exception as e:
+        logger.error(f"Error listing complaints: {e}")
+        raise HTTPException(status_code=500, detail="Failed to list complaints")
+
+@app.patch("/complaints/{complaint_id}", response_model=schemas.ComplaintOut)
+def update_complaint(complaint_id: int, complaint_update: schemas.ComplaintUpdate, db: Session = Depends(get_db)):
+    """Update a complaint (e.g. mark as resolved)"""
+    try:
+        complaint = db.query(models.Complaint).filter(models.Complaint.id == complaint_id).first()
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+        
+        update_data = complaint_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(complaint, field, value)
+        
+        db.commit()
+        db.refresh(complaint)
+        return complaint
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating complaint: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update complaint")
+
+@app.delete("/complaints/{complaint_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_complaint(complaint_id: int, db: Session = Depends(get_db)):
+    """Delete a complaint"""
+    try:
+        complaint = db.query(models.Complaint).filter(models.Complaint.id == complaint_id).first()
+        if not complaint:
+            raise HTTPException(status_code=404, detail="Complaint not found")
+        
+        db.delete(complaint)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting complaint: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete complaint")
+
+
+# ============================================
+# ADMIN ENDPOINTS
+# ============================================
+@app.patch("/users/{user_id}/role", response_model=schemas.UserOut)
+def update_user_role(user_id: int, role: str = Query(..., pattern="^(user|admin)$"), db: Session = Depends(get_db)):
+    """Update a user's role (use this to promote a user to admin)"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        user.role = role
+        db.commit()
+        db.refresh(user)
+        logger.info(f"User {user_id} role updated to: {role}")
+        return user
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error updating user role: {e}")
+        raise HTTPException(status_code=500, detail="Failed to update user role")
+
+
+# ============================================
 # DEBUG ENDPOINTS
 # ============================================
 @app.get("/debug/users")
-def get_all_users(db: Session = Depends(get_db)):
-    """Debug: View all users"""
+def get_all_users_debug(db: Session = Depends(get_db)):
+    """Debug: View all users with roles"""
     try:
         users = db.query(models.User).all()
         return {
             "count": len(users),
-            "users": [{"id": u.id, "name": u.name, "email": u.email} for u in users]
+            "users": [{"id": u.id, "name": u.name, "email": u.email, "role": u.role} for u in users]
         }
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/debug/seed-admin")
+def seed_admin(db: Session = Depends(get_db)):
+    """Debug: Create a default admin user or promote first user to admin"""
+    try:
+        # Check if an admin already exists
+        existing_admin = db.query(models.User).filter(models.User.role == "admin").first()
+        if existing_admin:
+            return {"message": f"Admin already exists: {existing_admin.email}", "id": existing_admin.id}
+        
+        # Check if any user exists — promote the first one
+        first_user = db.query(models.User).order_by(models.User.id).first()
+        if first_user:
+            first_user.role = "admin"
+            db.commit()
+            return {"message": f"Promoted '{first_user.name}' ({first_user.email}) to admin", "id": first_user.id}
+        
+        # No users at all — create a fresh admin
+        admin = models.User(
+            name="Admin",
+            email="admin@smartitinerary.com",
+            hashed_password=get_password_hash("admin123"),
+            role="admin"
+        )
+        db.add(admin)
+        db.commit()
+        db.refresh(admin)
+        return {"message": "Admin user created", "id": admin.id, "email": admin.email, "password": "admin123"}
+    except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/debug/itineraries")

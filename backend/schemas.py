@@ -24,6 +24,7 @@ class UserOut(BaseModel):
     id: int
     name: str
     email: EmailStr
+    role: str = "user"
     bio: Optional[str] = None
     location: Optional[str] = None
     profile_picture_url: Optional[str] = None
@@ -502,3 +503,31 @@ class RouteResponse(BaseModel):
     distance_km: float
     duration_minutes: int
     polyline: str  # Encoded polyline for map display
+
+
+# ============================================
+# COMPLAINT SCHEMAS
+# ============================================
+class ComplaintBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1)
+    category: Optional[str] = Field(None, pattern="^(bug|feedback|abuse|other)$")
+
+class ComplaintCreate(ComplaintBase):
+    pass
+
+class ComplaintUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(open|pending|resolved)$")
+
+class ComplaintOut(ComplaintBase):
+    id: int
+    user_id: int
+    status: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

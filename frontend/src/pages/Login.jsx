@@ -86,8 +86,11 @@ const Login = () => {
                 localStorage.setItem('userId', response.data.id);
                 localStorage.setItem('userName', response.data.name);
                 localStorage.setItem('userEmail', response.data.email);
+                localStorage.setItem('userRole', response.data.role || 'user');
             }
-            navigate('/dashboard', { replace: true });
+            // Redirect based on role
+            const role = response.data.role || 'user';
+            navigate(role === 'admin' ? '/admin' : '/dashboard', { replace: true });
         } catch (err) {
             if (err.code === 'ECONNABORTED') setError('Request timeout. Please check your connection.');
             else if (err.code === 'ERR_NETWORK') setError('Cannot connect to server. Please make sure the backend is running.');

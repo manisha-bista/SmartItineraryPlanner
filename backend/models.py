@@ -11,6 +11,7 @@ class User(Base):
     name = Column(String(100), nullable=False)
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
+    role = Column(String(20), default="user", nullable=False)  # user, admin
     
     # Profile fields
     profile_picture_url = Column(String(500), nullable=True)
@@ -26,6 +27,7 @@ class User(Base):
     itineraries = relationship("Itinerary", back_populates="owner", cascade="all, delete-orphan")
     comments = relationship("ItineraryComment", back_populates="user", cascade="all, delete-orphan")
     community_updates = relationship("CommunityUpdate", back_populates="author", cascade="all, delete-orphan")
+    complaints = relationship("Complaint", back_populates="user", cascade="all, delete-orphan")
 
 
 # ITINERARY MODEL (Main Trip)
@@ -370,3 +372,24 @@ class CommunityUpdate(Base):
         Index('idx_location_active', 'location', 'is_active'),
         Index('idx_type_created', 'update_type', 'created_at'),
     )
+
+
+# COMPLAINT MODEL (for admin management)
+class Complaint(Base):
+    __tablename__ = "complaints"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=False)
+    category = Column(String(50), nullable=True, index=True)  # bug, feedback, abuse, other
+    status = Column(String(20), default="open", nullable=False, index=True)  # open, pending, resolved
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign Keys
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Relationships
+    user = relationship("User", back_populates="complaints")

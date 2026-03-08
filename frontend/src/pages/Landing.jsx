@@ -1,10 +1,9 @@
 import React, { useState } from 'react';
-import { Box, Button, Container, Typography, Stack, GlobalStyles, IconButton, Tooltip } from '@mui/material';
+import { Box, Button, Typography, Stack, GlobalStyles, IconButton, Tooltip } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import MapIcon from '@mui/icons-material/Map';
 import GroupIcon from '@mui/icons-material/Group';
 import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
-import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import LuggageIcon from '@mui/icons-material/Luggage';
 import CellTowerIcon from '@mui/icons-material/CellTower';
 import SyncIcon from '@mui/icons-material/Sync';
@@ -183,17 +182,20 @@ const Landing = () => {
         {
             title: 'Heritage Walks in Bhaktapur',
             desc: 'Escape the crowds. Explore hidden courtyards and ancient pottery squares with our curated walking routes.',
-            img: 'https://images.unsplash.com/photo-1707912258699-ee8d6179dee0?q=80&w=400&auto=format&fit=crop'
+            img: 'https://images.unsplash.com/photo-1707912258699-ee8d6179dee0?q=80&w=400&auto=format&fit=crop',
+            placeId: 'bhaktapur'
         },
         {
             title: 'Safe Travels in Kathmandu',
             desc: 'Navigate the chaos like a local. Get real-time community updates on road closures and traffic jams.....',
-            img: 'https://images.unsplash.com/photo-1748760036656-964ac32eefb4?q=80&w=400&auto=format&fit=crop'
+            img: 'https://images.unsplash.com/photo-1748760036656-964ac32eefb4?q=80&w=400&auto=format&fit=crop',
+            placeId: 'kathmandu'
         },
         {
             title: 'Pokhara on a Budget',
-            desc: 'Plan a 3-day lakeside getaway for under NPR 10,000. See how our budget tool helps you track every rupee.....',
-            img: 'https://images.unsplash.com/photo-1562462181-b228e3cff9ad?q=80&w=400&auto=format&fit=crop'
+            desc: 'Plan a 3-day lakeside getaway under NPR 10,000. See how our budget tool helps you track every rupee.....',
+            img: 'https://images.unsplash.com/photo-1562462181-b228e3cff9ad?q=80&w=400&auto=format&fit=crop',
+            placeId: 'pokhara'
         },
     ];
 
@@ -588,27 +590,29 @@ const Landing = () => {
                     gap: 3,
                     mb: 10
                 }}>
+                    {/* Curated place cards — clicking card or Read More navigates to PlaceDetail */}
                     {curated.map((item, i) => (
-                        <Box key={i} sx={{
-                            borderRadius: 4,
-                            overflow: 'hidden',
-                            bgcolor: COLORS.cardSecondary,
-                            boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.08)',
-                            transition: 'all 0.3s',
-                            cursor: 'pointer',
-                            '&:hover': {
-                                transform: 'translateY(-6px)',
-                                boxShadow: isDark ? `0 12px 32px rgba(0,0,0,0.4)` : `0 12px 32px rgba(0,0,0,0.15)`
-                            }
-                        }}>
-                            <Box sx={{ position: 'relative' }}>
-                                <Box
-                                    component="img"
-                                    src={item.img}
-                                    alt={item.title}
-                                    sx={{ width: '100%', height: 320, objectFit: 'cover', display: 'block' }}
-                                />
-                            </Box>
+                        <Box
+                            key={i}
+                            onClick={() => navigate(`/place/${item.placeId}`)}
+                            sx={{
+                                borderRadius: 4,
+                                overflow: 'hidden',
+                                bgcolor: COLORS.cardSecondary,
+                                boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.08)',
+                                transition: 'all 0.3s',
+                                cursor: 'pointer',
+                                '&:hover': {
+                                    transform: 'translateY(-6px)',
+                                    boxShadow: isDark ? `0 12px 32px rgba(0,0,0,0.4)` : `0 12px 32px rgba(0,0,0,0.15)`
+                                }
+                            }}>
+                            <Box
+                                component="img"
+                                src={item.img}
+                                alt={item.title}
+                                sx={{ width: '100%', height: 320, objectFit: 'cover', display: 'block' }}
+                            />
                             <Box sx={{ p: 2.5 }}>
                                 <Typography variant="subtitle1" fontWeight={700} sx={{ color: isDark ? 'white' : COLORS.headings, mb: 1 }}>
                                     {item.title}
@@ -618,7 +622,6 @@ const Landing = () => {
                                 </Typography>
                                 <Typography variant="body2" sx={{
                                     color: COLORS.brand,
-                                    cursor: 'pointer',
                                     display: 'flex',
                                     alignItems: 'center',
                                     gap: 0.5,
@@ -630,15 +633,17 @@ const Landing = () => {
                         </Box>
                     ))}
 
-                    {/* 4th card: CTA */}
-                    <Box sx={{
-                        borderRadius: 4,
-                        overflow: 'hidden',
-                        position: 'relative',
-                        cursor: 'pointer',
-                        minHeight: 460,
-                        '&:hover img': { transform: 'scale(1.05)' }
-                    }}>
+                    {/* 4th card: CTA — routes to register */}
+                    <Box
+                        onClick={() => navigate('/register')}
+                        sx={{
+                            borderRadius: 4,
+                            overflow: 'hidden',
+                            position: 'relative',
+                            cursor: 'pointer',
+                            minHeight: 460,
+                            '&:hover img': { transform: 'scale(1.05)' }
+                        }}>
                         <Box
                             component="img"
                             src="https://images.unsplash.com/photo-1554629947-334ff61d85dc?q=80&w=400"
@@ -670,7 +675,7 @@ const Landing = () => {
                                 gap: 0.5,
                                 cursor: 'pointer'
                             }}>
-                                Read More →
+                                Get Started →
                             </Typography>
                         </Box>
                     </Box>
@@ -757,7 +762,7 @@ const Landing = () => {
                     <Button
                         variant="contained"
                         size="large"
-                        onClick={() => window.location.href = '/register'}
+                        onClick={() => navigate('/register')}
                         sx={{
                             bgcolor: COLORS.brand,
                             color: isDark ? '#141627' : '#FFFFFF',

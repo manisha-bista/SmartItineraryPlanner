@@ -10,6 +10,7 @@ import MyItineraries from './pages/MyItineraries';
 import ProfileSettings from './pages/ProfileSettings';
 import PlaceDetail from './pages/PlaceDetail';
 import AdminDashboard from './pages/AdminDashboard.jsx';
+import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
   return (
@@ -21,15 +22,15 @@ function App() {
         <Route path="/register" element={<Register />} />
         <Route path="/place/:placeId" element={<PlaceDetail />} />
 
-        {/* Private Routes */}
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/itinerary/:id" element={<ItineraryDetail />} />
-        <Route path="/community" element={<CommunityFeed />} />
-        <Route path="/itineraries" element={<MyItineraries />} />
-        <Route path="/profile" element={<ProfileSettings />} />
+        {/* User-only Routes */}
+        <Route path="/dashboard" element={<ProtectedRoute requiredRole="user"><Dashboard /></ProtectedRoute>} />
+        <Route path="/itinerary/:id" element={<ProtectedRoute requiredRole="user"><ItineraryDetail /></ProtectedRoute>} />
+        <Route path="/community" element={<ProtectedRoute requiredRole="user"><CommunityFeed /></ProtectedRoute>} />
+        <Route path="/itineraries" element={<ProtectedRoute requiredRole="user"><MyItineraries /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute requiredRole="user"><ProfileSettings /></ProtectedRoute>} />
 
-        {/* Admin Routes */}
-        <Route path="/admin" element={<AdminDashboard />} />
+        {/* Admin-only Routes */}
+        <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
       </Routes>
     </Router>
   );

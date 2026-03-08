@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Typography, Stack, Button, Chip, IconButton, Tooltip } from '@mui/material';
+import { Box, Typography, Stack, Button, Chip, IconButton, Tooltip, GlobalStyles } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
@@ -14,7 +14,7 @@ import HotelIcon from '@mui/icons-material/Hotel';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
 import TipsAndUpdatesIcon from '@mui/icons-material/TipsAndUpdates';
 
-// --- THEME COLORS (same as Landing) ---
+// --- THEME COLORS ---
 const DARK_COLORS = {
     brand: '#33CCCC',
     background: '#141627',
@@ -227,12 +227,17 @@ const PlaceDetail = () => {
 
     if (!place) {
         return (
-            <Box sx={{ bgcolor: COLORS.background, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h4" sx={{ color: COLORS.headings, mb: 2 }}>Place not found</Typography>
-                    <Button onClick={() => navigate('/')} sx={{ color: COLORS.brand }}>← Back to Home</Button>
+            <>
+                <GlobalStyles styles={{
+                    'html, body, #root': { margin: 0, padding: 0, background: COLORS.background },
+                }} />
+                <Box sx={{ bgcolor: COLORS.background, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Box sx={{ textAlign: 'center' }}>
+                        <Typography variant="h4" sx={{ color: COLORS.headings, mb: 2 }}>Place not found</Typography>
+                        <Button onClick={() => navigate('/')} sx={{ color: COLORS.brand }}>← Back to Home</Button>
+                    </Box>
                 </Box>
-            </Box>
+            </>
         );
     }
 
@@ -243,6 +248,17 @@ const PlaceDetail = () => {
             fontFamily: '"Exo 2", "Segoe UI", sans-serif',
             transition: 'background-color 0.35s ease',
         }}>
+            {/* FIX: GlobalStyles ensures html/body/root have no white background bleeding through */}
+            <GlobalStyles styles={{
+                'html, body, #root': {
+                    margin: 0,
+                    padding: 0,
+                    background: `${COLORS.background} !important`,
+                },
+                '*': {
+                    transition: 'background-color 0.3s ease, border-color 0.3s ease, color 0.3s ease',
+                }
+            }} />
 
             {/* ===== HERO ===== */}
             <Box sx={{ position: 'relative', height: { xs: 320, md: 500 }, overflow: 'hidden' }}>
@@ -258,7 +274,7 @@ const PlaceDetail = () => {
                     background: 'linear-gradient(to bottom, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.65) 100%)',
                 }} />
 
-                {/* Top Bar */}
+                {/* Top Bar — back button + theme toggle */}
                 <Box sx={{
                     position: 'absolute', top: 0, left: 0, right: 0,
                     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -273,13 +289,17 @@ const PlaceDetail = () => {
                         <ArrowBackIcon />
                     </IconButton>
 
-                    <Tooltip title={isDark ? 'Light Mode' : 'Dark Mode'}>
-                        <IconButton onClick={() => setIsDark(p => !p)} sx={{
-                            color: 'white', bgcolor: 'rgba(255,255,255,0.15)',
-                            backdropFilter: 'blur(8px)',
-                            border: '1px solid rgba(255,255,255,0.2)',
-                            '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' }
-                        }}>
+                    <Tooltip title={isDark ? 'Switch to Light Mode' : 'Switch to Dark Mode'}>
+                        <IconButton
+                            onClick={() => setIsDark(prev => !prev)}
+                            sx={{
+                                color: 'white',
+                                bgcolor: 'rgba(255,255,255,0.15)',
+                                backdropFilter: 'blur(8px)',
+                                border: '1px solid rgba(255,255,255,0.2)',
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.25)' }
+                            }}
+                        >
                             {isDark ? <LightModeIcon sx={{ fontSize: 18 }} /> : <DarkModeIcon sx={{ fontSize: 18 }} />}
                         </IconButton>
                     </Tooltip>
@@ -461,7 +481,7 @@ const PlaceDetail = () => {
                     </Stack>
                     <Box sx={{
                         display: 'grid',
-                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)', md: 'repeat(3, 1fr)' },
+                        gridTemplateColumns: { xs: '1fr', sm: 'repeat(3, 1fr)' },
                         gap: 2
                     }}>
                         {place.gallery.map((item, i) => (
@@ -556,12 +576,12 @@ const PlaceDetail = () => {
                 {/* CTA */}
                 <Box sx={{
                     textAlign: 'center',
-                    bgcolor: COLORS.cardSecondary,
                     borderRadius: 5, p: { xs: 4, md: 6 },
                     border: `1px solid ${COLORS.borderColor}`,
                     background: isDark
-                        ? `linear-gradient(135deg, ${COLORS.cardSecondary}, rgba(51,204,204,0.05))`
+                        ? `linear-gradient(135deg, #252845, rgba(51,204,204,0.05))`
                         : `linear-gradient(135deg, #FFFFFF, rgba(26,175,175,0.05))`,
+                    boxShadow: isDark ? 'none' : '0 4px 24px rgba(0,0,0,0.07)',
                 }}>
                     <Typography variant="h5" fontWeight={800} sx={{
                         color: isDark ? 'white' : COLORS.headings,
@@ -608,7 +628,8 @@ const PlaceDetail = () => {
             <Box sx={{
                 borderTop: `1px solid ${COLORS.borderColor}`,
                 py: 3, px: { xs: 3, md: 6 }, textAlign: 'center',
-                bgcolor: COLORS.cardSecondary
+                bgcolor: COLORS.cardSecondary,
+                mt: 6,
             }}>
                 <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
                     © 2026 Smart Itinerary Planner. All rights reserved.
