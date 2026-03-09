@@ -200,7 +200,24 @@ const MyItineraries = () => {
                             sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 5, px: 3, py: 1.25, textTransform: 'uppercase', '&:hover': { bgcolor: '#2db8b8' } }}>
                             New Trip
                         </Button>
-                        <Avatar sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', width: 44, height: 44 }}>{user.initial}</Avatar>
+                        <Avatar 
+                            onClick={() => navigate('/profile')}
+                            sx={{ 
+                                bgcolor: COLORS.brand,
+                                color: COLORS.background,
+                                fontWeight: 'bold',
+                                cursor: 'pointer',
+                                width: 44,
+                                height: 44,
+                                transition: 'all 0.2s',
+                                '&:hover': {
+                                    transform: 'scale(1.08)',
+                                    boxShadow: `0 0 0 3px ${COLORS.brand}40`
+                                }
+                            }}
+                        >
+                            {user.initial}
+                        </Avatar>
                     </Stack>
                 </Stack>
 

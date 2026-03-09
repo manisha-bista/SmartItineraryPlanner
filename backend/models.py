@@ -28,6 +28,7 @@ class User(Base):
     comments = relationship("ItineraryComment", back_populates="user", cascade="all, delete-orphan")
     community_updates = relationship("CommunityUpdate", back_populates="author", cascade="all, delete-orphan")
     complaints = relationship("Complaint", back_populates="user", cascade="all, delete-orphan")
+    community_posts = relationship("CommunityPost", back_populates="author", cascade="all, delete-orphan")
 
 
 # ITINERARY MODEL (Main Trip)
@@ -393,3 +394,54 @@ class Complaint(Base):
     
     # Relationships
     user = relationship("User", back_populates="complaints")
+
+
+# COMMUNITY POST MODEL (user-generated feed posts)
+class CommunityPost(Base):
+    __tablename__ = "community_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200), nullable=False)
+    body = Column(Text, nullable=True)
+    image_url = Column(String(500), nullable=True)
+    
+    # tag/flair for the post (Experience, Alert, Event, Tip, Question)
+    tag = Column(String(50), default="Experience", nullable=False, index=True)
+    
+    # place filter — "All" for now, will be destination-specific later
+    place = Column(String(200), default="All", nullable=False, index=True)
+    
+    # engagement
+    upvotes = Column(Integer, default=0)
+    downvotes = Column(Integer, default=0)
+    comment_count = Column(Integer, default=0)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Foreign Keys
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    
+    # Relationships
+    author = relationship("User", back_populates="community_posts")
+    votes = relationship("PostVote", back_populates="post", cascade="all, delete-orphan")
+
+
+# tracks which user voted on which post (so one vote per user per post)
+class PostVote(Base):
+    __tablename__ = "post_votes"
+
+    id = Column(Integer, primary_key=True, index=True)
+    direction = Column(String(10), nullable=False)  # 'up' or 'down'
+    
+    # Foreign Keys
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    post_id = Column(Integer, ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False)
+    
+    # Relationships
+    post = relationship("CommunityPost", back_populates="votes")
+
+    __table_args__ = (
+        Index('idx_user_post_vote', 'user_id', 'post_id', unique=True),
+    )

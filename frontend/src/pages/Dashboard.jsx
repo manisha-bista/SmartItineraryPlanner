@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
     Box, 
     Button, 
+    Container, 
     Typography, 
     Stack,
     IconButton,
@@ -19,14 +20,13 @@ import {
     ListItemButton,
     ListItemIcon,
     ListItemText,
+    Divider,
     Alert,
-    CircularProgress,
-    Tooltip
+    CircularProgress
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import CreateItineraryDialog from '../components/CreateItineraryDialog';
-import { useTheme } from '../context/ThemeContext';
 
 // Icons
 import SearchIcon from '@mui/icons-material/Search';
@@ -39,17 +39,28 @@ import ExploreIcon from '@mui/icons-material/Explore';
 import LogoutIcon from '@mui/icons-material/Logout';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
+import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import LightModeIcon from '@mui/icons-material/LightMode';
-import DarkModeIcon from '@mui/icons-material/DarkMode';
+
+// Brand Colors
+const COLORS = {
+    brand: '#33CCCC',
+    background: '#141627',
+    cardPrimary: '#252845',
+    cardSecondary: 'rgba(255, 255, 255, 0.1)',
+    headings: '#B0D2EB',
+    subheadings: '#C0D2EB',
+    text: '#D0D2EB',
+    fadedText: '#7B809A',
+    icons: '#B0D2EB'
+};
 
 const drawerWidth = 240;
 
 const Dashboard = () => {
     const navigate = useNavigate();
-    const { isDark, COLORS, toggleTheme } = useTheme();
-
+    
     // User from localStorage
     const [user, setUser] = useState({
         id: null,
@@ -84,9 +95,11 @@ const Dashboard = () => {
             initial: (userName || 'U')[0].toUpperCase()
         });
 
+        // Fetch user's itineraries
         fetchItineraries(parseInt(userId));
     }, [navigate]);
 
+    // Fetch itineraries from API
     const fetchItineraries = async (userId) => {
         try {
             setLoading(true);
@@ -105,6 +118,7 @@ const Dashboard = () => {
         }
     };
 
+    // Hardcoded similar itineraries for demo
     const similarItineraries = [
         {
             id: 1,
@@ -144,6 +158,7 @@ const Dashboard = () => {
     const handleDialogClose = () => setDialogOpen(false);
 
     const handleItineraryCreated = () => {
+        // Refresh the itineraries list
         fetchItineraries(user.id);
     };
 
@@ -172,8 +187,8 @@ const Dashboard = () => {
 
     const isToday = (day) => {
         const today = new Date();
-        return day === today.getDate() &&
-               currentDate.getMonth() === today.getMonth() &&
+        return day === today.getDate() && 
+               currentDate.getMonth() === today.getMonth() && 
                currentDate.getFullYear() === today.getFullYear();
     };
 
@@ -182,6 +197,7 @@ const Dashboard = () => {
     for (let i = 0; i < startingDayOfWeek; i++) calendarDays.push(null);
     for (let day = 1; day <= daysInMonth; day++) calendarDays.push(day);
 
+    // Calculate trip duration in days
     const calculateDuration = (startDate, endDate) => {
         const start = new Date(startDate);
         const end = new Date(endDate);
@@ -190,11 +206,13 @@ const Dashboard = () => {
         return diffDays;
     };
 
+    // Format date for display
     const formatDate = (dateString) => {
         const date = new Date(dateString);
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
+    // Get status chip color
     const getStatusColor = (status) => {
         const colors = {
             planning: 'info',
@@ -206,24 +224,24 @@ const Dashboard = () => {
         return colors[status] || 'default';
     };
 
+    // --- SIDEBAR MENU (with navigation paths) ---
     const sidebarMenu = [
-        { text: 'Dashboard',       icon: <DashboardIcon />, active: true,  path: '/dashboard' },
-        { text: 'My Itineraries',  icon: <ExploreIcon />,   active: false, path: '/itineraries' },
-        { text: 'Interactive Map', icon: <MapIcon />,        active: false, path: '/dashboard' },
-        { text: 'Community Feed',  icon: <GroupIcon />,      active: false, path: '/community' },
+        { text: 'Dashboard',      icon: <DashboardIcon />, active: true,  path: '/dashboard' },
+        { text: 'My Itineraries', icon: <ExploreIcon />,   active: false, path: '/itineraries' },
+        { text: 'Interactive Map',icon: <MapIcon />,        active: false, path: '/dashboard' },
+        { text: 'Community Feed', icon: <GroupIcon />,      active: false, path: '/community' },
     ];
 
     return (
-        <Box sx={{
-            display: 'flex',
-            bgcolor: COLORS.background,
+        <Box sx={{ 
+            display: 'flex', 
+            bgcolor: COLORS.background, 
             minHeight: '100vh',
             width: '100vw',
             position: 'fixed',
             top: 0,
             left: 0,
-            overflow: 'hidden',
-            transition: 'background-color 0.3s ease'
+            overflow: 'hidden'
         }}>
             {/* --- SIDEBAR --- */}
             <Drawer
@@ -235,9 +253,8 @@ const Dashboard = () => {
                         width: drawerWidth,
                         boxSizing: 'border-box',
                         bgcolor: COLORS.background,
-                        borderRight: isDark ? 'none' : `1px solid ${COLORS.borderColor}`,
-                        backgroundImage: 'linear-gradient(to bottom, rgba(51, 204, 204, 0.05), transparent)',
-                        transition: 'background-color 0.3s ease'
+                        borderRight: 'none',
+                        backgroundImage: 'linear-gradient(to bottom, rgba(51, 204, 204, 0.05), transparent)'
                     },
                 }}
             >
@@ -245,11 +262,7 @@ const Dashboard = () => {
                 <Box sx={{ p: 3, display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                         <Box component="span" sx={{ color: COLORS.brand, fontSize: '1.5rem' }}>✈</Box>
-                        <Typography variant="h6" fontWeight="bold" sx={{
-                            color: isDark ? 'white' : COLORS.headings,
-                            fontFamily: '"Exo 2", sans-serif',
-                            letterSpacing: 0.5
-                        }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ color: 'white', fontFamily: '"Exo 2", sans-serif', letterSpacing: 0.5 }}>
                             Smart <Box component="span" sx={{ color: COLORS.brand }}>Itinerary</Box>
                         </Typography>
                     </Stack>
@@ -259,33 +272,34 @@ const Dashboard = () => {
                 <List sx={{ px: 2, mt: 2, flexGrow: 1 }}>
                     {sidebarMenu.map((item) => (
                         <ListItem key={item.text} disablePadding sx={{ mb: 1 }}>
-                            <ListItemButton
+                            <ListItemButton 
                                 selected={item.active}
-                                onClick={() => navigate(item.path)}
-                                sx={{
+                                onClick={() => navigate(item.path)}  // ← navigation added
+                                sx={{ 
                                     borderRadius: 2,
                                     color: item.active ? COLORS.background : COLORS.subheadings,
-                                    '&.Mui-selected': {
+                                    '&.Mui-selected': { 
                                         bgcolor: COLORS.brand,
                                         color: COLORS.background,
                                         '&:hover': { bgcolor: '#2db8b8' }
                                     },
-                                    '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,175,175,0.08)' }
+                                    '&:hover': {
+                                        bgcolor: COLORS.cardSecondary
+                                    }
                                 }}
                             >
-                                <ListItemIcon sx={{
-                                    color: item.active ? COLORS.background : COLORS.icons,
+                                <ListItemIcon sx={{ 
+                                    color: item.active ? COLORS.background : COLORS.subheadings,
                                     minWidth: 40
                                 }}>
                                     {item.icon}
                                 </ListItemIcon>
-                                <ListItemText
-                                    primary={item.text}
-                                    primaryTypographyProps={{
+                                <ListItemText 
+                                    primary={item.text} 
+                                    primaryTypographyProps={{ 
                                         fontWeight: item.active ? 'bold' : 'medium',
-                                        fontSize: '0.9rem',
-                                        color: item.active ? COLORS.background : COLORS.text
-                                    }}
+                                        fontSize: '0.9rem'
+                                    }} 
                                 />
                             </ListItemButton>
                         </ListItem>
@@ -294,9 +308,9 @@ const Dashboard = () => {
 
                 {/* Logout Button */}
                 <Box sx={{ p: 2 }}>
-                    <Button
-                        fullWidth
-                        startIcon={<LogoutIcon />}
+                    <Button 
+                        fullWidth 
+                        startIcon={<LogoutIcon />} 
                         onClick={handleLogout}
                         sx={{
                             color: COLORS.fadedText,
@@ -313,15 +327,14 @@ const Dashboard = () => {
             </Drawer>
 
             {/* --- MAIN CONTENT AREA --- */}
-            <Box
-                component="main"
-                sx={{
-                    flexGrow: 1,
+            <Box 
+                component="main" 
+                sx={{ 
+                    flexGrow: 1, 
                     p: 3,
                     height: '100vh',
                     overflow: 'auto',
-                    bgcolor: COLORS.background,
-                    transition: 'background-color 0.3s ease'
+                    bgcolor: COLORS.background
                 }}
             >
                 {/* Top Bar */}
@@ -340,7 +353,7 @@ const Dashboard = () => {
                                     bgcolor: COLORS.cardPrimary,
                                     borderRadius: 5,
                                     color: COLORS.text,
-                                    '& fieldset': { borderColor: isDark ? 'rgba(255,255,255,0.08)' : COLORS.borderColor },
+                                    '& fieldset': { borderColor: COLORS.cardSecondary },
                                     '&:hover fieldset': { borderColor: COLORS.brand },
                                     '&.Mui-focused fieldset': { borderColor: COLORS.brand }
                                 },
@@ -362,7 +375,7 @@ const Dashboard = () => {
                             variant="contained"
                             sx={{
                                 bgcolor: COLORS.brand,
-                                color: isDark ? COLORS.background : '#FFFFFF',
+                                color: COLORS.background,
                                 fontWeight: 'bold',
                                 px: 4,
                                 py: 1.75,
@@ -370,7 +383,7 @@ const Dashboard = () => {
                                 textTransform: 'uppercase',
                                 fontSize: '0.875rem',
                                 whiteSpace: 'nowrap',
-                                '&:hover': {
+                                '&:hover': { 
                                     bgcolor: '#2db8b8',
                                     transform: 'translateY(-2px)',
                                     boxShadow: `0 4px 12px ${COLORS.brand}40`
@@ -384,15 +397,13 @@ const Dashboard = () => {
 
                     {/* Right Side Actions */}
                     <Stack direction="row" spacing={2} alignItems="center">
-                        
-                        {/* Notifications */}
-                        <IconButton
-                            sx={{
+                        <IconButton 
+                            sx={{ 
                                 bgcolor: COLORS.cardPrimary,
                                 color: COLORS.icons,
                                 position: 'relative',
                                 borderRadius: 3,
-                                '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)' }
+                                '&:hover': { bgcolor: COLORS.cardSecondary }
                             }}
                         >
                             <NotificationsIcon />
@@ -415,13 +426,13 @@ const Dashboard = () => {
                             onClick={handleDialogOpen}
                             sx={{
                                 bgcolor: COLORS.brand,
-                                color: isDark ? COLORS.background : '#FFFFFF',
+                                color: COLORS.background,
                                 fontWeight: 'bold',
                                 borderRadius: 5,
                                 px: 3,
                                 py: 1.25,
                                 textTransform: 'uppercase',
-                                '&:hover': {
+                                '&:hover': { 
                                     bgcolor: '#2db8b8',
                                     transform: 'translateY(-2px)',
                                     boxShadow: `0 4px 12px ${COLORS.brand}40`
@@ -441,10 +452,10 @@ const Dashboard = () => {
                                 cursor: 'pointer',
                                 width: 44,
                                 height: 44,
+                                transition: 'all 0.2s',
                                 '&:hover': {
-                                    opacity: 0.85,
-                                    transform: 'scale(1.05)',
-                                    transition: 'all 0.2s'
+                                    transform: 'scale(1.08)',
+                                    boxShadow: `0 0 0 3px ${COLORS.brand}40`
                                 }
                             }}
                         >
@@ -453,7 +464,7 @@ const Dashboard = () => {
                     </Stack>
                 </Stack>
 
-                {/* 3-Column Layout */}
+                {/* 3-Column Layout: Content (left) and Sidebar (right) */}
                 <Box sx={{ display: 'flex', gap: 3 }}>
                     {/* Main Content Column */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -474,7 +485,6 @@ const Dashboard = () => {
                                     Your Trips
                                 </Typography>
                                 <Button
-                                    onClick={() => navigate('/itineraries')}
                                     sx={{
                                         color: COLORS.brand,
                                         textTransform: 'none',
@@ -485,6 +495,7 @@ const Dashboard = () => {
                                 </Button>
                             </Stack>
 
+                            {/* Error Alert */}
                             {error && (
                                 <Alert severity="error" sx={{ mb: 3 }} onClose={() => setError('')}>
                                     {error}
@@ -496,6 +507,7 @@ const Dashboard = () => {
                                     <CircularProgress sx={{ color: COLORS.brand }} />
                                 </Box>
                             ) : itineraries.length === 0 ? (
+                                // Empty State for New Users
                                 <Card
                                     sx={{
                                         bgcolor: COLORS.cardPrimary,
@@ -503,7 +515,6 @@ const Dashboard = () => {
                                         p: 6,
                                         textAlign: 'center',
                                         cursor: 'pointer',
-                                        boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.07)',
                                         transition: 'all 0.3s',
                                         '&:hover': {
                                             bgcolor: COLORS.cardSecondary,
@@ -527,6 +538,7 @@ const Dashboard = () => {
                                     </Typography>
                                 </Card>
                             ) : (
+                                // Trips Grid (when user has trips)
                                 <Grid container spacing={3}>
                                     {itineraries.map((trip) => (
                                         <Grid item xs={12} sm={6} md={4} key={trip.id}>
@@ -536,7 +548,6 @@ const Dashboard = () => {
                                                     borderRadius: 5,
                                                     overflow: 'hidden',
                                                     cursor: 'pointer',
-                                                    boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.07)',
                                                     transition: 'all 0.3s',
                                                     '&:hover': {
                                                         transform: 'translateY(-8px)',
@@ -604,6 +615,7 @@ const Dashboard = () => {
                                 </Button>
                             </Stack>
 
+                            {/* Flex Row Layout for Similar Itineraries */}
                             <Stack direction="row" spacing={2.5} sx={{ overflowX: 'auto', pb: 2 }}>
                                 {similarItineraries.map((itinerary) => (
                                     <Card
@@ -615,7 +627,6 @@ const Dashboard = () => {
                                             cursor: 'pointer',
                                             minWidth: 312,
                                             maxWidth: 312,
-                                            boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.07)',
                                             transition: 'all 0.3s',
                                             '&:hover': {
                                                 transform: 'translateY(-8px)',
@@ -638,11 +649,11 @@ const Dashboard = () => {
                                             />
                                             <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
                                                 <Box>
-                                                    <Typography
-                                                        variant="subtitle1"
-                                                        fontWeight="bold"
-                                                        sx={{
-                                                            color: COLORS.headings,
+                                                    <Typography 
+                                                        variant="subtitle1" 
+                                                        fontWeight="bold" 
+                                                        sx={{ 
+                                                            color: COLORS.headings, 
                                                             mb: 0.5,
                                                             fontSize: '0.95rem',
                                                             overflow: 'hidden',
@@ -686,40 +697,38 @@ const Dashboard = () => {
                                 bgcolor: COLORS.cardPrimary,
                                 borderRadius: 5,
                                 p: 3,
-                                mb: 3,
-                                boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.07)',
-                                transition: 'background-color 0.3s ease'
+                                mb: 3
                             }}
                         >
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                                <Typography variant="body1" fontWeight="bold" sx={{ color: COLORS.headings }}>
+                                <Typography variant="body1" fontWeight="bold" sx={{ color: COLORS.subheadings }}>
                                     {formatMonthYear(currentDate)}
                                 </Typography>
                                 <Stack direction="row" spacing={1}>
-                                    <IconButton
-                                        size="small"
+                                    <IconButton 
+                                        size="small" 
                                         onClick={previousMonth}
-                                        sx={{
+                                        sx={{ 
                                             color: COLORS.icons,
                                             borderRadius: 2,
-                                            '&:hover': {
+                                            '&:hover': { 
                                                 color: COLORS.brand,
-                                                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,175,175,0.08)'
-                                            }
+                                                bgcolor: COLORS.cardSecondary
+                                            } 
                                         }}
                                     >
                                         <ChevronLeftIcon />
                                     </IconButton>
-                                    <IconButton
-                                        size="small"
+                                    <IconButton 
+                                        size="small" 
                                         onClick={nextMonth}
-                                        sx={{
+                                        sx={{ 
                                             color: COLORS.icons,
                                             borderRadius: 2,
-                                            '&:hover': {
+                                            '&:hover': { 
                                                 color: COLORS.brand,
-                                                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,175,175,0.08)'
-                                            }
+                                                bgcolor: COLORS.cardSecondary
+                                            } 
                                         }}
                                     >
                                         <ChevronRightIcon />
@@ -729,13 +738,14 @@ const Dashboard = () => {
 
                             {/* Calendar Grid */}
                             <Box>
+                                {/* Day Headers */}
                                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 1, mb: 1 }}>
                                     {['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'].map((day) => (
                                         <Typography
                                             key={day}
                                             variant="caption"
                                             align="center"
-                                            sx={{
+                                            sx={{ 
                                                 color: COLORS.fadedText,
                                                 fontWeight: 'bold',
                                                 fontSize: '0.65rem'
@@ -746,6 +756,7 @@ const Dashboard = () => {
                                     ))}
                                 </Box>
 
+                                {/* Calendar Days */}
                                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: 0.5 }}>
                                     {calendarDays.map((day, index) => (
                                         <Box key={index}>
@@ -764,7 +775,7 @@ const Dashboard = () => {
                                                         fontSize: '0.85rem',
                                                         transition: 'all 0.2s',
                                                         '&:hover': {
-                                                            bgcolor: isToday(day) ? '#ff6b6b' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,175,175,0.1)'),
+                                                            bgcolor: isToday(day) ? '#ff6b6b' : COLORS.cardSecondary,
                                                             transform: 'scale(1.1)'
                                                         }
                                                     }}
@@ -785,9 +796,7 @@ const Dashboard = () => {
                             sx={{
                                 bgcolor: COLORS.cardPrimary,
                                 borderRadius: 5,
-                                overflow: 'hidden',
-                                boxShadow: isDark ? 'none' : '0 2px 16px rgba(0,0,0,0.07)',
-                                transition: 'background-color 0.3s ease'
+                                overflow: 'hidden'
                             }}
                         >
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ p: 2.5 }}>
@@ -800,7 +809,7 @@ const Dashboard = () => {
                                         color: COLORS.brand,
                                         textTransform: 'none',
                                         borderRadius: 3,
-                                        '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(26,175,175,0.08)' }
+                                        '&:hover': { bgcolor: COLORS.cardSecondary }
                                     }}
                                 >
                                     Expand

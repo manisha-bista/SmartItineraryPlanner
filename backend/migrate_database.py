@@ -15,35 +15,42 @@ def migrate_database():
     print(f"Found tables: {existing_tables}")
     
     # Ask for confirmation
-    print("\n  WARNING: This will DROP all existing tables and recreate them.")
+    print("WARNING: This will DROP all existing tables and recreate them.")
     print("   All existing data will be LOST!")
     response = input("\nType 'YES' to continue or anything else to cancel: ")
     
     if response != 'YES':
-        print(" Migration cancelled.")
+        print("Migration cancelled.")
         return
     
-    print("\n  Dropping all tables...")
+    print("\Dropping all tables...")
     
     with engine.connect() as conn:
         # Drop tables in reverse order of dependencies
+        # (child tables with foreign keys must come before parent tables)
         tables_to_drop = [
-            'trip_notes',
-            'transportation', 
-            'accommodations',
-            'activities',
-            'itinerary_days',
-            'itineraries',
-            'users',
-            'trips'  # Old table if it exists
+            'post_votes',           # depends on community_posts + users
+            'community_posts',      # depends on users
+            'community_updates',    # depends on users
+            'itinerary_tags',       # depends on itineraries
+            'itinerary_comments',   # depends on itineraries + users
+            'complaints',           # depends on users
+            'trip_notes',           # depends on itineraries
+            'transportation',       # depends on itineraries
+            'accommodations',       # depends on itineraries
+            'activities',           # depends on itinerary_days
+            'itinerary_days',       # depends on itineraries
+            'itineraries',          # depends on users
+            'users',                # root table
+            'trips',                # old table if it exists
         ]
         
         for table in tables_to_drop:
             try:
                 conn.execute(text(f'DROP TABLE IF EXISTS {table} CASCADE'))
-                print(f"   ✓ Dropped {table}")
+                print(f"Dropped {table}")
             except Exception as e:
-                print(f"   ⚠ Could not drop {table}: {e}")
+                print(f"Could not drop {table}: {e}")
         
         conn.commit()
     
@@ -54,7 +61,7 @@ def migrate_database():
     models.Base.metadata.create_all(bind=engine)
     
     print("\n Migration completed successfully!")
-    print("\n📋 New tables created:")
+    print("\n New tables created:")
     inspector = inspect(engine)
     for table in inspector.get_table_names():
         print(f"   ✓ {table}")

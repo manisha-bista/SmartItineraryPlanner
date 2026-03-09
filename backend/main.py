@@ -921,6 +921,161 @@ def get_community_updates(
 
 
 # ============================================
+# COMMUNITY POSTS ENDPOINTS
+# ============================================
+@app.post("/community/posts", response_model=schemas.CommunityPostOut, status_code=status.HTTP_201_CREATED)
+def create_community_post(post: schemas.CommunityPostCreate, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Create a community post"""
+    try:
+        user = db.query(models.User).filter(models.User.id == user_id).first()
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        new_post = models.CommunityPost(**post.dict(), user_id=user_id)
+        db.add(new_post)
+        db.commit()
+        db.refresh(new_post)
+        
+        result = schemas.CommunityPostOut.from_orm(new_post)
+        result.author_name = user.name
+        result.author_initial = user.name[0].upper() if user.name else 'U'
+        result.user_vote = None
+        return result
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error creating post: {e}")
+        raise HTTPException(status_code=500, detail="Failed to create post")
+
+@app.get("/community/posts", response_model=List[schemas.CommunityPostOut])
+def get_community_posts(
+    tag: Optional[str] = Query(None),
+    place: Optional[str] = Query(None),
+    sort: str = Query("new"),  # new, popular, top
+    user_id: Optional[int] = Query(None),  # for tracking current user's votes
+    limit: int = Query(50, le=100),
+    db: Session = Depends(get_db)
+):
+    """Get community posts with filtering and sorting"""
+    try:
+        query = db.query(models.CommunityPost)
+        
+        if tag:
+            query = query.filter(models.CommunityPost.tag == tag)
+        
+        if place and place != "All":
+            query = query.filter(models.CommunityPost.place.ilike(f"%{place}%"))
+        
+        # sorting
+        if sort == "popular":
+            query = query.order_by((models.CommunityPost.upvotes - models.CommunityPost.downvotes).desc())
+        elif sort == "top":
+            query = query.order_by(models.CommunityPost.upvotes.desc())
+        else:
+            query = query.order_by(models.CommunityPost.created_at.desc())
+        
+        posts = query.limit(limit).all()
+        
+        # build response with author info and user vote status
+        results = []
+        for p in posts:
+            out = schemas.CommunityPostOut.from_orm(p)
+            out.author_name = p.author.name if p.author else "Unknown"
+            out.author_initial = p.author.name[0].upper() if p.author and p.author.name else "U"
+            
+            # check if current user has voted on this post
+            if user_id:
+                vote = db.query(models.PostVote).filter(
+                    models.PostVote.post_id == p.id,
+                    models.PostVote.user_id == user_id
+                ).first()
+                out.user_vote = vote.direction if vote else None
+            else:
+                out.user_vote = None
+            
+            results.append(out)
+        
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching posts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch posts")
+
+@app.post("/community/posts/{post_id}/vote")
+def vote_on_post(post_id: int, vote: schemas.PostVoteRequest, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Vote on a post — toggles if same direction, switches if different"""
+    try:
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        
+        existing = db.query(models.PostVote).filter(
+            models.PostVote.post_id == post_id,
+            models.PostVote.user_id == user_id
+        ).first()
+        
+        if existing:
+            if existing.direction == vote.direction:
+                # same vote again = remove vote
+                if existing.direction == 'up':
+                    post.upvotes = max(0, post.upvotes - 1)
+                else:
+                    post.downvotes = max(0, post.downvotes - 1)
+                db.delete(existing)
+                db.commit()
+                return {"status": "removed", "upvotes": post.upvotes, "downvotes": post.downvotes}
+            else:
+                # switching vote direction
+                if existing.direction == 'up':
+                    post.upvotes = max(0, post.upvotes - 1)
+                    post.downvotes += 1
+                else:
+                    post.downvotes = max(0, post.downvotes - 1)
+                    post.upvotes += 1
+                existing.direction = vote.direction
+                db.commit()
+                return {"status": "switched", "upvotes": post.upvotes, "downvotes": post.downvotes}
+        else:
+            # new vote
+            new_vote = models.PostVote(user_id=user_id, post_id=post_id, direction=vote.direction)
+            if vote.direction == 'up':
+                post.upvotes += 1
+            else:
+                post.downvotes += 1
+            db.add(new_vote)
+            db.commit()
+            return {"status": "voted", "upvotes": post.upvotes, "downvotes": post.downvotes}
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error voting: {e}")
+        raise HTTPException(status_code=500, detail="Failed to vote")
+
+@app.delete("/community/posts/{post_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_community_post(post_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Delete a community post (only by the author)"""
+    try:
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        if post.user_id != user_id:
+            raise HTTPException(status_code=403, detail="You can only delete your own posts")
+        
+        db.delete(post)
+        db.commit()
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting post: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete post")
+
+
+# ============================================
 # COMPLAINTS ENDPOINTS
 # ============================================
 @app.post("/complaints", response_model=schemas.ComplaintOut, status_code=status.HTTP_201_CREATED)

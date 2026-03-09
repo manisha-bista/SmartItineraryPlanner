@@ -6,7 +6,6 @@ import {
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { useTheme } from '../context/ThemeContext';
 
 import DashboardIcon      from '@mui/icons-material/Dashboard';
 import MapIcon            from '@mui/icons-material/Map';
@@ -19,10 +18,107 @@ import EmailOutlinedIcon  from '@mui/icons-material/EmailOutlined';
 import AddIcon            from '@mui/icons-material/Add';
 import FlightTakeoffIcon  from '@mui/icons-material/FlightTakeoff';
 import EditOutlinedIcon   from '@mui/icons-material/EditOutlined';
-import LightModeIcon      from '@mui/icons-material/LightMode';
-import DarkModeIcon       from '@mui/icons-material/DarkMode';
+
+// ─── Design System ────────────────────────────────────────────
+const C = {
+    brand:   '#33CCCC',
+    bg:      '#141627',
+    card:    '#252845',
+    input:   '#1e2240',
+    error:   '#ff6b6b',
+    divider: 'rgba(255,255,255,0.08)',
+    white:   '#ffffff',
+    dim:     'rgba(255,255,255,0.55)',   // secondary/placeholder text
+};
 
 const DRAWER_W = 240;
+
+// Field — white text always, visible dark bg
+const fieldSx = (editing) => ({
+    '& .MuiOutlinedInput-root': {
+        bgcolor: editing ? C.input : '#1e2240',
+        borderRadius: 2.5,
+        color: C.white,
+        fontSize: '0.9rem',
+        transition: 'all 0.2s',
+        '& fieldset': { borderColor: editing ? 'rgba(255,255,255,0.15)' : 'transparent' },
+        '&:hover fieldset': { borderColor: C.brand },
+        '&.Mui-focused fieldset': { borderColor: C.brand, borderWidth: 1.5 },
+        '&.Mui-disabled': {
+            bgcolor: '#1e2240',
+            WebkitTextFillColor: C.white,
+        },
+    },
+    '& .MuiInputBase-input': {
+        py: 1.4,
+        color: C.white,
+        WebkitTextFillColor: C.white,       // ← override MUI disabled grey
+    },
+    '& .MuiInputBase-input.Mui-disabled': {
+        WebkitTextFillColor: C.white,       // ← specifically target disabled state
+        color: C.white,
+    },
+    '& .MuiInputBase-input::placeholder': { color: C.dim, opacity: 1 },
+    '& .MuiFormHelperText-root': { color: C.error },
+});
+
+// Select — white text always
+const selectSx = (editing) => ({
+    bgcolor: editing ? C.input : '#1e2240',
+    borderRadius: 2.5,
+    color: C.white,
+    fontSize: '0.9rem',
+    transition: 'all 0.2s',
+    '& .MuiOutlinedInput-notchedOutline': { borderColor: editing ? 'rgba(255,255,255,0.15)' : 'transparent' },
+    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand },
+    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand, borderWidth: 1.5 },
+    '&.Mui-disabled': {
+        WebkitTextFillColor: C.white,
+        bgcolor: '#1e2240',
+    },
+    '& .MuiSelect-select': {
+        WebkitTextFillColor: C.white,       // ← force white on select value text
+        color: C.white,
+    },
+    '& .MuiSelect-select.Mui-disabled': {
+        WebkitTextFillColor: C.white,       // ← force white when disabled
+    },
+    '& .MuiSelect-icon': { color: C.white },
+    '& .MuiSvgIcon-root': { color: C.white },
+});
+
+const labelSx = {
+    fontSize: '0.78rem',
+    fontWeight: 700,
+    color: C.white,
+    mb: 0.75,
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+};
+
+// Dark dropdown menu for Select components
+const darkMenuProps = {
+    PaperProps: {
+        sx: {
+            bgcolor: '#1e2240',
+            backgroundImage: 'none',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 2.5,
+            boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+            '& .MuiMenuItem-root': {
+                color: C.white,
+                fontSize: '0.9rem',
+                py: 1,
+                '&:hover': { bgcolor: 'rgba(51,204,204,0.12)' },
+                '&.Mui-selected': {
+                    bgcolor: 'rgba(51,204,204,0.18)',
+                    color: C.brand,
+                    '&:hover': { bgcolor: 'rgba(51,204,204,0.22)' },
+                },
+            },
+        },
+    },
+};
 
 const NAV = [
     { text: 'Dashboard',       icon: <DashboardIcon />, path: '/dashboard' },
@@ -33,82 +129,6 @@ const NAV = [
 
 export default function ProfileSettings() {
     const navigate = useNavigate();
-    const { isDark, COLORS, toggleTheme } = useTheme();
-
-    // Derive local design tokens from COLORS so all UI adapts
-    const C = {
-        brand:   COLORS.brand,
-        bg:      COLORS.background,
-        card:    COLORS.cardPrimary,
-        input:   COLORS.inputBg,
-        error:   '#ff6b6b',
-        divider: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-        white:   isDark ? '#ffffff' : COLORS.headings,
-        dim:     COLORS.fadedText,
-        text:    COLORS.text,
-    };
-
-    // Field styles — adapts to theme
-    const fieldSx = (editing) => ({
-        '& .MuiOutlinedInput-root': {
-            bgcolor: editing ? C.input : C.input,
-            borderRadius: 2.5,
-            color: C.text,
-            fontSize: '0.9rem',
-            transition: 'all 0.2s',
-            '& fieldset': { borderColor: editing ? (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)') : 'transparent' },
-            '&:hover fieldset': { borderColor: C.brand },
-            '&.Mui-focused fieldset': { borderColor: C.brand, borderWidth: 1.5 },
-            '&.Mui-disabled': {
-                bgcolor: C.input,
-                WebkitTextFillColor: C.text,
-            },
-        },
-        '& .MuiInputBase-input': {
-            py: 1.4,
-            color: C.text,
-            WebkitTextFillColor: C.text,
-        },
-        '& .MuiInputBase-input.Mui-disabled': {
-            WebkitTextFillColor: C.text,
-            color: C.text,
-        },
-        '& .MuiInputBase-input::placeholder': { color: C.dim, opacity: 1 },
-        '& .MuiFormHelperText-root': { color: C.error },
-    });
-
-    const selectSx = (editing) => ({
-        bgcolor: C.input,
-        borderRadius: 2.5,
-        color: C.text,
-        fontSize: '0.9rem',
-        transition: 'all 0.2s',
-        '& .MuiOutlinedInput-notchedOutline': { borderColor: editing ? (isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.15)') : 'transparent' },
-        '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand },
-        '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand, borderWidth: 1.5 },
-        '&.Mui-disabled': {
-            WebkitTextFillColor: C.text,
-            bgcolor: C.input,
-        },
-        '& .MuiSelect-select': {
-            WebkitTextFillColor: C.text,
-            color: C.text,
-        },
-        '& .MuiSelect-select.Mui-disabled': {
-            WebkitTextFillColor: C.text,
-        },
-        '& .MuiSelect-icon': { color: C.dim },
-        '& .MuiSvgIcon-root': { color: C.dim },
-    });
-
-    const labelSx = {
-        fontSize: '0.78rem',
-        fontWeight: 700,
-        color: C.white,
-        mb: 0.75,
-        textTransform: 'uppercase',
-        letterSpacing: 0.8,
-    };
 
     const [user, setUser]       = useState({ name: 'User', email: '', initial: 'U' });
     const [editing, setEditing] = useState(false);
@@ -143,25 +163,18 @@ export default function ProfileSettings() {
     });
 
     return (
-        <Box sx={{
-            display: 'flex',
-            bgcolor: C.bg,
-            minHeight: '100vh',
-            transition: 'background-color 0.3s ease'
-        }}>
+        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
 
             {/* ══ SIDEBAR ══════════════════════════════════════ */}
             <Drawer variant="permanent" sx={{
                 width: DRAWER_W, flexShrink: 0,
+                bgcolor: C.bg,
                 '& .MuiDrawer-paper': {
                     width: DRAWER_W,
-                    borderRight: isDark ? 'none' : `1px solid ${COLORS.borderColor}`,
-                    background: isDark
-                        ? `linear-gradient(180deg, #1a1d35 0%, ${C.bg} 100%)`
-                        : `linear-gradient(180deg, #e8edf8 0%, ${C.bg} 100%)`,
-                    boxShadow: isDark ? '4px 0 24px rgba(0,0,0,0.4)' : '4px 0 16px rgba(0,0,0,0.06)',
+                    borderRight: 'none',
+                    background: `linear-gradient(180deg, #1a1d35 0%, ${C.bg} 100%)`,
+                    boxShadow: '4px 0 24px rgba(0,0,0,0.4)',
                     display: 'flex', flexDirection: 'column',
-                    transition: 'background 0.3s ease',
                 },
             }}>
                 {/* Logo */}
@@ -181,9 +194,9 @@ export default function ProfileSettings() {
                             <ListItemButton onClick={() => navigate(item.path)} sx={{
                                 borderRadius: 2.5, py: 1.3, px: 2,
                                 color: C.white, transition: 'all 0.2s',
-                                '&:hover': { bgcolor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(26,175,175,0.08)', color: C.white },
+                                '&:hover': { bgcolor: 'rgba(255,255,255,0.07)', color: C.white },
                             }}>
-                                <ListItemIcon sx={{ color: C.dim, minWidth: 36 }}>{item.icon}</ListItemIcon>
+                                <ListItemIcon sx={{ color: C.white, minWidth: 36 }}>{item.icon}</ListItemIcon>
                                 <ListItemText primary={item.text}
                                     primaryTypographyProps={{ fontWeight: 500, fontSize: '0.88rem', color: C.white }} />
                             </ListItemButton>
@@ -205,7 +218,7 @@ export default function ProfileSettings() {
             </Drawer>
 
             {/* ══ MAIN ═════════════════════════════════════════ */}
-            <Box sx={{ flexGrow: 1, overflow: 'auto', display: 'flex', flexDirection: 'column' }}>
+            <Box sx={{ flexGrow: 1, overflow: 'auto', display: 'flex', flexDirection: 'column', bgcolor: C.bg, height: '100vh' }}>
 
                 {/* Top Bar */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center"
@@ -222,18 +235,13 @@ export default function ProfileSettings() {
                     <Stack direction="row" spacing={1.5} alignItems="center">
                         <Stack direction="row" alignItems="center" spacing={1} sx={{
                             bgcolor: C.card, borderRadius: 3, px: 2, py: 1, minWidth: 200,
-                            transition: 'background-color 0.3s ease'
                         }}>
                             <SearchIcon sx={{ color: C.dim, fontSize: 17 }} />
                             <Typography variant="body2" sx={{ color: C.dim, fontSize: '0.82rem' }}>Search…</Typography>
                         </Stack>
 
-                        <IconButton sx={{
-                            bgcolor: C.card, borderRadius: 2.5,
-                            '&:hover': { bgcolor: isDark ? '#2d3154' : COLORS.cardSecondary },
-                            transition: 'background-color 0.3s ease'
-                        }}>
-                            <NotificationsIcon sx={{ color: C.dim, fontSize: 20 }} />
+                        <IconButton sx={{ bgcolor: C.card, borderRadius: 2.5, '&:hover': { bgcolor: '#2d3154' } }}>
+                            <NotificationsIcon sx={{ color: C.white, fontSize: 20 }} />
                         </IconButton>
 
                         <Avatar onClick={() => navigate('/profile')} sx={{
@@ -270,9 +278,7 @@ export default function ProfileSettings() {
                     <Box sx={{
                         bgcolor: C.card, borderRadius: 4,
                         px: 4, pt: 0, pb: 4,
-                        boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.3)' : '0 4px 24px rgba(0,0,0,0.08)',
-                        transition: 'background-color 0.3s ease',
-                        mb: 3,
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
                     }}>
                         {/* Avatar + name row */}
                         <Stack direction="row" alignItems="flex-end" justifyContent="space-between"
@@ -350,6 +356,7 @@ export default function ProfileSettings() {
 
                         {/* 2-col grid */}
                         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 4 }}>
+
                             <Box>
                                 <Typography sx={labelSx}>Full Name</Typography>
                                 <TextField fullWidth placeholder="Your full name"
@@ -369,6 +376,7 @@ export default function ProfileSettings() {
                                 <FormControl fullWidth>
                                     <Select displayEmpty value={form.gender} onChange={set('gender')}
                                         disabled={!editing} sx={selectSx(editing)}
+                                        MenuProps={darkMenuProps}
                                         renderValue={v => v ||
                                             <span style={{ color: C.dim }}>Select gender</span>}>
                                         {['Male','Female','Non-binary','Prefer not to say'].map(o =>
@@ -382,6 +390,7 @@ export default function ProfileSettings() {
                                 <FormControl fullWidth>
                                     <Select displayEmpty value={form.country} onChange={set('country')}
                                         disabled={!editing} sx={selectSx(editing)}
+                                        MenuProps={darkMenuProps}
                                         renderValue={v => v ||
                                             <span style={{ color: C.dim }}>Select country</span>}>
                                         {['Nepal','India','USA','UK','Australia','Other'].map(o =>
@@ -395,6 +404,7 @@ export default function ProfileSettings() {
                                 <FormControl fullWidth>
                                     <Select displayEmpty value={form.language} onChange={set('language')}
                                         disabled={!editing} sx={selectSx(editing)}
+                                        MenuProps={darkMenuProps}
                                         renderValue={v => v ||
                                             <span style={{ color: C.dim }}>Select language</span>}>
                                         {['English','Nepali','Hindi','Other'].map(o =>
@@ -408,6 +418,7 @@ export default function ProfileSettings() {
                                 <FormControl fullWidth>
                                     <Select displayEmpty value={form.timeZone} onChange={set('timeZone')}
                                         disabled={!editing} sx={selectSx(editing)}
+                                        MenuProps={darkMenuProps}
                                         renderValue={v => v ||
                                             <span style={{ color: C.dim }}>Select time zone</span>}>
                                         {[
@@ -425,7 +436,7 @@ export default function ProfileSettings() {
                         {/* Divider */}
                         <Box sx={{ height: 1, bgcolor: C.divider, mb: 3 }} />
 
-                        {/* Email section */}
+                        {/* Email section title */}
                         <Typography sx={{
                             color: C.white, mb: 2.5, fontSize: '0.82rem',
                             fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
@@ -461,86 +472,6 @@ export default function ProfileSettings() {
                             + Add Email Address
                         </Button>
                     </Box>
-
-                    {/* ══ APPEARANCE SECTION ══════════════════════════════════ */}
-                    <Box sx={{
-                        bgcolor: C.card, borderRadius: 4,
-                        px: 4, py: 3.5,
-                        boxShadow: isDark ? '0 8px 32px rgba(0,0,0,0.3)' : '0 4px 24px rgba(0,0,0,0.08)',
-                        transition: 'background-color 0.3s ease',
-                    }}>
-                        <Typography sx={{
-                            color: C.white, mb: 3, fontSize: '0.82rem',
-                            fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1,
-                        }}>
-                            Appearance
-                        </Typography>
-
-                        <Stack direction="row" alignItems="center" justifyContent="space-between">
-                            <Box>
-                                <Typography variant="body1" fontWeight={600} sx={{ color: C.white, mb: 0.4 }}>
-                                    App Theme
-                                </Typography>
-                                <Typography variant="body2" sx={{ color: C.dim, fontSize: '0.82rem' }}>
-                                    {isDark ? 'Dark mode is currently active' : 'Light mode is currently active'}
-                                </Typography>
-                            </Box>
-
-                            {/* Toggle Pills */}
-                            <Stack direction="row" spacing={0} sx={{
-                                bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-                                borderRadius: 3,
-                                p: 0.5,
-                            }}>
-                                {/* Dark option */}
-                                <Button
-                                    onClick={() => !isDark && toggleTheme()}
-                                    startIcon={<DarkModeIcon sx={{ fontSize: 16 }} />}
-                                    sx={{
-                                        borderRadius: 2.5,
-                                        px: 2.5,
-                                        py: 1,
-                                        textTransform: 'none',
-                                        fontWeight: 600,
-                                        fontSize: '0.85rem',
-                                        bgcolor: isDark ? C.brand : 'transparent',
-                                        color: isDark ? C.bg : C.dim,
-                                        transition: 'all 0.25s ease',
-                                        '&:hover': {
-                                            bgcolor: isDark ? C.brand : 'rgba(255,255,255,0.08)',
-                                            color: isDark ? C.bg : C.white,
-                                        },
-                                    }}
-                                >
-                                    Dark
-                                </Button>
-
-                                {/* Light option */}
-                                <Button
-                                    onClick={() => isDark && toggleTheme()}
-                                    startIcon={<LightModeIcon sx={{ fontSize: 16 }} />}
-                                    sx={{
-                                        borderRadius: 2.5,
-                                        px: 2.5,
-                                        py: 1,
-                                        textTransform: 'none',
-                                        fontWeight: 600,
-                                        fontSize: '0.85rem',
-                                        bgcolor: !isDark ? C.brand : 'transparent',
-                                        color: !isDark ? C.bg : C.dim,
-                                        transition: 'all 0.25s ease',
-                                        '&:hover': {
-                                            bgcolor: !isDark ? C.brand : 'rgba(255,255,255,0.08)',
-                                            color: !isDark ? C.bg : C.white,
-                                        },
-                                    }}
-                                >
-                                    Light
-                                </Button>
-                            </Stack>
-                        </Stack>
-                    </Box>
-
                 </Box>
             </Box>
         </Box>

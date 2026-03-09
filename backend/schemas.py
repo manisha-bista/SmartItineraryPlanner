@@ -531,3 +531,37 @@ class ComplaintOut(ComplaintBase):
 
     class Config:
         from_attributes = True
+
+
+# ============================================
+# COMMUNITY POST SCHEMAS
+# ============================================
+class CommunityPostCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    body: Optional[str] = None
+    image_url: Optional[str] = None
+    tag: str = Field(default="Experience", pattern="^(Experience|Alert|Event|Tip|Question)$")
+    place: str = Field(default="All", max_length=200)
+
+class CommunityPostOut(BaseModel):
+    id: int
+    title: str
+    body: Optional[str] = None
+    image_url: Optional[str] = None
+    tag: str
+    place: str
+    upvotes: int
+    downvotes: int
+    comment_count: int
+    user_id: int
+    created_at: datetime
+    # added by the endpoint, not directly from the model
+    author_name: Optional[str] = None
+    author_initial: Optional[str] = None
+    user_vote: Optional[str] = None  # 'up', 'down', or None
+
+    class Config:
+        from_attributes = True
+
+class PostVoteRequest(BaseModel):
+    direction: str = Field(..., pattern="^(up|down)$")
