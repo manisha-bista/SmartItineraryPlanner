@@ -21,7 +21,9 @@ import {
     AccordionSummary,
     AccordionDetails,
     Grid,
-    Paper
+    Paper,
+    Divider,
+    Chip
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import AddIcon from '@mui/icons-material/Add';
@@ -32,9 +34,10 @@ import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import AccessTimeIcon from '@mui/icons-material/AccessTime';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import AutoAwesomeIcon from '@mui/icons-material/AutoAwesome';
+import EditIcon from '@mui/icons-material/Edit';
 import axios from 'axios';
 
-// Design System Colors
 const COLORS = {
     brand: '#33CCCC',
     background: '#141627',
@@ -49,7 +52,6 @@ const COLORS = {
     border: 'rgba(255, 255, 255, 0.08)',
 };
 
-// Shared input field styles
 const inputSx = {
     '& .MuiOutlinedInput-root': {
         bgcolor: COLORS.cardSecondary,
@@ -59,21 +61,14 @@ const inputSx = {
         '&:hover fieldset': { borderColor: COLORS.brand },
         '&.Mui-focused fieldset': { borderColor: COLORS.brand },
     },
-    '& .MuiInputBase-input::placeholder': {
-        color: COLORS.fadedText,
-        opacity: 1,
-    },
+    '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
     '& .MuiInputLabel-root': { color: COLORS.fadedText },
     '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand },
     '& .MuiFormHelperText-root': { color: COLORS.fadedText },
     '& .MuiInputBase-input': { color: COLORS.text },
     '& .MuiSelect-icon': { color: COLORS.fadedText },
-    '& .MuiInputBase-input[type=date]::-webkit-calendar-picker-indicator': {
-        filter: 'invert(0.6)',
-    },
-    '& .MuiInputBase-input[type=time]::-webkit-calendar-picker-indicator': {
-        filter: 'invert(0.6)',
-    },
+    '& .MuiInputBase-input[type=date]::-webkit-calendar-picker-indicator': { filter: 'invert(0.6)' },
+    '& .MuiInputBase-input[type=time]::-webkit-calendar-picker-indicator': { filter: 'invert(0.6)' },
 };
 
 const errorInputSx = (hasError) => ({
@@ -85,6 +80,16 @@ const errorInputSx = (hasError) => ({
     '& .MuiFormHelperText-root': { color: hasError ? COLORS.error : COLORS.fadedText },
 });
 
+const TRAVEL_STYLES = [
+    { value: 'general',   label: 'General' },
+    { value: 'adventure', label: 'Adventure' },
+    { value: 'cultural',  label: 'Cultural' },
+    { value: 'trekking',  label: 'Trekking' },
+    { value: 'relaxed',   label: 'Relaxed' },
+    { value: 'budget',    label: 'Budget' },
+    { value: 'luxury',    label: 'Luxury' },
+];
+
 const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     const [activeStep, setActiveStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
@@ -95,11 +100,17 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         start_date: '',
         end_date: '',
         estimated_budget: '',
-        currency: 'NPR'
+        currency: 'NPR',
     });
 
     const [days, setDays] = useState([]);
     const [validationErrors, setValidationErrors] = useState({});
+
+    // AI section state
+    const [aiPrompt, setAiPrompt] = useState('');
+    const [aiStyle, setAiStyle] = useState('general');
+    const [aiGenerating, setAiGenerating] = useState(false);
+    const [aiError, setAiError] = useState('');
 
     const steps = ['Trip Details', 'Plan Destinations', 'Review & Save'];
 
@@ -108,8 +119,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         const start = new Date(startDate);
         const end = new Date(endDate);
         const diffTime = Math.abs(end - start);
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
-        return diffDays;
+        return Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
     };
 
     useEffect(() => {
@@ -123,7 +133,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     return {
                         day_number: index + 1,
                         date: dayDate.toISOString().split('T')[0],
-                        destinations: []
+                        destinations: [],
                     };
                 });
                 setDays(newDays);
@@ -176,6 +186,57 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
     const handleBack = () => setActiveStep((prev) => prev - 1);
 
+    // AI generation — uses the freeform prompt as destination description
+    const handleAiGenerate = async () => {
+        if (!validateStep1()) return;
+
+        if (!aiPrompt.trim()) {
+            setAiError('Please describe your ideal trip before generating.');
+            return;
+        }
+
+        setAiGenerating(true);
+        setAiError('');
+
+        try {
+            const numDays = calculateDays(tripInfo.start_date, tripInfo.end_date);
+
+            const response = await axios.post('http://127.0.0.1:8000/ai/generate-itinerary', {
+                destination: aiPrompt.trim(),
+                days: numDays,
+                budget: parseFloat(tripInfo.estimated_budget) || 0,
+                style: aiStyle,
+            });
+
+            const data = response.data;
+
+            const updatedDays = days.map((day) => {
+                const aiDay = (data.days || []).find((d) => d.day_number === day.day_number);
+                if (!aiDay) return day;
+                return {
+                    ...day,
+                    destinations: (aiDay.activities || []).map((act) => ({
+                        location: act.location || act.title || '',
+                        time: act.start_time || '',
+                        description: act.description || '',
+                        activity_type: act.activity_type || 'sightseeing',
+                        cost: act.cost || 0,
+                        priority: act.priority || 'medium',
+                        title: act.title || act.location || '',
+                    })),
+                };
+            });
+
+            setDays(updatedDays);
+            setActiveStep(1);
+        } catch (err) {
+            if (err.response?.data?.detail) setAiError(err.response.data.detail);
+            else setAiError('AI generation failed. You can still proceed manually by clicking Next.');
+        } finally {
+            setAiGenerating(false);
+        }
+    };
+
     const handleSubmit = async () => {
         setSubmitting(true);
         setError('');
@@ -192,18 +253,21 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 status: 'planning',
                 is_public: false,
                 user_id: userId,
-                days: days.map(day => ({
+                days: days.map((day) => ({
                     day_number: day.day_number,
                     date: day.date,
                     title: `Day ${day.day_number}`,
                     description: null,
-                    estimated_cost: 0
+                    estimated_cost: 0,
                 })),
                 accommodations: [],
-                transportation: []
+                transportation: [],
             };
 
-            const itineraryResponse = await axios.post('http://127.0.0.1:8000/itineraries/complete', itineraryPayload);
+            const itineraryResponse = await axios.post(
+                'http://127.0.0.1:8000/itineraries/complete',
+                itineraryPayload
+            );
 
             for (let dayIndex = 0; dayIndex < days.length; dayIndex++) {
                 const day = days[dayIndex];
@@ -211,16 +275,16 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 for (const destination of day.destinations) {
                     if (destination.location.trim()) {
                         await axios.post('http://127.0.0.1:8000/activities', {
-                            title: destination.location.trim(),
-                            description: destination.description.trim() || null,
+                            title: destination.title || destination.location.trim(),
+                            description: destination.description?.trim() || null,
                             location: destination.location.trim(),
                             start_time: destination.time || null,
                             end_time: null,
-                            activity_type: 'destination',
-                            cost: 0,
-                            priority: 'medium',
+                            activity_type: destination.activity_type || 'destination',
+                            cost: destination.cost || 0,
+                            priority: destination.priority || 'medium',
                             is_completed: false,
-                            day_id: createdDay.id
+                            day_id: createdDay.id,
                         });
                     }
                 }
@@ -244,6 +308,9 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             setDays([]);
             setValidationErrors({});
             setError('');
+            setAiPrompt('');
+            setAiStyle('general');
+            setAiError('');
             onClose();
         }
     };
@@ -267,10 +334,10 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     border: `1px solid ${COLORS.border}`,
                     borderRadius: 4,
                     boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${COLORS.border}`,
-                }
+                },
             }}
         >
-            {/* Dialog Title */}
+            {/* Title */}
             <DialogTitle
                 sx={{
                     display: 'flex',
@@ -295,7 +362,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     sx={{
                         color: COLORS.fadedText,
                         borderRadius: 2,
-                        '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' }
+                        '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' },
                     }}
                 >
                     <CloseIcon />
@@ -325,7 +392,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 </Stepper>
             </Box>
 
-            {/* Dialog Content */}
+            {/* Content */}
             <DialogContent
                 dividers
                 sx={{
@@ -354,9 +421,11 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     </Alert>
                 )}
 
-                {/* ── STEP 1: Trip Details ── */}
+                {/* STEP 1: Trip Details */}
                 {activeStep === 0 && (
                     <Stack spacing={3} sx={{ mt: 2 }}>
+
+                        {/* --- Main form fields --- */}
                         <TextField
                             fullWidth
                             label="Trip Title *"
@@ -443,11 +512,8 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                         '& select': {
                                             bgcolor: 'transparent',
                                             color: COLORS.text,
-                                            '& option': {
-                                                bgcolor: COLORS.cardPrimary,
-                                                color: COLORS.text,
-                                            }
-                                        }
+                                            '& option': { bgcolor: COLORS.cardPrimary, color: COLORS.text },
+                                        },
                                     }}
                                 >
                                     <option value="NPR">NPR</option>
@@ -457,10 +523,85 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                 </TextField>
                             </Grid>
                         </Grid>
+
+                        {/* --- AI Generation Section --- */}
+                        <Box>
+                            <Divider sx={{ borderColor: COLORS.border, mb: 3 }} />
+
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                <AutoAwesomeIcon sx={{ fontSize: 16, color: COLORS.fadedText }} />
+                                <Typography variant="subtitle2" sx={{ color: COLORS.subheadings, fontWeight: 'bold' }}>
+                                    Generate with AI
+                                </Typography>
+                            </Stack>
+
+                            <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 2 }}>
+                                Describe your ideal trip — places you want to visit, things to do, landmarks, food experiences, or anything else. AI will build your day-by-day plan from it.
+                            </Typography>
+
+                            {aiError && (
+                                <Alert
+                                    severity="error"
+                                    sx={{
+                                        mb: 2,
+                                        bgcolor: 'rgba(255,107,107,0.1)',
+                                        color: COLORS.error,
+                                        border: `1px solid rgba(255,107,107,0.3)`,
+                                        borderRadius: 2,
+                                        '& .MuiAlert-icon': { color: COLORS.error },
+                                    }}
+                                    onClose={() => setAiError('')}
+                                >
+                                    {aiError}
+                                </Alert>
+                            )}
+
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={3}
+                                label="Describe your ideal trip"
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                placeholder="e.g., I want to visit Boudhanath Stupa and Pashupatinath Temple, try local street food in Thamel, and hike to a viewpoint with Himalayan views. I also enjoy cultural experiences and peaceful spots."
+                                sx={{ ...inputSx, mb: 2 }}
+                            />
+
+                            <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 1.5 }}>
+                                Travel style
+                            </Typography>
+
+                            <Stack direction="row" flexWrap="wrap" gap={1}>
+                                {TRAVEL_STYLES.map((style) => (
+                                    <Chip
+                                        key={style.value}
+                                        label={style.label}
+                                        onClick={() => setAiStyle(style.value)}
+                                        size="small"
+                                        sx={{
+                                            borderRadius: 2,
+                                            fontWeight: aiStyle === style.value ? 'bold' : 'normal',
+                                            bgcolor: aiStyle === style.value
+                                                ? 'rgba(51,204,204,0.18)'
+                                                : COLORS.cardSecondary,
+                                            color: aiStyle === style.value ? COLORS.brand : COLORS.fadedText,
+                                            border: aiStyle === style.value
+                                                ? `1px solid rgba(51,204,204,0.5)`
+                                                : `1px solid transparent`,
+                                            cursor: 'pointer',
+                                            '&:hover': {
+                                                bgcolor: 'rgba(51,204,204,0.1)',
+                                                color: COLORS.brand,
+                                            },
+                                        }}
+                                    />
+                                ))}
+                            </Stack>
+                        </Box>
                     </Stack>
                 )}
 
-                {/* ── STEP 2: Plan Destinations ── */}
+                {/* STEP 2: Plan Destinations */}
                 {activeStep === 1 && (
                     <Box sx={{ mt: 2 }}>
                         <Typography variant="h6" gutterBottom sx={{ mb: 3, color: COLORS.headings, fontWeight: 'bold' }}>
@@ -478,18 +619,13 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                         border: `1px solid ${COLORS.border}`,
                                         '&:before': { display: 'none' },
                                         boxShadow: 'none',
-                                        '&.Mui-expanded': {
-                                            boxShadow: `0 4px 20px rgba(51,204,204,0.08)`,
-                                        },
+                                        '&.Mui-expanded': { boxShadow: `0 4px 20px rgba(51,204,204,0.08)` },
                                         overflow: 'hidden',
                                     }}
                                 >
                                     <AccordionSummary
                                         expandIcon={<ExpandMoreIcon sx={{ color: COLORS.brand }} />}
-                                        sx={{
-                                            bgcolor: 'transparent',
-                                            '&:hover': { bgcolor: COLORS.cardSecondary },
-                                        }}
+                                        sx={{ bgcolor: 'transparent', '&:hover': { bgcolor: COLORS.cardSecondary } }}
                                     >
                                         <Stack direction="row" spacing={2} alignItems="center">
                                             <Box
@@ -548,7 +684,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                 sx={{
                                                                     color: COLORS.fadedText,
                                                                     borderRadius: 1.5,
-                                                                    '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' }
+                                                                    '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' },
                                                                 }}
                                                             >
                                                                 <DeleteIcon fontSize="small" />
@@ -609,7 +745,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                     '&:hover': {
                                                         borderColor: COLORS.brand,
                                                         bgcolor: 'rgba(51,204,204,0.06)',
-                                                    }
+                                                    },
                                                 }}
                                             >
                                                 Add Destination
@@ -622,7 +758,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     </Box>
                 )}
 
-                {/* ── STEP 3: Review & Save ── */}
+                {/* STEP 3: Review & Save */}
                 {activeStep === 2 && (
                     <Box sx={{ mt: 2 }}>
                         <Stack spacing={3}>
@@ -704,10 +840,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                 {day.destinations.map((dest, idx) => (
                                                     <Box
                                                         key={idx}
-                                                        sx={{
-                                                            pl: 2,
-                                                            borderLeft: `3px solid rgba(51,204,204,0.5)`,
-                                                        }}
+                                                        sx={{ pl: 2, borderLeft: `3px solid rgba(51,204,204,0.5)` }}
                                                     >
                                                         <Stack direction="row" spacing={2} alignItems="center">
                                                             <Typography variant="body2" fontWeight="medium" sx={{ color: COLORS.text }}>
@@ -743,7 +876,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 )}
             </DialogContent>
 
-            {/* Dialog Actions */}
+            {/* Actions */}
             <DialogActions
                 sx={{
                     px: 3,
@@ -755,7 +888,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             >
                 <Button
                     onClick={handleClose}
-                    disabled={submitting}
+                    disabled={submitting || aiGenerating}
                     sx={{
                         color: COLORS.fadedText,
                         borderRadius: 2.5,
@@ -782,10 +915,41 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     </Button>
                 )}
 
+                {activeStep === 0 && (
+                    <Button
+                        variant="outlined"
+                        onClick={handleAiGenerate}
+                        disabled={aiGenerating || submitting}
+                        startIcon={
+                            aiGenerating
+                                ? <CircularProgress size={15} sx={{ color: COLORS.brand }} />
+                                : <AutoAwesomeIcon />
+                        }
+                        sx={{
+                            borderColor: 'rgba(51,204,204,0.45)',
+                            color: COLORS.brand,
+                            borderRadius: 2.5,
+                            px: 2.5,
+                            '&:hover': {
+                                borderColor: COLORS.brand,
+                                bgcolor: 'rgba(51,204,204,0.06)',
+                            },
+                            '&:disabled': {
+                                borderColor: COLORS.border,
+                                color: COLORS.fadedText,
+                            },
+                        }}
+                    >
+                        {aiGenerating ? 'Generating...' : 'Generate'}
+                    </Button>
+                )}
+
                 {activeStep < steps.length - 1 ? (
                     <Button
                         variant="contained"
                         onClick={handleNext}
+                        disabled={aiGenerating}
+                        startIcon={<EditIcon />}
                         endIcon={<NavigateNextIcon />}
                         sx={{
                             bgcolor: COLORS.brand,
@@ -797,6 +961,10 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                 bgcolor: '#2db8b8',
                                 transform: 'translateY(-2px)',
                                 boxShadow: `0 4px 12px rgba(51,204,204,0.4)`,
+                            },
+                            '&:disabled': {
+                                bgcolor: COLORS.cardSecondary,
+                                color: COLORS.fadedText,
                             },
                             transition: 'all 0.3s',
                         }}

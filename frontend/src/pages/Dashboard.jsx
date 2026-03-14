@@ -507,7 +507,7 @@ const Dashboard = () => {
                                     <CircularProgress sx={{ color: COLORS.brand }} />
                                 </Box>
                             ) : itineraries.length === 0 ? (
-                                // Empty State for New Users
+                                // Empty State
                                 <Card
                                     sx={{
                                         bgcolor: COLORS.cardPrimary,
@@ -538,63 +538,63 @@ const Dashboard = () => {
                                     </Typography>
                                 </Card>
                             ) : (
-                                // Trips Grid (when user has trips)
-                                <Grid container spacing={3}>
-                                    {itineraries.map((trip) => (
-                                        <Grid item xs={12} sm={6} md={4} key={trip.id}>
-                                            <Card
-                                                sx={{
-                                                    bgcolor: COLORS.cardPrimary,
-                                                    borderRadius: 5,
-                                                    overflow: 'hidden',
-                                                    cursor: 'pointer',
-                                                    transition: 'all 0.3s',
-                                                    '&:hover': {
-                                                        transform: 'translateY(-8px)',
-                                                        boxShadow: `0 8px 24px ${COLORS.brand}20`
-                                                    }
-                                                }}
-                                                onClick={() => navigate(`/itinerary/${trip.id}`)}
-                                            >
-                                                <CardMedia
-                                                    component="img"
-                                                    height="180"
-                                                    image='https://images.unsplash.com/photo-1609750727688-1176db9980ae?q=80&w=2071&auto=format&fit=crop'
-                                                    alt={trip.title}
-                                                />
-                                                <CardContent sx={{ p: 2.5 }}>
-                                                    <Stack direction="row" justifyContent="space-between" alignItems="flex-start" sx={{ mb: 1.5 }}>
-                                                        <Typography variant="h6" fontWeight="bold" sx={{ color: COLORS.headings }}>
-                                                            {trip.title}
+                                // Trips Row — max 3 fixed-size cards
+                                <Stack direction="row" spacing={2.5}>
+                                    {itineraries.slice(0, 3).map((trip) => (
+                                        <Card
+                                            key={trip.id}
+                                            sx={{
+                                                bgcolor: COLORS.cardPrimary,
+                                                borderRadius: 4,
+                                                overflow: 'hidden',
+                                                cursor: 'pointer',
+                                                flex: '1 1 0',
+                                                minWidth: 0,
+                                                maxWidth: '33.33%',
+                                                transition: 'all 0.3s',
+                                                '&:hover': {
+                                                    transform: 'translateY(-6px)',
+                                                    boxShadow: `0 8px 24px ${COLORS.brand}20`
+                                                }
+                                            }}
+                                            onClick={() => navigate(`/itinerary/${trip.id}`)}
+                                        >
+                                            <CardMedia
+                                                component="img"
+                                                height="160"
+                                                image="https://images.unsplash.com/photo-1609750727688-1176db9980ae?q=80&w=600&auto=format&fit=crop"
+                                                alt={trip.title}
+                                                sx={{ objectFit: 'cover' }}
+                                            />
+                                            <CardContent sx={{ p: 2 }}>
+                                                <Typography
+                                                    variant="subtitle1"
+                                                    fontWeight="bold"
+                                                    noWrap
+                                                    sx={{ color: COLORS.headings, mb: 1 }}
+                                                >
+                                                    {trip.title}
+                                                </Typography>
+                                                <Stack spacing={0.75}>
+                                                    <Stack direction="row" justifyContent="space-between" alignItems="center">
+                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
+                                                            Estimated Budget
                                                         </Typography>
-                                                        <Chip
-                                                            label={trip.status?.toUpperCase()}
-                                                            size="small"
-                                                            color={getStatusColor(trip.status)}
-                                                        />
-                                                    </Stack>
-                                                    <Stack spacing={1}>
-                                                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                            <LocationOnIcon sx={{ fontSize: 14, color: COLORS.fadedText }} />
-                                                            <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
-                                                                {trip.destination}
-                                                            </Typography>
-                                                        </Stack>
-                                                        <Typography variant="body2" fontWeight="bold" sx={{ color: COLORS.brand }}>
-                                                            Estimated Budget {trip.currency} {trip.estimated_budget?.toLocaleString()}
+                                                        <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.brand }}>
+                                                            {trip.currency} {trip.estimated_budget?.toLocaleString()}
                                                         </Typography>
-                                                        <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                            <CalendarTodayIcon sx={{ fontSize: 14, color: COLORS.fadedText }} />
-                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
-                                                                {formatDate(trip.start_date)} – {formatDate(trip.end_date)} · {calculateDuration(trip.start_date, trip.end_date)} days
-                                                            </Typography>
-                                                        </Stack>
                                                     </Stack>
-                                                </CardContent>
-                                            </Card>
-                                        </Grid>
+                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                        <CalendarTodayIcon sx={{ fontSize: 12, color: COLORS.fadedText }} />
+                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText }} noWrap>
+                                                            {formatDate(trip.start_date)} - {formatDate(trip.end_date)}
+                                                        </Typography>
+                                                    </Stack>
+                                                </Stack>
+                                            </CardContent>
+                                        </Card>
                                     ))}
-                                </Grid>
+                                </Stack>
                             )}
                         </Box>
 

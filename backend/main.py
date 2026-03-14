@@ -7,7 +7,15 @@ import models, schemas
 from passlib.context import CryptContext
 from datetime import datetime
 import logging
+import json
+import os
 from typing import List, Optional
+from dotenv import load_dotenv
+from google import genai as google_genai
+from google.genai import types
+
+load_dotenv()
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
@@ -1250,6 +1258,129 @@ def get_all_itineraries(db: Session = Depends(get_db)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
+
+# ============================================
+# AI ITINERARY GENERATION ENDPOINT
+# ============================================
+
+SYSTEM_PROMPT = """
+You are a Nepal travel itinerary planner AI.
+You MUST return ONLY a valid JSON object with NO extra text, no markdown, no explanation, no ```json fences — just raw JSON.
+
+The JSON must follow this EXACT structure:
+{
+  "title": "string - creative trip title",
+  "destination": "string - main destination name, derived from the user's description",
+  "description": "string - 2 sentence trip summary",
+  "days": [
+    {
+      "day_number": 1,
+      "title": "string - theme for the day",
+      "estimated_cost": 0,
+      "activities": [
+        {
+          "title": "string - activity name",
+          "location": "string - specific place name in Nepal, real and searchable on Google Maps",
+          "description": "string - 1-2 sentence description",
+          "start_time": "HH:MM",
+          "activity_type": "one of exactly: trekking, sightseeing, dining, cultural, adventure, transport, shopping, wellness, health",
+          "cost": 0,
+          "priority": "one of exactly: low, medium, high, must-do"
+        }
+      ]
+    }
+  ]
+}
+
+Rules you MUST follow:
+- Read the user's description carefully and base the itinerary on the specific places, things to do, and interests they mention
+- Do NOT default to generic Kathmandu locations unless the user specifically mentions Kathmandu
+- cost and estimated_cost are numbers in NPR, never strings, never include currency symbols
+- start_time is always 24hr format like "09:00" or "14:30"
+- Generate exactly 3-4 activities per day
+- activity_type must be one value from the allowed list only
+- priority must be one value from the allowed list only
+- location must be a real, specific place in Nepal that exists on Google Maps
+- All fields must be present, never null or missing
+"""
+
+@app.post("/ai/generate-itinerary")
+async def generate_itinerary(request: dict):
+    try:
+        destination = request.get("destination", "")
+        days = request.get("days", 3)
+        budget = request.get("budget", 0)
+        style = request.get("style", "general")
+
+        if not destination:
+            raise HTTPException(status_code=400, detail="Destination is required")
+
+        client = google_genai.Client(api_key=GEMINI_API_KEY)
+
+        user_prompt = f"""
+The user has described their ideal trip as follows:
+"{destination}"
+
+Using the above description, generate a {days}-day travel itinerary in Nepal.
+- Travel style: {style}
+- Total budget: NPR {budget if budget > 0 else "flexible"}
+- Number of days: {days}
+
+Important instructions:
+- Extract the specific places, landmarks, and activities mentioned in the description and use them as the basis for the itinerary.
+- If the description mentions specific locations (e.g. Boudhanath, Pokhara, Chitwan), prioritize those. Do NOT default to Kathmandu unless it is mentioned.
+- Spread activities logically across the {days} days.
+- Use real, accurate place names in Nepal.
+- Make the itinerary feel personalized to what the user described.
+"""
+
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            config=types.GenerateContentConfig(
+                system_instruction=SYSTEM_PROMPT,
+                temperature=0.7,
+            ),
+            contents=user_prompt
+        )
+
+        raw_text = response.text.strip()
+
+        # Clean up in case Gemini adds markdown fences anyway
+        if raw_text.startswith("```"):
+            raw_text = raw_text.split("```")[1]
+            if raw_text.startswith("json"):
+                raw_text = raw_text[4:]
+        raw_text = raw_text.strip()
+
+        itinerary_data = json.loads(raw_text)
+
+        # Validate and fill defaults as safety net
+        for day in itinerary_data.get("days", []):
+            day.setdefault("estimated_cost", 0)
+            for act in day.get("activities", []):
+                act.setdefault("cost", 0)
+                act.setdefault("priority", "medium")
+                act.setdefault("start_time", "09:00")
+                act.setdefault("activity_type", "sightseeing")
+                act.setdefault("description", "")
+
+        return itinerary_data
+
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=500, detail="AI returned invalid JSON. Please try again.")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"AI generation failed: {str(e)}")
+
+
+@app.get("/ai/list-models")
+async def list_models():
+    """Debug: List all available Gemini models for this API key"""
+    try:
+        client = google_genai.Client(api_key=GEMINI_API_KEY)
+        models_list = client.models.list()
+        return {"models": [m.name for m in models_list]}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":
     import uvicorn
