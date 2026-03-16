@@ -9,11 +9,13 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
+    username = Column(String(20), unique=True, index=True, nullable=True)  # auto-generated, public identity
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(20), default="user", nullable=False)  # user, admin
     
     # Profile fields
+    avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-20)
     profile_picture_url = Column(String(500), nullable=True)
     bio = Column(Text, nullable=True)
     location = Column(String(200), nullable=True)
@@ -290,7 +292,7 @@ class TripNote(Base):
     itinerary = relationship("Itinerary", back_populates="notes")
 
 
-# NEW: ITINERARY COMMENTS (for community engagement)
+# ITINERARY COMMENTS (for community engagement)
 class ItineraryComment(Base):
     __tablename__ = "itinerary_comments"
 
@@ -315,7 +317,7 @@ class ItineraryComment(Base):
     )
 
 
-# NEW: ITINERARY TAGS (for categorization and search)
+# ITINERARY TAGS (for categorization and search)
 class ItineraryTag(Base):
     __tablename__ = "itinerary_tags"
 
@@ -333,7 +335,7 @@ class ItineraryTag(Base):
     )
 
 
-# NEW: COMMUNITY UPDATES (road closures, events, alerts)
+# COMMUNITY UPDATES (road closures, events, alerts)
 class CommunityUpdate(Base):
     __tablename__ = "community_updates"
 
@@ -426,6 +428,7 @@ class CommunityPost(Base):
     # Relationships
     author = relationship("User", back_populates="community_posts")
     votes = relationship("PostVote", back_populates="post", cascade="all, delete-orphan")
+    comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
 
 
 # tracks which user voted on which post (so one vote per user per post)
@@ -444,4 +447,147 @@ class PostVote(Base):
 
     __table_args__ = (
         Index('idx_user_post_vote', 'user_id', 'post_id', unique=True),
+    )
+
+
+# PLACE MODEL
+# Caches Google Places API results so we only ever call the API
+# once per unique place. All future lookups for the same place hit our DB.
+class Place(Base):
+    __tablename__ = "places"
+
+    id = Column(Integer, primary_key=True, index=True)
+    google_place_id = Column(String(200), unique=True, index=True, nullable=False)
+    name = Column(String(200), nullable=False, index=True)
+    address = Column(String(500), nullable=True)
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    place_types = Column(String(500), nullable=True)   # "tourist_attraction,park"
+    rating = Column(Float, nullable=True)
+    photo_reference = Column(String(1000), nullable=True)
+    city = Column(String(100), nullable=True, index=True)  # "Kathmandu" | "Pokhara" | "Bhaktapur"
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # relationship to aliases
+    aliases = relationship("PlaceSearchAlias", back_populates="place", cascade="all, delete-orphan")
+
+
+# PLACE SEARCH ALIAS
+# Learns from every Google API query. Maps user search terms to cached places.
+# e.g. "monkey temple" → Swayambhunath, "boudha" → Boudhanath Stupa
+# Only stores aliases for queries 5+ chars to avoid noisy short fragments.
+class PlaceSearchAlias(Base):
+    __tablename__ = "place_search_aliases"
+
+    id = Column(Integer, primary_key=True, index=True)
+    query_text = Column(String(300), nullable=False, index=True)  # lowercase, trimmed
+    place_id = Column(Integer, ForeignKey("places.id", ondelete="CASCADE"), nullable=False, index=True)
+    hit_count = Column(Integer, default=1)  # how many times this alias was searched
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # relationship
+    place = relationship("Place", back_populates="aliases")
+
+    __table_args__ = (
+        Index('idx_alias_query_place', 'query_text', 'place_id', unique=True),
+    )
+
+
+# PASSWORD RESET OTP
+# Stores a temporary 6-digit OTP for password reset.
+# Expires after 10 minutes. Deleted after successful use.
+class PasswordResetOTP(Base):
+    __tablename__ = "password_reset_otps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    otp_code = Column(String(6), nullable=False)
+    expires_at = Column(DateTime, nullable=False)
+    is_used = Column(Boolean, default=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+# POST COMMENT MODEL
+# Comments on community posts
+class PostComment(Base):
+    __tablename__ = "post_comments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    content = Column(Text, nullable=False)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    # Foreign Keys
+    post_id = Column(Integer, ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+
+    # Relationships
+    post = relationship("CommunityPost", back_populates="comments")
+    user = relationship("User")
+
+    __table_args__ = (
+        Index('idx_post_comment_created', 'post_id', 'created_at'),
+    )
+
+
+# NOTIFICATION MODEL
+# Tracks events users should know about — votes, comments on their content
+class Notification(Base):
+    __tablename__ = "notifications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    type = Column(String(50), nullable=False, index=True)  # 'comment', 'upvote', 'alert'
+    message = Column(String(500), nullable=False)
+    is_read = Column(Boolean, default=False, index=True)
+
+    # optional references
+    post_id = Column(Integer, nullable=True)
+    from_user_id = Column(Integer, nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index('idx_user_unread', 'user_id', 'is_read'),
+    )
+
+
+# FRIENDSHIP MODEL
+# Bidirectional friend connections with request/accept flow
+class Friendship(Base):
+    __tablename__ = "friendships"
+
+    id = Column(Integer, primary_key=True, index=True)
+    requester_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    receiver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, accepted, rejected
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+
+    __table_args__ = (
+        Index('idx_friendship_pair', 'requester_id', 'receiver_id', unique=True),
+    )
+
+
+# MESSAGE MODEL
+# Direct messages between friends
+class Message(Base):
+    __tablename__ = "messages"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    receiver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    content = Column(Text, nullable=False)
+    is_read = Column(Boolean, default=False)
+
+    # optional: shared itinerary
+    shared_itinerary_id = Column(Integer, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        Index('idx_message_conversation', 'sender_id', 'receiver_id', 'created_at'),
     )

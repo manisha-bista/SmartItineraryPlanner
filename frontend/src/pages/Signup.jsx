@@ -104,6 +104,9 @@ const Signup = () => {
                 localStorage.setItem('userId', response.data.id);
                 localStorage.setItem('userName', response.data.name);
                 localStorage.setItem('userEmail', response.data.email);
+                localStorage.setItem('userRole', response.data.role || 'user');
+                localStorage.setItem('username', response.data.username || '');
+                localStorage.setItem('avatarId', response.data.avatar_id || 1);
             }
             navigate('/dashboard', { replace: true });
         } catch (err) {

@@ -77,7 +77,7 @@ const Navbar = ({ COLORS, isDark, onToggle }) => {
 
             {/* Nav Links + Toggle */}
             <Stack direction="row" spacing={1} alignItems="center">
-                {['Home', 'Features'].map((item) => (
+                {/* {['Home', 'Features'].map((item) => (
                     <Button key={item} sx={{
                         color: isDark ? 'white' : COLORS.headings,
                         bgcolor: 'transparent',
@@ -91,7 +91,7 @@ const Navbar = ({ COLORS, isDark, onToggle }) => {
                     }}>
                         {item}
                     </Button>
-                ))}
+                ))} */}
                 <Button
                     onClick={() => navigate('/login')}
                     sx={{

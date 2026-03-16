@@ -562,7 +562,7 @@ const Dashboard = () => {
                                             <CardMedia
                                                 component="img"
                                                 height="160"
-                                                image="https://images.unsplash.com/photo-1609750727688-1176db9980ae?q=80&w=600&auto=format&fit=crop"
+                                                image={trip.cover_photo ? `http://127.0.0.1:8000/places/photo?photo_reference=${trip.cover_photo}&max_width=600` : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'}
                                                 alt={trip.title}
                                                 sx={{ objectFit: 'cover' }}
                                             />

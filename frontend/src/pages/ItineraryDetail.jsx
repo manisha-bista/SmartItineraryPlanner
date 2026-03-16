@@ -20,9 +20,11 @@ import {
     Alert,
     Snackbar,
     Collapse,
+    Chip,
 } from '@mui/material';
 import { useParams, useNavigate } from 'react-router-dom';
 import axios from 'axios';
+import PlaceSearchAutocomplete from '../components/PlaceSearchAutocomplete';
 
 // Icons
 import ArrowBackIcon         from '@mui/icons-material/ArrowBack';
@@ -45,6 +47,10 @@ import GroupIcon             from '@mui/icons-material/Group';
 import LogoutIcon            from '@mui/icons-material/Logout';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowRightIcon from '@mui/icons-material/KeyboardArrowRight';
+import WbSunnyIcon from '@mui/icons-material/WbSunny';
+import CloudIcon from '@mui/icons-material/Cloud';
+import WaterDropIcon from '@mui/icons-material/WaterDrop';
+import AirIcon from '@mui/icons-material/Air';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -134,16 +140,90 @@ export default function ItineraryDetail() {
     const [delOpen,   setDelOpen]   = useState(false);
     const [delTarget, setDelTarget] = useState(null);
 
+    // community alerts relevant to this itinerary's places
+    const [alerts, setAlerts] = useState([]);
+
+    // weather
+    const [weatherLoading, setWeatherLoading] = useState(false);
+
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const load = async () => {
         try {
             setLoading(true);
             const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
             setItinerary(r.data);
+            checkAndUpdateStatus(r.data);
         } catch { toast('Failed to load itinerary.', 'error'); }
         finally { setLoading(false); }
     };
     useEffect(() => { load(); }, [id]);
+
+    // auto-update status: "planned" if every day has at least one activity, "planning" otherwise
+    const checkAndUpdateStatus = async (itin) => {
+        if (!itin || !itin.days || itin.days.length === 0) return;
+        // skip if status is already beyond planning/planned (ongoing, completed, cancelled)
+        if (['ongoing', 'completed', 'cancelled'].includes(itin.status)) return;
+
+        const allDaysFilled = itin.days.every(day =>
+            day.activities && day.activities.length > 0 && day.activities.every(act => act.location?.trim())
+        );
+        const newStatus = allDaysFilled ? 'confirmed' : 'planning';
+
+        if (itin.status !== newStatus) {
+            try {
+                await axios.put(`http://127.0.0.1:8000/itineraries/${itin.id}`, { status: newStatus });
+                setItinerary(prev => prev ? { ...prev, status: newStatus } : prev);
+            } catch { /* silent — status update is non-critical */ }
+        }
+    };
+
+    const fetchWeather = async () => {
+        if (!itinerary) return;
+        setWeatherLoading(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/itineraries/${itinerary.id}/fetch-weather?user_id=${userId}`);
+            await load();
+            toast('Weather updated!');
+        } catch (e) { toast(e.response?.data?.detail || 'Failed to fetch weather.', 'error'); }
+        finally { setWeatherLoading(false); }
+    };
+
+    // fetch relevant alerts when itinerary loads
+    useEffect(() => {
+        if (!itinerary) return;
+        const fetchAlerts = async () => {
+            try {
+                // gather all unique locations from activities
+                const locations = new Set();
+                (itinerary.days || []).forEach(day => {
+                    (day.activities || []).forEach(act => {
+                        if (act.location) locations.add(act.location);
+                        // also extract city from address
+                        if (act.formatted_address) {
+                            const parts = act.formatted_address.split(',');
+                            if (parts.length >= 2) locations.add(parts[parts.length - 2].trim());
+                        }
+                    });
+                });
+                if (itinerary.destination) locations.add(itinerary.destination);
+
+                // fetch alerts for each location
+                const allAlerts = [];
+                const seen = new Set();
+                for (const loc of locations) {
+                    try {
+                        const res = await axios.get('http://127.0.0.1:8000/community-updates', { params: { location: loc, active_only: true } });
+                        (res.data || []).forEach(a => {
+                            if (!seen.has(a.id)) { seen.add(a.id); allAlerts.push(a); }
+                        });
+                    } catch { /* skip */ }
+                }
+                setAlerts(allAlerts.sort((a, b) => new Date(b.created_at) - new Date(a.created_at)));
+            } catch { /* ignore */ }
+        };
+        fetchAlerts();
+    }, [itinerary]);
 
     const toast = (msg, sev = 'success') => setSnack({ open:true, msg, sev });
 
@@ -208,7 +288,7 @@ export default function ItineraryDetail() {
     // ── Activity CRUD ─────────────────────────────────────────────────────────
     const openAddAct = (dayId) => {
         setActDayId(dayId); setEditAct(null);
-        setActForm({ title:'', description:'', location:'', start_time:'', end_time:'', activity_type:'sightseeing', cost:0, actual_cost:0 });
+        setActForm({ title:'', description:'', location:'', start_time:'', end_time:'', activity_type:'sightseeing', cost:0, actual_cost:0, place_id:null, latitude:null, longitude:null, formatted_address:null, place_types:null, rating:null });
         setActErr({});
         setActOpen(true);
     };
@@ -224,6 +304,12 @@ export default function ItineraryDetail() {
             activity_type: act.activity_type || 'sightseeing',
             cost:          act.cost || 0,
             actual_cost:   act.actual_cost || 0,
+            place_id:      act.place_id || null,
+            latitude:      act.latitude || null,
+            longitude:     act.longitude || null,
+            formatted_address: act.formatted_address || null,
+            place_types:   act.place_types || null,
+            rating:        act.rating || null,
         });
         setActErr({});
         setActOpen(true);
@@ -231,19 +317,24 @@ export default function ItineraryDetail() {
 
     const saveAct = async () => {
         const errs = {};
-        if (!actForm.title?.trim())    errs.title    = 'Required';
         if (!actForm.location?.trim()) errs.location = 'Required';
         setActErr(errs);
         if (Object.keys(errs).length) return;
         setActBusy(true);
         try {
             const payload = {
-                title:         actForm.title.trim(),
+                title:         actForm.title?.trim() || actForm.location.trim(),
                 description:   actForm.description.trim(),
                 location:      actForm.location.trim(),
+                formatted_address: actForm.formatted_address || null,
+                latitude:      actForm.latitude || null,
+                longitude:     actForm.longitude || null,
+                place_id:      actForm.place_id || null,
+                place_types:   actForm.place_types || null,
+                rating:        actForm.rating || null,
                 start_time:    actForm.start_time || null,
                 end_time:      actForm.end_time   || null,
-                activity_type: actForm.activity_type,
+                activity_type: actForm.activity_type || 'sightseeing',
                 cost:          parseFloat(actForm.cost)        || 0,
                 actual_cost:   parseFloat(actForm.actual_cost) || 0,
                 is_completed:  editAct?.is_completed || false,
@@ -397,6 +488,12 @@ export default function ItineraryDetail() {
                         <Typography variant="body2" sx={{ color:C.faded }}>₹</Typography>
                         <Typography variant="body1" fontWeight="bold" sx={{ color:C.brand }}>{fmtNum(totalActual)}</Typography>
                     </Stack>
+
+                    <Button size="small" startIcon={weatherLoading ? <CircularProgress size={14} sx={{ color: C.brand }} /> : <WbSunnyIcon sx={{ fontSize: 16 }} />}
+                        onClick={fetchWeather} disabled={weatherLoading}
+                        sx={{ color: C.brand, bgcolor: 'rgba(51,204,204,0.08)', borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: 'rgba(51,204,204,0.15)' } }}>
+                        {weatherLoading ? 'Fetching...' : 'Weather'}
+                    </Button>
                 </Box>
 
                 {/* ── Days ──────────────────────────────────────────────────── */}
@@ -431,9 +528,30 @@ export default function ItineraryDetail() {
                                         </IconButton>
 
                                         {/* Day label */}
-                                        <Typography variant="h6" fontWeight="bold" sx={{ color:C.heading, flexGrow:1 }}>
+                                        <Typography variant="h6" fontWeight="bold" sx={{ color:C.heading }}>
                                             Day {day.day_number}: {fmtDateFull(day.date)}
                                         </Typography>
+
+                                        {/* Weather chip */}
+                                        {day.weather_condition && (
+                                            <Stack direction="row" alignItems="center" spacing={0.5} sx={{
+                                                bgcolor: 'rgba(51,204,204,0.06)', borderRadius: 2, px: 1.2, py: 0.3, ml: 1.5,
+                                                border: '1px solid rgba(51,204,204,0.12)',
+                                            }}>
+                                                {day.weather_icon && (
+                                                    <Box component="img" src={`https://openweathermap.org/img/wn/${day.weather_icon}.png`}
+                                                        sx={{ width: 24, height: 24 }} />
+                                                )}
+                                                <Typography sx={{ color: C.heading, fontSize: '0.72rem', fontWeight: 600 }}>
+                                                    {Math.round(day.weather_temp_min || 0)}°–{Math.round(day.weather_temp_max || 0)}°
+                                                </Typography>
+                                                <Typography sx={{ color: C.faded, fontSize: '0.65rem' }}>
+                                                    {day.weather_description || day.weather_condition}
+                                                </Typography>
+                                            </Stack>
+                                        )}
+
+                                        <Box sx={{ flexGrow: 1 }} />
 
                                         {/* Per-day budget numbers */}
                                         <Stack direction="row" alignItems="center" spacing={2} sx={{ mr:1.5 }}>
@@ -450,12 +568,6 @@ export default function ItineraryDetail() {
                                                 </Typography>
                                             </Stack>
                                         </Stack>
-
-                                        {/* Edit day (title + estimated budget) */}
-                                        <IconButton size="small" onClick={() => openEditDay(day)}
-                                            sx={{ color:C.faded, '&:hover':{ color:C.brand } }}>
-                                            <EditIcon fontSize="small" />
-                                        </IconButton>
 
                                         {/* Delete day */}
                                         <IconButton size="small"
@@ -490,6 +602,38 @@ export default function ItineraryDetail() {
                                     {/* ── Activities ── */}
                                     <Collapse in={isOpen}>
                                         <Box sx={{ px:2, pb:2 }}>
+                                            {/* Weather detail bar */}
+                                            {day.weather_condition && (
+                                                <Stack direction="row" spacing={2.5} alignItems="center" sx={{
+                                                    bgcolor: 'rgba(51,204,204,0.04)', borderRadius: 2.5, px: 2, py: 1, mb: 1.5,
+                                                    border: '1px solid rgba(51,204,204,0.08)',
+                                                }}>
+                                                    {day.weather_icon && (
+                                                        <Box component="img" src={`https://openweathermap.org/img/wn/${day.weather_icon}@2x.png`}
+                                                            sx={{ width: 40, height: 40 }} />
+                                                    )}
+                                                    <Box>
+                                                        <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 700 }}>
+                                                            {Math.round(day.weather_temp_min || 0)}° – {Math.round(day.weather_temp_max || 0)}°C
+                                                        </Typography>
+                                                        <Typography sx={{ color: C.faded, fontSize: '0.72rem', textTransform: 'capitalize' }}>
+                                                            {day.weather_description || day.weather_condition}
+                                                        </Typography>
+                                                    </Box>
+                                                    {day.weather_humidity != null && (
+                                                        <Stack direction="row" spacing={0.4} alignItems="center">
+                                                            <WaterDropIcon sx={{ fontSize: 14, color: '#42a5f5' }} />
+                                                            <Typography sx={{ color: C.sub, fontSize: '0.72rem' }}>{day.weather_humidity}%</Typography>
+                                                        </Stack>
+                                                    )}
+                                                    {day.weather_wind_speed != null && (
+                                                        <Stack direction="row" spacing={0.4} alignItems="center">
+                                                            <AirIcon sx={{ fontSize: 14, color: C.faded }} />
+                                                            <Typography sx={{ color: C.sub, fontSize: '0.72rem' }}>{day.weather_wind_speed} m/s</Typography>
+                                                        </Stack>
+                                                    )}
+                                                </Stack>
+                                            )}
                                             {!day.activities?.length ? (
                                                 <Box sx={{ textAlign:'center', py:4 }}>
                                                     <Typography variant="body2" sx={{ color:C.faded }}>
@@ -609,40 +753,51 @@ export default function ItineraryDetail() {
                         </Box>
                     </Stack>
                 )}
-            </Box>
 
-            {/* ── Day Dialog ────────────────────────────────────────────────── */}
-            <Dialog open={dayOpen} onClose={() => setDayOpen(false)} maxWidth="sm" fullWidth
-                PaperProps={{ sx:{ bgcolor:C.card, borderRadius:4 } }}>
-                <DialogTitle sx={{ color:C.heading, fontWeight:'bold' }}>
-                    {editDay ? 'Edit Day' : 'Add New Day'}
-                </DialogTitle>
-                <DialogContent>
-                    <Stack spacing={2.5} sx={{ mt:1 }}>
-                        <TextField fullWidth label="Day Title *" value={dayForm.title}
-                            onChange={e => setDayForm({ ...dayForm, title:e.target.value })}
-                            error={!!dayErr.title} helperText={dayErr.title || 'e.g., "Lakeside Pokhara"'}
-                            sx={inputSx} />
-                        <TextField fullWidth label="Date *" type="date" value={dayForm.date}
-                            onChange={e => setDayForm({ ...dayForm, date:e.target.value })}
-                            error={!!dayErr.date} helperText={dayErr.date}
-                            InputLabelProps={{ shrink:true }} sx={inputSx} />
-                        <TextField fullWidth label="Description" multiline rows={3} value={dayForm.description}
-                            onChange={e => setDayForm({ ...dayForm, description:e.target.value })}
-                            helperText="Brief overview of the day" sx={inputSx} />
-                        <TextField fullWidth label="Estimated Budget (₹)" type="number" value={dayForm.estimated_cost}
-                            onChange={e => setDayForm({ ...dayForm, estimated_cost:e.target.value })}
-                            helperText="Your planned spend for this day" sx={inputSx} />
-                    </Stack>
-                </DialogContent>
-                <DialogActions sx={{ px:3, pb:2.5 }}>
-                    <Button onClick={() => setDayOpen(false)} disabled={dayBusy} sx={{ color:C.faded }}>Cancel</Button>
-                    <Button onClick={saveDay} disabled={dayBusy}
-                        sx={{ bgcolor:C.brand, color:C.bg, fontWeight:'bold', borderRadius:3, px:3, '&:hover':{ bgcolor:'#2db8b8' } }}>
-                        {dayBusy ? <CircularProgress size={20} /> : (editDay ? 'Update Day' : 'Add Day')}
-                    </Button>
-                </DialogActions>
-            </Dialog>
+                {/* ── Alerts & Reports for this itinerary ─────────────────── */}
+                {alerts.length > 0 && (
+                    <Box sx={{ mt: 4, mb: 2 }}>
+                        <Typography variant="h6" fontWeight="bold" sx={{ color: C.yellow, mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Box component="span" sx={{ fontSize: '1.1rem' }}>⚠</Box>
+                            Community Alerts ({alerts.length})
+                        </Typography>
+                        <Stack spacing={1.5}>
+                            {alerts.map((alert) => {
+                                const sevColors = { info: C.brand, warning: C.yellow, urgent: C.red };
+                                const sevColor = sevColors[alert.severity] || C.yellow;
+                                return (
+                                    <Box key={alert.id} sx={{
+                                        bgcolor: C.card, borderRadius: 3, border: `1px solid ${sevColor}30`,
+                                        borderLeft: `3px solid ${sevColor}`, px: 2.5, py: 1.5,
+                                    }}>
+                                        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                                    <Typography sx={{ color: sevColor, fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase' }}>
+                                                        {alert.update_type}
+                                                    </Typography>
+                                                    <Typography sx={{ color: C.faded, fontSize: '0.68rem' }}>·</Typography>
+                                                    <Typography sx={{ color: C.faded, fontSize: '0.68rem' }}>{alert.severity}</Typography>
+                                                    <Typography sx={{ color: C.faded, fontSize: '0.68rem' }}>·</Typography>
+                                                    <Stack direction="row" spacing={0.3} alignItems="center">
+                                                        <LocationOnIcon sx={{ fontSize: 11, color: C.brand }} />
+                                                        <Typography sx={{ color: C.brand, fontSize: '0.68rem' }}>{alert.location}</Typography>
+                                                    </Stack>
+                                                </Stack>
+                                                <Typography sx={{ color: C.heading, fontSize: '0.88rem', fontWeight: 600 }}>{alert.title}</Typography>
+                                                <Typography sx={{ color: C.faded, fontSize: '0.78rem', mt: 0.3, lineHeight: 1.5 }}>{alert.content}</Typography>
+                                            </Box>
+                                            <Typography sx={{ color: C.faded, fontSize: '0.65rem', flexShrink: 0, ml: 2 }}>
+                                                {fmtDate(alert.created_at)}
+                                            </Typography>
+                                        </Stack>
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    </Box>
+                )}
+            </Box>
 
             {/* ── Activity Dialog ───────────────────────────────────────────── */}
             <Dialog open={actOpen} onClose={() => setActOpen(false)} maxWidth="sm" fullWidth
@@ -652,44 +807,83 @@ export default function ItineraryDetail() {
                 </DialogTitle>
                 <DialogContent>
                     <Stack spacing={2.5} sx={{ mt:1 }}>
-                        <TextField fullWidth label="Title *" value={actForm.title}
-                            onChange={e => setActForm({ ...actForm, title:e.target.value })}
-                            error={!!actErr.title} helperText={actErr.title || 'e.g., "Visit Phewa Lake"'}
-                            sx={inputSx} />
-                        <TextField fullWidth label="Location *" value={actForm.location}
-                            onChange={e => setActForm({ ...actForm, location:e.target.value })}
-                            error={!!actErr.location} helperText={actErr.location || 'Where is this?'}
-                            sx={inputSx} />
-                        <TextField fullWidth label="Description" multiline rows={2} value={actForm.description}
-                            onChange={e => setActForm({ ...actForm, description:e.target.value })}
-                            sx={inputSx} />
+                        <Box>
+                            <PlaceSearchAutocomplete
+                                label="Location / Place *"
+                                value={actForm.location}
+                                onChange={(text) => setActForm(f => ({ ...f, location: text, title: text, place_id: null, latitude: null, longitude: null, formatted_address: null, place_types: null, rating: null }))}
+                                onSelect={(place) => setActForm(f => ({
+                                    ...f,
+                                    location: place.name,
+                                    title: place.name,
+                                    place_id: place.google_place_id,
+                                    latitude: place.latitude,
+                                    longitude: place.longitude,
+                                    formatted_address: place.address,
+                                    place_types: Array.isArray(place.place_types) ? place.place_types.join(',') : place.place_types || null,
+                                    rating: place.rating || null,
+                                }))}
+                            />
+                            {actErr.location && (
+                                <Typography variant="caption" sx={{ color: C.red, ml: 1.5, mt: 0.5, display: 'block' }}>{actErr.location}</Typography>
+                            )}
+                            {actForm.place_id ? (
+                                <Stack direction="row" spacing={0.5} alignItems="center" sx={{ mt: 0.5, ml: 0.5 }}>
+                                    <Chip label="Mapped" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(51,204,204,0.12)', color: C.brand, border: '1px solid rgba(51,204,204,0.3)' }} />
+                                    {actForm.formatted_address && (
+                                        <Typography variant="caption" sx={{ color: C.faded, fontSize: '0.7rem' }}>{actForm.formatted_address}</Typography>
+                                    )}
+                                </Stack>
+                            ) : actForm.location?.trim() && (
+                                <Typography variant="caption" sx={{ color: C.faded, fontSize: '0.68rem', ml: 0.5, mt: 0.3, display: 'block' }}>
+                                    Select from dropdown to map this place
+                                </Typography>
+                            )}
+                        </Box>
                         <Stack direction="row" spacing={2}>
-                            <TextField fullWidth label="Start Time" type="time" value={actForm.start_time}
-                                onChange={e => setActForm({ ...actForm, start_time:e.target.value })}
-                                InputLabelProps={{ shrink:true }} sx={inputSx} />
-                            <TextField fullWidth label="End Time" type="time" value={actForm.end_time}
-                                onChange={e => setActForm({ ...actForm, end_time:e.target.value })}
-                                InputLabelProps={{ shrink:true }} sx={inputSx} />
-                        </Stack>
-                        <TextField fullWidth label="Activity Type" select value={actForm.activity_type}
-                            onChange={e => setActForm({ ...actForm, activity_type:e.target.value })}
-                            SelectProps={{ native:true }} sx={inputSx}>
-                            <option value="sightseeing">Sightseeing</option>
-                            <option value="dining">Dining</option>
-                            <option value="adventure">Adventure</option>
-                            <option value="relaxation">Relaxation</option>
-                            <option value="shopping">Shopping</option>
-                            <option value="transport">Transport</option>
-                            <option value="activity">Activity</option>
-                        </TextField>
-                        <Stack direction="row" spacing={2}>
-                            <TextField fullWidth label="Estimated Cost (₹)" type="number" value={actForm.cost}
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" sx={{ color: C.faded, mb: 0.5, display: 'block', fontWeight: 600 }}>Time</Typography>
+                                <Stack direction="row" spacing={0.5} alignItems="center">
+                                    <TextField
+                                        select size="small"
+                                        value={(() => { if (!actForm.start_time) return ''; const h = parseInt(actForm.start_time.split(':')[0]); return String(h % 12 || 12).padStart(2,'0'); })()}
+                                        onChange={(e) => { const hr = parseInt(e.target.value) || 12; const m = (actForm.start_time || '00:00').split(':')[1] || '00'; const isPM = actForm.start_time ? parseInt(actForm.start_time.split(':')[0]) >= 12 : false; const h24 = isPM ? (hr === 12 ? 12 : hr + 12) : (hr === 12 ? 0 : hr); setActForm(f => ({ ...f, start_time: `${String(h24).padStart(2,'0')}:${m}` })); }}
+                                        SelectProps={{ native: true, sx: { py: '6px !important', pr: '20px !important' } }}
+                                        sx={{ ...inputSx, width: 58, '& .MuiSelect-icon': { right: 2, fontSize: 16, color: C.faded } }}
+                                    >
+                                        <option value="">-</option>
+                                        {Array.from({ length: 12 }, (_, i) => i + 1).map(h => <option key={h} value={String(h).padStart(2,'0')}>{String(h).padStart(2,'0')}</option>)}
+                                    </TextField>
+                                    <Typography sx={{ color: C.faded, fontWeight: 700, fontSize: '0.9rem' }}>:</Typography>
+                                    <TextField
+                                        select size="small"
+                                        value={actForm.start_time ? actForm.start_time.split(':')[1] || '00' : ''}
+                                        onChange={(e) => { const h = (actForm.start_time || '00:00').split(':')[0]; setActForm(f => ({ ...f, start_time: `${h}:${e.target.value}` })); }}
+                                        SelectProps={{ native: true, sx: { py: '6px !important', pr: '20px !important' } }}
+                                        sx={{ ...inputSx, width: 58, '& .MuiSelect-icon': { right: 2, fontSize: 16, color: C.faded } }}
+                                    >
+                                        <option value="">-</option>
+                                        {['00','15','30','45'].map(m => <option key={m} value={m}>{m}</option>)}
+                                    </TextField>
+                                    <TextField
+                                        select size="small"
+                                        value={actForm.start_time ? (parseInt(actForm.start_time.split(':')[0]) >= 12 ? 'PM' : 'AM') : 'AM'}
+                                        onChange={(e) => { const [hStr, m] = (actForm.start_time || '00:00').split(':'); let h = parseInt(hStr) || 0; if (e.target.value === 'PM' && h < 12) h += 12; if (e.target.value === 'AM' && h >= 12) h -= 12; setActForm(f => ({ ...f, start_time: `${String(h).padStart(2,'0')}:${m}` })); }}
+                                        SelectProps={{ native: true, sx: { py: '6px !important', pr: '20px !important' } }}
+                                        sx={{ ...inputSx, width: 58, '& .MuiSelect-icon': { right: 2, fontSize: 16, color: C.faded } }}
+                                    >
+                                        <option value="AM">AM</option>
+                                        <option value="PM">PM</option>
+                                    </TextField>
+                                </Stack>
+                            </Box>
+                            <TextField fullWidth label={`Budget (${itinerary?.currency || 'NPR'})`} type="number" value={actForm.cost}
                                 onChange={e => setActForm({ ...actForm, cost:e.target.value })}
-                                helperText="Planned spend" sx={inputSx} />
-                            <TextField fullWidth label="Actual Cost (₹)" type="number" value={actForm.actual_cost}
-                                onChange={e => setActForm({ ...actForm, actual_cost:e.target.value })}
-                                helperText="What you actually spent" sx={inputSx} />
+                                placeholder="0" sx={inputSx} />
                         </Stack>
+                        <TextField fullWidth label="Description (optional)" multiline rows={2} value={actForm.description}
+                            onChange={e => setActForm({ ...actForm, description:e.target.value })}
+                            placeholder="e.g., Scenic views, local food stop" sx={inputSx} />
                     </Stack>
                 </DialogContent>
                 <DialogActions sx={{ px:3, pb:2.5 }}>

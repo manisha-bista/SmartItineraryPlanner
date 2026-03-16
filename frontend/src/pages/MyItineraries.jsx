@@ -19,6 +19,7 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DeleteIcon from '@mui/icons-material/Delete';
+import CreateItineraryDialog from '../components/CreateItineraryDialog';
 
 const COLORS = {
     brand: '#33CCCC',
@@ -64,6 +65,7 @@ const MyItineraries = () => {
     const [search, setSearch] = useState('');
     const [deleteId, setDeleteId] = useState(null);
     const [deleting, setDeleting] = useState(false);
+    const [createOpen, setCreateOpen] = useState(false);
 
     useEffect(() => {
         const userId = localStorage.getItem('userId');
@@ -107,7 +109,7 @@ const MyItineraries = () => {
             }}
         >
             <Box sx={{ position: 'relative' }}>
-                <CardMedia component="img" height="160" image='https://images.unsplash.com/photo-1609750727688-1176db9980ae?q=80&w=2071&auto=format&fit=crop' alt={trip.title} />
+                <CardMedia component="img" height="160" image={trip.cover_photo ? `http://127.0.0.1:8000/places/photo?photo_reference=${trip.cover_photo}&max_width=600` : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'} alt={trip.title} />
                 <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
                     <IconButton
                         size="small"
@@ -196,7 +198,7 @@ const MyItineraries = () => {
                             <NotificationsIcon />
                             <Box sx={{ position: 'absolute', top: 8, right: 8, width: 8, height: 8, bgcolor: COLORS.error, borderRadius: '50%' }} />
                         </IconButton>
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/dashboard')}
+                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}
                             sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 5, px: 3, py: 1.25, textTransform: 'uppercase', '&:hover': { bgcolor: '#2db8b8' } }}>
                             New Trip
                         </Button>
@@ -240,7 +242,7 @@ const MyItineraries = () => {
                             <Box sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 5, p: 5, textAlign: 'center', mb: 5 }}>
                                 <Typography variant="body1" sx={{ color: COLORS.fadedText }}>
                                     No upcoming trips.{' '}
-                                    <Button onClick={() => navigate('/dashboard')} sx={{ color: COLORS.brand, p: 0, minWidth: 0, textTransform: 'none', fontWeight: 'bold' }}>Create one →</Button>
+                                    <Button onClick={() => setCreateOpen(true)} sx={{ color: COLORS.brand, p: 0, minWidth: 0, textTransform: 'none', fontWeight: 'bold' }}>Create one →</Button>
                                 </Typography>
                             </Box>
                         ) : (
@@ -271,7 +273,7 @@ const MyItineraries = () => {
                             <Box sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 5, p: 8, textAlign: 'center' }}>
                                 <Typography variant="h6" sx={{ color: COLORS.headings, mb: 1 }}>No trips yet</Typography>
                                 <Typography variant="body2" sx={{ color: COLORS.fadedText, mb: 3 }}>Start planning your first adventure!</Typography>
-                                <Button variant="contained" startIcon={<AddIcon />} onClick={() => navigate('/dashboard')}
+                                <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}
                                     sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 5 }}>
                                     Create Trip
                                 </Button>
@@ -296,6 +298,20 @@ const MyItineraries = () => {
                     </Button>
                 </DialogActions>
             </Dialog>
+
+            {/* Create Trip dialog — same as Dashboard */}
+            <CreateItineraryDialog
+                open={createOpen}
+                onClose={() => setCreateOpen(false)}
+                userId={user.id}
+                onSuccess={() => {
+                    setCreateOpen(false);
+                    // reload itineraries
+                    axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}`)
+                        .then(r => setItineraries(r.data))
+                        .catch(() => {});
+                }}
+            />
         </Box>
     );
 };

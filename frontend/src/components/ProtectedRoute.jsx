@@ -2,7 +2,7 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 
 // wraps around routes to check if user is logged in and has the right role
-// requiredRole can be 'user' or 'admin'
+// admins can access all pages (user + admin), regular users can't see admin pages
 const ProtectedRoute = ({ children, requiredRole = 'user' }) => {
     const userId = localStorage.getItem('userId');
     const userRole = localStorage.getItem('userRole') || 'user';
@@ -12,9 +12,9 @@ const ProtectedRoute = ({ children, requiredRole = 'user' }) => {
         return <Navigate to="/login" replace />;
     }
 
-    // admin shouldn't see normal user pages
-    if (requiredRole === 'user' && userRole === 'admin') {
-        return <Navigate to="/admin" replace />;
+    // admins have full access to everything
+    if (userRole === 'admin') {
+        return children;
     }
 
     // normal users can't access admin stuff
