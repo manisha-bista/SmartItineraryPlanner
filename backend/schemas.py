@@ -19,14 +19,30 @@ class UserUpdate(BaseModel):
     bio: Optional[str] = None
     location: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    avatar_id: Optional[int] = Field(None, ge=1, le=20)
 
 class UserOut(BaseModel):
     id: int
     name: str
+    username: Optional[str] = None
     email: EmailStr
+    role: str = "user"
+    avatar_id: int = 1
     bio: Optional[str] = None
     location: Optional[str] = None
     profile_picture_url: Optional[str] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# public profile — no real name or email shown
+class UserPublicProfile(BaseModel):
+    id: int
+    username: Optional[str] = None
+    avatar_id: int = 1
+    bio: Optional[str] = None
+    location: Optional[str] = None
     created_at: datetime
 
     class Config:
@@ -502,3 +518,144 @@ class RouteResponse(BaseModel):
     distance_km: float
     duration_minutes: int
     polyline: str  # Encoded polyline for map display
+
+
+# ============================================
+# COMPLAINT SCHEMAS
+# ============================================
+class ComplaintBase(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    description: str = Field(..., min_length=1)
+    category: Optional[str] = Field(None, pattern="^(bug|feedback|abuse|other)$")
+
+class ComplaintCreate(ComplaintBase):
+    pass
+
+class ComplaintUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    category: Optional[str] = None
+    status: Optional[str] = Field(None, pattern="^(open|pending|resolved)$")
+
+class ComplaintOut(ComplaintBase):
+    id: int
+    user_id: int
+    status: str
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# COMMUNITY POST SCHEMAS
+# ============================================
+class CommunityPostCreate(BaseModel):
+    title: str = Field(..., min_length=1, max_length=200)
+    body: Optional[str] = None
+    image_url: Optional[str] = None
+    tag: str = Field(default="Experience", pattern="^(Experience|Alert|Event|Tip|Question)$")
+    place: str = Field(default="All", max_length=200)
+
+class CommunityPostOut(BaseModel):
+    id: int
+    title: str
+    body: Optional[str] = None
+    image_url: Optional[str] = None
+    tag: str
+    place: str
+    upvotes: int
+    downvotes: int
+    comment_count: int
+    user_id: int
+    created_at: datetime
+    # added by the endpoint, not directly from the model
+    author_name: Optional[str] = None
+    author_initial: Optional[str] = None
+    user_vote: Optional[str] = None  # 'up', 'down', or None
+
+    class Config:
+        from_attributes = True
+
+class PostVoteRequest(BaseModel):
+    direction: str = Field(..., pattern="^(up|down)$")
+
+
+# ============================================
+# POST COMMENT SCHEMAS
+# ============================================
+class PostCommentCreate(BaseModel):
+    content: str = Field(..., min_length=1, max_length=1000)
+
+class PostCommentOut(BaseModel):
+    id: int
+    content: str
+    post_id: int
+    user_id: int
+    created_at: datetime
+    author_name: Optional[str] = None
+    author_initial: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# NOTIFICATION SCHEMAS
+# ============================================
+class NotificationOut(BaseModel):
+    id: int
+    user_id: int
+    type: str
+    message: str
+    is_read: bool
+    post_id: Optional[int] = None
+    from_user_id: Optional[int] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# FRIENDSHIP SCHEMAS
+# ============================================
+class FriendRequestCreate(BaseModel):
+    receiver_username: str = Field(..., min_length=1)
+
+class FriendshipOut(BaseModel):
+    id: int
+    requester_id: int
+    receiver_id: int
+    status: str
+    created_at: datetime
+    accepted_at: Optional[datetime] = None
+    friend_username: Optional[str] = None
+    friend_avatar_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# MESSAGE SCHEMAS
+# ============================================
+class MessageCreate(BaseModel):
+    receiver_id: int
+    content: str = Field(..., min_length=1, max_length=2000)
+    shared_itinerary_id: Optional[int] = None
+
+class MessageOut(BaseModel):
+    id: int
+    sender_id: int
+    receiver_id: int
+    content: str
+    is_read: bool
+    shared_itinerary_id: Optional[int] = None
+    created_at: datetime
+    sender_username: Optional[str] = None
+    sender_avatar_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
