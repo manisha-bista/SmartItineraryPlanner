@@ -51,6 +51,8 @@ import WbSunnyIcon from '@mui/icons-material/WbSunny';
 import CloudIcon from '@mui/icons-material/Cloud';
 import WaterDropIcon from '@mui/icons-material/WaterDrop';
 import AirIcon from '@mui/icons-material/Air';
+import ShareIcon from '@mui/icons-material/Share';
+import SendIcon from '@mui/icons-material/Send';
 
 // ─── Design Tokens ────────────────────────────────────────────────────────────
 const C = {
@@ -146,6 +148,12 @@ export default function ItineraryDetail() {
     // weather
     const [weatherLoading, setWeatherLoading] = useState(false);
 
+    // share
+    const [shareOpen, setShareOpen] = useState(false);
+    const [friends, setFriends] = useState([]);
+    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [sharing, setSharing] = useState(null);
+
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const load = async () => {
         try {
@@ -187,6 +195,34 @@ export default function ItineraryDetail() {
             toast('Weather updated!');
         } catch (e) { toast(e.response?.data?.detail || 'Failed to fetch weather.', 'error'); }
         finally { setWeatherLoading(false); }
+    };
+
+    const openShare = async () => {
+        setShareOpen(true);
+        setFriendsLoading(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            const res = await axios.get(`http://127.0.0.1:8000/friends/${userId}`);
+            setFriends(res.data?.friends || []);
+        } catch { setFriends([]); }
+        finally { setFriendsLoading(false); }
+    };
+
+    const shareToFriend = async (friendId) => {
+        if (!itinerary) return;
+        setSharing(friendId);
+        try {
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/messages?user_id=${userId}`, {
+                receiver_id: friendId,
+                content: `Check out my itinerary: "${itinerary.title}"`,
+                shared_itinerary_id: itinerary.id,
+            });
+            setSharing(null);
+            setShareOpen(false);
+            toast('Itinerary shared!');
+        } catch { toast('Failed to share.', 'error'); }
+        finally { setSharing(null); }
     };
 
     // fetch relevant alerts when itinerary loads
@@ -493,6 +529,11 @@ export default function ItineraryDetail() {
                         onClick={fetchWeather} disabled={weatherLoading}
                         sx={{ color: C.brand, bgcolor: 'rgba(51,204,204,0.08)', borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: 'rgba(51,204,204,0.15)' } }}>
                         {weatherLoading ? 'Fetching...' : 'Weather'}
+                    </Button>
+                    <Button size="small" startIcon={<ShareIcon sx={{ fontSize: 16 }} />}
+                        onClick={openShare}
+                        sx={{ color: C.sub, bgcolor: 'rgba(255,255,255,0.05)', borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: 'rgba(51,204,204,0.08)', color: C.brand } }}>
+                        Share
                     </Button>
                 </Box>
 
@@ -914,6 +955,54 @@ export default function ItineraryDetail() {
                         sx={{ bgcolor:C.red, color:'white', fontWeight:'bold', borderRadius:3, px:3, '&:hover':{ bgcolor:'#e55959' } }}>
                         Delete
                     </Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Share Dialog ─────────────────────────────────────────────── */}
+            <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="xs" fullWidth
+                PaperProps={{ sx: { bgcolor: C.bg, border: `1px solid ${C.border}`, borderRadius: 4 } }}>
+                <DialogTitle sx={{ color: C.heading, fontWeight: 'bold', borderBottom: `1px solid ${C.border}`, pb: 1.5 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <ShareIcon sx={{ color: C.brand, fontSize: 20 }} />
+                        <Typography fontWeight="bold" sx={{ color: C.heading }}>Share Itinerary</Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.5 }}>
+                        Send "{itinerary?.title}" to a friend
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2, px: 2 }}>
+                    {friendsLoading ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: C.brand }} /></Box>
+                    ) : friends.length === 0 ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Typography sx={{ color: C.faded, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
+                            <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>Add friends from the community to share itineraries.</Typography>
+                        </Box>
+                    ) : (
+                        <Stack spacing={0.5}>
+                            {friends.map(f => (
+                                <Stack key={f.user_id} direction="row" alignItems="center" sx={{
+                                    px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer',
+                                    '&:hover': { bgcolor: 'rgba(51,204,204,0.06)' },
+                                }}>
+                                    <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
+                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                                    </Typography>
+                                    <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>
+                                        {f.username}
+                                    </Typography>
+                                    <IconButton size="small" onClick={() => shareToFriend(f.user_id)}
+                                        disabled={sharing === f.user_id}
+                                        sx={{ color: C.brand, '&:hover': { bgcolor: 'rgba(51,204,204,0.12)' }, '&:disabled': { color: C.faded } }}>
+                                        {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: C.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                    </IconButton>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 2, py: 1.5, borderTop: `1px solid ${C.border}` }}>
+                    <Button onClick={() => setShareOpen(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
                 </DialogActions>
             </Dialog>
 

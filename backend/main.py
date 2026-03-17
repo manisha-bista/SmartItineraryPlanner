@@ -3693,59 +3693,6 @@ def get_user_by_username(username: str, db: Session = Depends(get_db)):
 # ============================================
 # BACKFILL USERNAMES (run once, delete after)
 # ============================================
-@app.api_route("/debug/add-missing-columns", methods=["GET", "POST"])
-def add_missing_columns(db: Session = Depends(get_db)):
-    """Safely add new columns to existing tables without dropping data."""
-    results = []
-    alter_statements = [
-        ("users", "username", "ALTER TABLE users ADD COLUMN IF NOT EXISTS username VARCHAR(20) UNIQUE"),
-        ("users", "avatar_id", "ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_id INTEGER DEFAULT 1"),
-    ]
-    create_statements = [
-        "CREATE TABLE IF NOT EXISTS post_comments (id SERIAL PRIMARY KEY, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT NOW(), post_id INTEGER REFERENCES community_posts(id) ON DELETE CASCADE, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE)",
-        "CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER REFERENCES users(id) ON DELETE CASCADE, type VARCHAR(50) NOT NULL, message VARCHAR(500) NOT NULL, is_read BOOLEAN DEFAULT FALSE, post_id INTEGER, from_user_id INTEGER, created_at TIMESTAMP DEFAULT NOW())",
-        "CREATE TABLE IF NOT EXISTS friendships (id SERIAL PRIMARY KEY, requester_id INTEGER REFERENCES users(id) ON DELETE CASCADE, receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE, status VARCHAR(20) DEFAULT 'pending', created_at TIMESTAMP DEFAULT NOW(), accepted_at TIMESTAMP)",
-        "CREATE TABLE IF NOT EXISTS messages (id SERIAL PRIMARY KEY, sender_id INTEGER REFERENCES users(id) ON DELETE CASCADE, receiver_id INTEGER REFERENCES users(id) ON DELETE CASCADE, content TEXT NOT NULL, is_read BOOLEAN DEFAULT FALSE, shared_itinerary_id INTEGER, created_at TIMESTAMP DEFAULT NOW())",
-    ]
-    try:
-        for table, col, sql in alter_statements:
-            try:
-                db.execute(text(sql))
-                results.append(f"Added {col} to {table}")
-            except Exception as e:
-                results.append(f"Skipped {col} on {table}: {str(e)[:60]}")
-                db.rollback()
-
-        for sql in create_statements:
-            try:
-                db.execute(text(sql))
-                table_name = sql.split("IF NOT EXISTS ")[1].split(" ")[0]
-                results.append(f"Created table {table_name}")
-            except Exception as e:
-                results.append(f"Table error: {str(e)[:60]}")
-                db.rollback()
-
-        db.commit()
-        return {"status": "done", "results": results}
-    except Exception as e:
-        db.rollback()
-        return {"status": "error", "detail": str(e)}
-
-@app.api_route("/debug/backfill-usernames", methods=["GET", "POST"])
-def backfill_usernames(db: Session = Depends(get_db)):
-    # get ALL users and fix any without a username
-    users = db.query(models.User).all()
-    updated = 0
-    for user in users:
-        if not user.username or len(user.username.strip()) < 3:
-            user.username = generate_username(db)
-            updated += 1
-        if not user.avatar_id or user.avatar_id < 1:
-            user.avatar_id = random.randint(1, 20)
-            updated += 1
-    db.commit()
-    return {"message": f"Updated {updated} fields", "users": [{"id": u.id, "name": u.name, "username": u.username, "avatar_id": u.avatar_id} for u in users]}
-
 
 # ============================================
 # FRIENDSHIP ENDPOINTS
@@ -3758,7 +3705,6 @@ def send_friend_request(request: schemas.FriendRequestCreate, user_id: int = Que
     if receiver.id == user_id:
         raise HTTPException(status_code=400, detail="Cannot send friend request to yourself")
 
-    # check if already friends or pending
     existing = db.query(models.Friendship).filter(
         or_(
             (models.Friendship.requester_id == user_id) & (models.Friendship.receiver_id == receiver.id),
@@ -3774,7 +3720,6 @@ def send_friend_request(request: schemas.FriendRequestCreate, user_id: int = Que
     friendship = models.Friendship(requester_id=user_id, receiver_id=receiver.id, status='pending')
     db.add(friendship)
 
-    # notify receiver
     sender = db.query(models.User).filter(models.User.id == user_id).first()
     notif = models.Notification(
         user_id=receiver.id, type='friend_request',
@@ -3795,7 +3740,6 @@ def accept_friend_request(friendship_id: int, user_id: int = Query(...), db: Ses
     friendship.status = 'accepted'
     friendship.accepted_at = datetime.utcnow()
 
-    # notify requester
     receiver = db.query(models.User).filter(models.User.id == user_id).first()
     notif = models.Notification(
         user_id=friendship.requester_id, type='friend_accepted',
@@ -3816,6 +3760,19 @@ def reject_friend_request(friendship_id: int, user_id: int = Query(...), db: Ses
     db.delete(friendship)
     db.commit()
     return {"status": "rejected"}
+
+# static path must come before parametric /friends/{user_id}
+@app.get("/friends/status/{other_user_id}")
+def check_friendship(other_user_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    friendship = db.query(models.Friendship).filter(
+        or_(
+            (models.Friendship.requester_id == user_id) & (models.Friendship.receiver_id == other_user_id),
+            (models.Friendship.requester_id == other_user_id) & (models.Friendship.receiver_id == user_id),
+        )
+    ).first()
+    if not friendship:
+        return {"status": "none", "friendship_id": None}
+    return {"status": friendship.status, "friendship_id": friendship.id, "is_requester": friendship.requester_id == user_id}
 
 @app.get("/friends/{user_id}")
 def get_friends(user_id: int, db: Session = Depends(get_db)):
@@ -3872,19 +3829,6 @@ def remove_friend(friendship_id: int, user_id: int = Query(...), db: Session = D
     db.delete(friendship)
     db.commit()
     return {"status": "removed"}
-
-# check friendship status between two users
-@app.get("/friends/status/{other_user_id}")
-def check_friendship(other_user_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
-    friendship = db.query(models.Friendship).filter(
-        or_(
-            (models.Friendship.requester_id == user_id) & (models.Friendship.receiver_id == other_user_id),
-            (models.Friendship.requester_id == other_user_id) & (models.Friendship.receiver_id == user_id),
-        )
-    ).first()
-    if not friendship:
-        return {"status": "none", "friendship_id": None}
-    return {"status": friendship.status, "friendship_id": friendship.id, "is_requester": friendship.requester_id == user_id}
 
 
 # ============================================

@@ -11,6 +11,7 @@ import ProfileSettings from './pages/ProfileSettings';
 import PlaceDetail from './pages/PlaceDetail';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import ProtectedRoute from './components/ProtectedRoute';
+import ChatWidget from './components/ChatWidget';
 
 function App() {
   return (
@@ -32,6 +33,9 @@ function App() {
         {/* Admin-only Routes */}
         <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
       </Routes>
+
+      {/* floating chat — shows on all pages when logged in */}
+      <ChatWidget />
     </Router>
   );
 }

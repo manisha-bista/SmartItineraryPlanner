@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Typography, Stack, Avatar, Button, TextField,
     MenuItem, Select, FormControl, IconButton, List,
-    ListItem, ListItemButton, ListItemIcon, ListItemText, Drawer
+    ListItem, ListItemButton, ListItemIcon, ListItemText, Drawer,
+    Chip, Snackbar, Alert,
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -127,23 +128,47 @@ const NAV = [
     { text: 'Community Feed',  icon: <GroupIcon />,      path: '/community' },
 ];
 
+const AVATAR_LIST = [
+    { id: 1, emoji: '🏔️', color: '#33CCCC' }, { id: 2, emoji: '🌄', color: '#FF7043' },
+    { id: 3, emoji: '🏕️', color: '#66BB6A' }, { id: 4, emoji: '🧗', color: '#AB47BC' },
+    { id: 5, emoji: '🚶', color: '#42A5F5' }, { id: 6, emoji: '🌿', color: '#26A69A' },
+    { id: 7, emoji: '🦅', color: '#8D6E63' }, { id: 8, emoji: '🌺', color: '#EC407A' },
+    { id: 9, emoji: '🏯', color: '#FFB74D' }, { id: 10, emoji: '🛶', color: '#5C6BC0' },
+    { id: 11, emoji: '🌙', color: '#78909C' }, { id: 12, emoji: '☀️', color: '#FDD835' },
+    { id: 13, emoji: '🦋', color: '#29B6F6' }, { id: 14, emoji: '🐾', color: '#A1887F' },
+    { id: 15, emoji: '🎒', color: '#EF5350' }, { id: 16, emoji: '🗻', color: '#7E57C2' },
+    { id: 17, emoji: '🌊', color: '#0097A7' }, { id: 18, emoji: '🔥', color: '#FF5722' },
+    { id: 19, emoji: '❄️', color: '#90CAF9' }, { id: 20, emoji: '🌈', color: '#9CCC65' },
+];
+const getAvatar = (id) => AVATAR_LIST.find(a => a.id === id) || AVATAR_LIST[0];
+
 export default function ProfileSettings() {
     const navigate = useNavigate();
 
-    const [user, setUser]       = useState({ name: 'User', email: '', initial: 'U' });
+    const [user, setUser]       = useState({ name: 'User', email: '', initial: 'U', username: '', avatarId: 1 });
     const [editing, setEditing] = useState(false);
     const [form, setForm]       = useState({
         fullName: '', nickName: '', gender: '',
-        country: '', language: '', timeZone: '',
+        country: '', language: '', timeZone: '', bio: '', avatarId: 1,
     });
+    const [snack, setSnack] = useState({ open: false, msg: '', sev: 'success' });
+    const toast = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
 
     useEffect(() => {
         const uid   = localStorage.getItem('userId');
         const uname = localStorage.getItem('userName') || 'User';
         const email = localStorage.getItem('userEmail') || '';
+        const username = localStorage.getItem('username') || '';
+        const avatarId = parseInt(localStorage.getItem('avatarId')) || 1;
         if (!uid) { navigate('/login'); return; }
-        setUser({ name: uname, email, initial: uname[0].toUpperCase() });
-        setForm(p => ({ ...p, fullName: uname, nickName: uname.split(' ')[0] }));
+        setUser({ name: uname, email, initial: uname[0].toUpperCase(), username, avatarId });
+        setForm(p => ({ ...p, fullName: uname, nickName: username || uname.split(' ')[0], avatarId, bio: '' }));
+        // fetch full profile from backend
+        axios.get(`http://127.0.0.1:8000/users/${uid}`).then(r => {
+            const u = r.data;
+            setUser(prev => ({ ...prev, username: u.username || '', avatarId: u.avatar_id || 1 }));
+            setForm(prev => ({ ...prev, fullName: u.name, nickName: u.username || u.name.split(' ')[0], bio: u.bio || '', avatarId: u.avatar_id || 1 }));
+        }).catch(() => {});
     }, [navigate]);
 
     const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }));
@@ -151,10 +176,16 @@ export default function ProfileSettings() {
     const handleSave = async () => {
         try {
             const uid = localStorage.getItem('userId');
-            await axios.put(`http://127.0.0.1:8000/users/${uid}`, { name: form.fullName });
+            await axios.put(`http://127.0.0.1:8000/users/${uid}`, {
+                name: form.fullName,
+                bio: form.bio || null,
+                avatar_id: form.avatarId,
+            });
             localStorage.setItem('userName', form.fullName);
-            setUser(p => ({ ...p, name: form.fullName, initial: form.fullName[0].toUpperCase() }));
-        } catch (err) { console.error('Update failed:', err); }
+            localStorage.setItem('avatarId', form.avatarId);
+            setUser(p => ({ ...p, name: form.fullName, initial: form.fullName[0].toUpperCase(), avatarId: form.avatarId }));
+            toast('Profile updated!');
+        } catch (err) { toast('Update failed.', 'error'); }
         setEditing(false);
     };
 
@@ -245,13 +276,14 @@ export default function ProfileSettings() {
                         </IconButton>
 
                         <Avatar onClick={() => navigate('/profile')} sx={{
-                            bgcolor: C.brand, color: C.bg, fontWeight: 700,
-                            width: 38, height: 38, cursor: 'pointer',
-                            boxShadow: `0 0 0 2px ${C.brand}55`,
+                            bgcolor: `${getAvatar(user.avatarId).color}20`, color: C.bg,
+                            width: 38, height: 38, cursor: 'pointer', borderRadius: 2.5,
+                            fontSize: '1.2rem', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            boxShadow: `0 0 0 2px ${getAvatar(user.avatarId).color}55`,
                             '&:hover': { transform: 'scale(1.07)' },
                             transition: 'all 0.2s',
                         }}>
-                            {user.initial}
+                            {getAvatar(user.avatarId).emoji}
                         </Avatar>
                     </Stack>
                 </Stack>
@@ -285,30 +317,35 @@ export default function ProfileSettings() {
                             sx={{ mb: 4 }}>
                             <Stack direction="row" alignItems="flex-end" spacing={2.5}>
                                 <Box sx={{ position: 'relative', mt: -4 }}>
-                                    <Avatar sx={{
-                                        width: 80, height: 80,
-                                        bgcolor: C.brand, color: C.bg,
-                                        fontSize: '2rem', fontWeight: 700,
+                                    <Box sx={{
+                                        width: 80, height: 80, borderRadius: 4,
+                                        bgcolor: `${getAvatar(form.avatarId).color}20`,
                                         border: `3px solid ${C.card}`,
                                         boxShadow: `0 4px 20px rgba(51,204,204,0.35)`,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '2.4rem',
                                     }}>
-                                        {user.initial}
-                                    </Avatar>
-                                    <Box sx={{
-                                        position: 'absolute', bottom: 2, right: 2,
-                                        width: 22, height: 22, borderRadius: '50%',
-                                        bgcolor: C.brand, display: 'flex',
-                                        alignItems: 'center', justifyContent: 'center',
-                                        border: `2px solid ${C.card}`, cursor: 'pointer',
-                                    }}>
-                                        <EditOutlinedIcon sx={{ fontSize: 11, color: C.bg }} />
+                                        {getAvatar(form.avatarId).emoji}
                                     </Box>
+                                    {editing && (
+                                        <Box sx={{
+                                            position: 'absolute', bottom: 2, right: 2,
+                                            width: 22, height: 22, borderRadius: '50%',
+                                            bgcolor: C.brand, display: 'flex',
+                                            alignItems: 'center', justifyContent: 'center',
+                                            border: `2px solid ${C.card}`, cursor: 'pointer',
+                                        }}>
+                                            <EditOutlinedIcon sx={{ fontSize: 11, color: C.bg }} />
+                                        </Box>
+                                    )}
                                 </Box>
                                 <Box sx={{ pb: 0.5 }}>
                                     <Typography variant="h6" fontWeight={700} sx={{ color: C.white, lineHeight: 1.2 }}>
                                         {user.name}
                                     </Typography>
-                                    <Typography variant="body2" sx={{ color: C.dim, fontSize: '0.82rem' }}>
+                                    <Chip label={`@${user.username || 'username'}`} size="small"
+                                        sx={{ mt: 0.5, height: 20, fontSize: '0.7rem', bgcolor: 'rgba(51,204,204,0.1)', color: C.brand, border: '1px solid rgba(51,204,204,0.2)' }} />
+                                    <Typography variant="body2" sx={{ color: C.dim, fontSize: '0.82rem', mt: 0.3 }}>
                                         {user.email || 'user@example.com'}
                                     </Typography>
                                 </Box>
@@ -346,6 +383,29 @@ export default function ProfileSettings() {
                             )}
                         </Stack>
 
+                        {/* Avatar picker — only when editing */}
+                        {editing && (
+                            <Box sx={{ mb: 3 }}>
+                                <Typography sx={labelSx}>Choose Avatar</Typography>
+                                <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1 }}>
+                                    {AVATAR_LIST.map(av => (
+                                        <Box key={av.id}
+                                            onClick={() => setForm(p => ({ ...p, avatarId: av.id }))}
+                                            sx={{
+                                                width: 44, height: 44, borderRadius: 2.5, cursor: 'pointer',
+                                                bgcolor: form.avatarId === av.id ? `${av.color}30` : 'rgba(255,255,255,0.04)',
+                                                border: form.avatarId === av.id ? `2px solid ${av.color}` : '2px solid transparent',
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '1.3rem', transition: 'all 0.15s',
+                                                '&:hover': { bgcolor: `${av.color}15`, border: `2px solid ${av.color}50` },
+                                            }}>
+                                            {av.emoji}
+                                        </Box>
+                                    ))}
+                                </Box>
+                            </Box>
+                        )}
+
                         {/* Section title */}
                         <Typography sx={{
                             color: C.white, mb: 2.5, fontSize: '0.82rem',
@@ -353,6 +413,14 @@ export default function ProfileSettings() {
                         }}>
                             Personal Information
                         </Typography>
+
+                        {/* Bio field */}
+                        <Box sx={{ mb: 3 }}>
+                            <Typography sx={labelSx}>Bio</Typography>
+                            <TextField fullWidth placeholder="Tell us about yourself..."
+                                value={form.bio} onChange={set('bio')}
+                                disabled={!editing} multiline rows={2} sx={fieldSx(editing)} />
+                        </Box>
 
                         {/* 2-col grid */}
                         <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 4 }}>
@@ -474,6 +542,15 @@ export default function ProfileSettings() {
                     </Box>
                 </Box>
             </Box>
+
+            {/* Snackbar */}
+            <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack(p => ({ ...p, open: false }))}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+                <Alert severity={snack.sev} onClose={() => setSnack(p => ({ ...p, open: false }))}
+                    sx={{ bgcolor: C.card, color: C.white, borderRadius: 3 }}>
+                    {snack.msg}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }

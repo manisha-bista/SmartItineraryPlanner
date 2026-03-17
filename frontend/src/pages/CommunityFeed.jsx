@@ -35,6 +35,10 @@ import ImageIcon from '@mui/icons-material/Image';
 import EditNoteIcon from '@mui/icons-material/EditNote';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import SendIcon from '@mui/icons-material/Send';
+import PersonAddIcon from '@mui/icons-material/PersonAdd';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import ChatIcon from '@mui/icons-material/Chat';
 
 // design system
 const COLORS = {
@@ -65,6 +69,20 @@ const TAG_COLORS = {
 };
 
 const KNOWN_CITIES = ['Kathmandu', 'Pokhara', 'Bhaktapur', 'Lalitpur', 'Patan', 'Chitwan', 'Lumbini', 'Mustang', 'Annapurna', 'Everest', 'Namche', 'Nagarkot', 'Bandipur', 'Janakpur', 'Boudha', 'Thamel', 'Kirtipur', 'Dhulikhel', 'Lukla', 'Jomsom', 'Gorkha', 'Tansen', 'Bardiya', 'Langtang', 'Manang', 'Dolpa'];
+
+const AVATAR_LIST = [
+    { id: 1, emoji: '🏔️', color: '#33CCCC' }, { id: 2, emoji: '🌄', color: '#FF7043' },
+    { id: 3, emoji: '🏕️', color: '#66BB6A' }, { id: 4, emoji: '🧗', color: '#AB47BC' },
+    { id: 5, emoji: '🚶', color: '#42A5F5' }, { id: 6, emoji: '🌿', color: '#26A69A' },
+    { id: 7, emoji: '🦅', color: '#8D6E63' }, { id: 8, emoji: '🌺', color: '#EC407A' },
+    { id: 9, emoji: '🏯', color: '#FFB74D' }, { id: 10, emoji: '🛶', color: '#5C6BC0' },
+    { id: 11, emoji: '🌙', color: '#78909C' }, { id: 12, emoji: '☀️', color: '#FDD835' },
+    { id: 13, emoji: '🦋', color: '#29B6F6' }, { id: 14, emoji: '🐾', color: '#A1887F' },
+    { id: 15, emoji: '🎒', color: '#EF5350' }, { id: 16, emoji: '🗻', color: '#7E57C2' },
+    { id: 17, emoji: '🌊', color: '#0097A7' }, { id: 18, emoji: '🔥', color: '#FF5722' },
+    { id: 19, emoji: '❄️', color: '#90CAF9' }, { id: 20, emoji: '🌈', color: '#9CCC65' },
+];
+const getAvatar = (id) => AVATAR_LIST.find(a => a.id === id) || AVATAR_LIST[0];
 
 const FILTER_OPTIONS = [
     { label: 'New', icon: <NewReleasesIcon sx={{ fontSize: 16 }} />, sort: 'new' },
@@ -106,7 +124,7 @@ const timeAgo = (dateStr) => {
 
 
 // ── Post Card ────────────────────────────────────────────────
-const PostCard = ({ post, onVote, onSave, userId }) => {
+const PostCard = ({ post, onVote, onSave, userId, onProfileClick }) => {
     const tagColor = TAG_COLORS[post.tag] || COLORS.brand;
     const netVotes = (post.upvotes || 0) - (post.downvotes || 0);
     const [showComments, setShowComments] = useState(false);
@@ -180,10 +198,13 @@ const PostCard = ({ post, onVote, onSave, userId }) => {
                     <Box sx={{ p: 2.5 }}>
                         {/* meta row */}
                         <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1.5, flexWrap: 'wrap', gap: 0.5 }}>
-                            <Avatar sx={{ width: 20, height: 20, bgcolor: tagColor, color: '#141627', fontSize: '0.55rem', fontWeight: 'bold' }}>
+                            <Avatar onClick={() => post.user_id !== userId && onProfileClick?.(post.user_id)}
+                                sx={{ width: 20, height: 20, bgcolor: tagColor, color: '#141627', fontSize: '0.55rem', fontWeight: 'bold', cursor: post.user_id !== userId ? 'pointer' : 'default' }}>
                                 {post.author_initial || 'U'}
                             </Avatar>
-                            <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.subheadings }}>
+                            <Typography variant="caption" fontWeight="bold"
+                                onClick={() => post.user_id !== userId && onProfileClick?.(post.user_id)}
+                                sx={{ color: COLORS.subheadings, cursor: post.user_id !== userId ? 'pointer' : 'default', '&:hover': post.user_id !== userId ? { color: COLORS.brand } : {} }}>
                                 {post.author_name || 'Unknown'}
                             </Typography>
                             {post.place && post.place !== 'All' && (
@@ -581,6 +602,13 @@ const CommunityFeed = () => {
     // sidebar place filter (within selected itinerary)
     const [sidebarPlace, setSidebarPlace] = useState('All');
 
+    // user profile dialog
+    const [profileOpen, setProfileOpen] = useState(false);
+    const [profileUser, setProfileUser] = useState(null);
+    const [profilePosts, setProfilePosts] = useState([]);
+    const [friendStatus, setFriendStatus] = useState({ status: 'none', friendship_id: null });
+    const [friendLoading, setFriendLoading] = useState(false);
+
     useEffect(() => {
         const userId = localStorage.getItem('userId');
         const userName = localStorage.getItem('userName');
@@ -800,6 +828,68 @@ const CommunityFeed = () => {
         else { setFilterMode(val); }
     };
 
+    // user profile dialog
+    const openUserProfile = async (targetUserId) => {
+        setProfileOpen(true);
+        setProfileUser(null); setProfilePosts([]); setFriendStatus({ status: 'none', friendship_id: null });
+        try {
+            const [profileRes, postsRes, statusRes] = await Promise.all([
+                axios.get(`http://127.0.0.1:8000/users/${targetUserId}/public`),
+                axios.get('http://127.0.0.1:8000/community/posts', { params: { user_id: user.id, sort: 'new' } }),
+                axios.get(`http://127.0.0.1:8000/friends/status/${targetUserId}`, { params: { user_id: user.id } }),
+            ]);
+            setProfileUser(profileRes.data);
+            // filter posts by this user
+            setProfilePosts((postsRes.data || []).filter(p => p.user_id === targetUserId).slice(0, 10));
+            setFriendStatus(statusRes.data || { status: 'none' });
+        } catch { /* silent */ }
+    };
+
+    const sendFriendRequest = async () => {
+        if (!profileUser) return;
+        setFriendLoading(true);
+        try {
+            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${user.id}`, { receiver_username: profileUser.username });
+            setFriendStatus({ status: 'pending', is_requester: true });
+        } catch (e) {
+            const detail = e.response?.data?.detail || '';
+            if (detail.includes('Already friends')) setFriendStatus({ status: 'accepted' });
+            if (detail.includes('pending')) setFriendStatus({ status: 'pending', is_requester: true });
+        }
+        finally { setFriendLoading(false); }
+    };
+
+    const acceptFriendFromNotif = async (friendshipId) => {
+        try {
+            await axios.patch(`http://127.0.0.1:8000/friends/${friendshipId}/accept?user_id=${user.id}`);
+            fetchNotifications();
+        } catch { /* silent */ }
+    };
+
+    const rejectFriendFromNotif = async (friendshipId) => {
+        try {
+            await axios.patch(`http://127.0.0.1:8000/friends/${friendshipId}/reject?user_id=${user.id}`);
+            fetchNotifications();
+        } catch { /* silent */ }
+    };
+
+    // accept/reject from notification using from_user_id (need to find friendship first)
+    const acceptFriendFromProfile = async (fromUserId) => {
+        try {
+            const res = await axios.get(`http://127.0.0.1:8000/friends/status/${fromUserId}`, { params: { user_id: user.id } });
+            if (res.data?.friendship_id) await axios.patch(`http://127.0.0.1:8000/friends/${res.data.friendship_id}/accept?user_id=${user.id}`);
+            fetchNotifications();
+        } catch { /* silent */ }
+    };
+
+    const rejectFriendFromProfile = async (fromUserId) => {
+        try {
+            const res = await axios.get(`http://127.0.0.1:8000/friends/status/${fromUserId}`, { params: { user_id: user.id } });
+            if (res.data?.friendship_id) await axios.patch(`http://127.0.0.1:8000/friends/${res.data.friendship_id}/reject?user_id=${user.id}`);
+            fetchNotifications();
+        } catch { /* silent */ }
+    };
+
     const handleLogout = () => { localStorage.clear(); navigate('/'); };
 
     const sidebarMenu = [
@@ -927,7 +1017,7 @@ const CommunityFeed = () => {
                                                         setUnreadCount(c => Math.max(0, c - 1));
                                                         setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x));
                                                     }
-                                                    setNotifAnchor(null);
+                                                    if (n.type !== 'friend_request') setNotifAnchor(null);
                                                 }}
                                                 sx={{
                                                     px: 2, py: 1.2, cursor: 'pointer',
@@ -939,16 +1029,34 @@ const CommunityFeed = () => {
                                                 <Stack direction="row" spacing={1.2} alignItems="flex-start">
                                                     <Box sx={{
                                                         width: 28, height: 28, borderRadius: 2, flexShrink: 0, mt: 0.2,
-                                                        bgcolor: n.type === 'upvote' ? 'rgba(51,204,204,0.15)' : n.type === 'comment' ? 'rgba(66,165,245,0.15)' : 'rgba(255,183,77,0.15)',
+                                                        bgcolor: n.type === 'upvote' ? 'rgba(51,204,204,0.15)' : n.type === 'comment' ? 'rgba(66,165,245,0.15)' : n.type === 'friend_request' ? 'rgba(156,39,176,0.15)' : n.type === 'friend_accepted' ? 'rgba(76,175,80,0.15)' : n.type === 'message' ? 'rgba(51,204,204,0.15)' : 'rgba(255,183,77,0.15)',
                                                         display: 'flex', alignItems: 'center', justifyContent: 'center',
                                                     }}>
                                                         {n.type === 'upvote' && <ArrowUpwardIcon sx={{ fontSize: 14, color: COLORS.brand }} />}
                                                         {n.type === 'comment' && <ChatBubbleOutlineIcon sx={{ fontSize: 14, color: '#42a5f5' }} />}
                                                         {n.type === 'alert' && <WarningAmberIcon sx={{ fontSize: 14, color: COLORS.warning }} />}
+                                                        {n.type === 'friend_request' && <PersonAddIcon sx={{ fontSize: 14, color: '#9C27B0' }} />}
+                                                        {n.type === 'friend_accepted' && <CheckCircleIcon sx={{ fontSize: 14, color: COLORS.success }} />}
+                                                        {n.type === 'message' && <ChatIcon sx={{ fontSize: 14, color: COLORS.brand }} />}
                                                     </Box>
                                                     <Box sx={{ flex: 1, minWidth: 0 }}>
                                                         <Typography sx={{ color: COLORS.text, fontSize: '0.78rem', lineHeight: 1.4 }}>{n.message}</Typography>
                                                         <Typography sx={{ color: COLORS.fadedText, fontSize: '0.65rem', mt: 0.2 }}>{timeAgo(n.created_at)}</Typography>
+                                                        {/* friend request accept/reject buttons */}
+                                                        {n.type === 'friend_request' && !n.is_read && n.from_user_id && (
+                                                            <Stack direction="row" spacing={0.8} sx={{ mt: 0.8 }}>
+                                                                <Button size="small" variant="contained"
+                                                                    onClick={async (e) => { e.stopPropagation(); await acceptFriendFromProfile(n.from_user_id); setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x)); setUnreadCount(c => Math.max(0, c - 1)); }}
+                                                                    sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.65rem', py: 0.2, px: 1, borderRadius: 1.5, textTransform: 'none', fontWeight: 700, minWidth: 0, '&:hover': { bgcolor: '#2db8b8' } }}>
+                                                                    Accept
+                                                                </Button>
+                                                                <Button size="small"
+                                                                    onClick={async (e) => { e.stopPropagation(); await rejectFriendFromProfile(n.from_user_id); setNotifications(prev => prev.filter(x => x.id !== n.id)); setUnreadCount(c => Math.max(0, c - 1)); }}
+                                                                    sx={{ color: COLORS.fadedText, fontSize: '0.65rem', py: 0.2, px: 1, borderRadius: 1.5, textTransform: 'none', minWidth: 0, '&:hover': { color: COLORS.error } }}>
+                                                                    Decline
+                                                                </Button>
+                                                            </Stack>
+                                                        )}
                                                     </Box>
                                                     {!n.is_read && <Box sx={{ width: 6, height: 6, borderRadius: '50%', bgcolor: COLORS.brand, flexShrink: 0, mt: 0.8 }} />}
                                                 </Stack>
@@ -1102,7 +1210,7 @@ const CommunityFeed = () => {
                                     )}
 
                                     {posts.map((post) => (
-                                        <PostCard key={post.id} post={post} onVote={handleVote} onSave={handleSave} userId={user.id} />
+                                        <PostCard key={post.id} post={post} onVote={handleVote} onSave={handleSave} userId={user.id} onProfileClick={(uid) => openUserProfile(uid)} />
                                     ))}
                                 </Stack>
                             )}
@@ -1250,6 +1358,119 @@ const CommunityFeed = () => {
                 myItineraries={myItineraries}
                 defaultTag={defaultTag}
             />
+
+            {/* User Profile Dialog */}
+            <Dialog open={profileOpen} onClose={() => setProfileOpen(false)} maxWidth="sm" fullWidth
+                PaperProps={{ sx: { bgcolor: COLORS.background, border: `1px solid ${COLORS.border}`, borderRadius: 4, boxShadow: '0 24px 64px rgba(0,0,0,0.7)', maxHeight: '85vh' } }}>
+                {!profileUser ? (
+                    <Box sx={{ py: 8, textAlign: 'center' }}><CircularProgress size={28} sx={{ color: COLORS.brand }} /></Box>
+                ) : (
+                    <>
+                        {/* profile header */}
+                        <Box sx={{ position: 'relative' }}>
+                            <Box sx={{ height: 80, background: `linear-gradient(135deg, ${getAvatar(profileUser.avatar_id).color}40, rgba(20,22,39,0.9))` }} />
+                            <IconButton onClick={() => setProfileOpen(false)}
+                                sx={{ position: 'absolute', top: 8, right: 8, color: COLORS.fadedText, '&:hover': { color: COLORS.error } }}>
+                                <CloseIcon />
+                            </IconButton>
+                            <Box sx={{ px: 3, mt: -4 }}>
+                                <Box sx={{
+                                    width: 56, height: 56, borderRadius: 3, bgcolor: `${getAvatar(profileUser.avatar_id).color}20`,
+                                    border: `3px solid ${COLORS.background}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.6rem',
+                                }}>
+                                    {getAvatar(profileUser.avatar_id).emoji}
+                                </Box>
+                            </Box>
+                        </Box>
+
+                        <DialogContent sx={{ pt: 1.5 }}>
+                            <Stack spacing={2.5}>
+                                {/* name + friend button */}
+                                <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+                                    <Box>
+                                        <Typography variant="h6" fontWeight="bold" sx={{ color: COLORS.headings, fontSize: '1.1rem' }}>
+                                            {profileUser.username || 'User'}
+                                        </Typography>
+                                        {profileUser.bio && (
+                                            <Typography variant="body2" sx={{ color: COLORS.fadedText, mt: 0.3, fontSize: '0.82rem' }}>{profileUser.bio}</Typography>
+                                        )}
+                                        {profileUser.location && (
+                                            <Stack direction="row" spacing={0.4} alignItems="center" sx={{ mt: 0.5 }}>
+                                                <LocationOnIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
+                                                <Typography variant="caption" sx={{ color: COLORS.fadedText }}>{profileUser.location}</Typography>
+                                            </Stack>
+                                        )}
+                                    </Box>
+
+                                    {/* friend action button */}
+                                    {friendStatus.status === 'accepted' ? (
+                                        <Chip icon={<CheckCircleIcon sx={{ fontSize: 14 }} />} label="Friends" size="small"
+                                            sx={{ bgcolor: 'rgba(76,175,80,0.12)', color: COLORS.success, border: `1px solid rgba(76,175,80,0.3)`, fontWeight: 600, fontSize: '0.72rem' }} />
+                                    ) : friendStatus.status === 'pending' ? (
+                                        friendStatus.is_requester ? (
+                                            <Chip icon={<HourglassEmptyIcon sx={{ fontSize: 13 }} />} label="Pending" size="small"
+                                                sx={{ bgcolor: 'rgba(255,183,77,0.12)', color: COLORS.warning, border: `1px solid rgba(255,183,77,0.3)`, fontWeight: 600, fontSize: '0.72rem' }} />
+                                        ) : (
+                                            <Stack direction="row" spacing={0.5}>
+                                                <Button size="small" variant="contained" onClick={async () => { await acceptFriendFromProfile(profileUser.id); setFriendStatus({ status: 'accepted' }); }}
+                                                    sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.7rem', px: 1.5, py: 0.3, borderRadius: 2, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#2db8b8' } }}>
+                                                    Accept
+                                                </Button>
+                                                <Button size="small" onClick={async () => { await rejectFriendFromProfile(profileUser.id); setFriendStatus({ status: 'none' }); }}
+                                                    sx={{ color: COLORS.fadedText, fontSize: '0.7rem', px: 1, py: 0.3, borderRadius: 2, textTransform: 'none', '&:hover': { color: COLORS.error } }}>
+                                                    Decline
+                                                </Button>
+                                            </Stack>
+                                        )
+                                    ) : (
+                                        <Button size="small" variant="contained" startIcon={friendLoading ? <CircularProgress size={12} sx={{ color: COLORS.background }} /> : <PersonAddIcon sx={{ fontSize: 14 }} />}
+                                            onClick={sendFriendRequest} disabled={friendLoading}
+                                            sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.72rem', px: 2, py: 0.5, borderRadius: 2, textTransform: 'none', fontWeight: 700, '&:hover': { bgcolor: '#2db8b8' }, '&:disabled': { bgcolor: COLORS.cardSecondary, color: COLORS.fadedText } }}>
+                                            Add Friend
+                                        </Button>
+                                    )}
+                                </Stack>
+
+                                {/* member since */}
+                                <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.7rem' }}>
+                                    Member since {new Date(profileUser.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                                </Typography>
+
+                                {/* their posts */}
+                                <Box>
+                                    <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.fadedText, textTransform: 'uppercase', letterSpacing: 1, display: 'block', mb: 1.5 }}>
+                                        Posts ({profilePosts.length})
+                                    </Typography>
+                                    {profilePosts.length === 0 ? (
+                                        <Typography variant="caption" sx={{ color: COLORS.fadedText, fontStyle: 'italic' }}>No posts yet</Typography>
+                                    ) : (
+                                        <Stack spacing={1}>
+                                            {profilePosts.map(p => {
+                                                const tc = TAG_COLORS[p.tag] || COLORS.brand;
+                                                return (
+                                                    <Box key={p.id} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 2.5, px: 2, py: 1.2, border: `1px solid ${COLORS.border}` }}>
+                                                        <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 0.5 }}>
+                                                            <Chip label={p.tag} size="small" sx={{ height: 16, fontSize: '0.58rem', bgcolor: `${tc}20`, color: tc, border: `1px solid ${tc}40`, '& .MuiChip-label': { px: 0.6 } }} />
+                                                            {p.place && p.place !== 'All' && <Typography variant="caption" sx={{ color: COLORS.brand, fontSize: '0.65rem' }}>{p.place}</Typography>}
+                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.6rem' }}>{timeAgo(p.created_at)}</Typography>
+                                                        </Stack>
+                                                        <Typography sx={{ color: COLORS.headings, fontSize: '0.85rem', fontWeight: 600 }}>{p.title}</Typography>
+                                                        {p.body && <Typography noWrap sx={{ color: COLORS.fadedText, fontSize: '0.75rem', mt: 0.3 }}>{p.body}</Typography>}
+                                                        <Stack direction="row" spacing={1.5} sx={{ mt: 0.5 }}>
+                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.62rem' }}>{p.upvotes - p.downvotes} votes</Typography>
+                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.62rem' }}>{p.comment_count || 0} comments</Typography>
+                                                        </Stack>
+                                                    </Box>
+                                                );
+                                            })}
+                                        </Stack>
+                                    )}
+                                </Box>
+                            </Stack>
+                        </DialogContent>
+                    </>
+                )}
+            </Dialog>
 
         </Box>
     );

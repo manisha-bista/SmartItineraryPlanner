@@ -19,6 +19,8 @@ import LogoutIcon from '@mui/icons-material/Logout';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';
 import LocationOnIcon from '@mui/icons-material/LocationOn';
 import DeleteIcon from '@mui/icons-material/Delete';
+import ShareIcon from '@mui/icons-material/Share';
+import SendIcon from '@mui/icons-material/Send';
 import CreateItineraryDialog from '../components/CreateItineraryDialog';
 
 const COLORS = {
@@ -67,6 +69,43 @@ const MyItineraries = () => {
     const [deleting, setDeleting] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
 
+    // share itinerary to friend
+    const [shareOpen, setShareOpen] = useState(false);
+    const [shareItinId, setShareItinId] = useState(null);
+    const [shareItinTitle, setShareItinTitle] = useState('');
+    const [friends, setFriends] = useState([]);
+    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [sharing, setSharing] = useState(null); // friend_id being shared to
+
+    const openShare = async (tripId, tripTitle, e) => {
+        e.stopPropagation();
+        setShareItinId(tripId);
+        setShareItinTitle(tripTitle);
+        setShareOpen(true);
+        setFriendsLoading(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            const res = await axios.get(`http://127.0.0.1:8000/friends/${userId}`);
+            setFriends(res.data?.friends || []);
+        } catch { setFriends([]); }
+        finally { setFriendsLoading(false); }
+    };
+
+    const shareToFriend = async (friendId) => {
+        setSharing(friendId);
+        try {
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/messages?user_id=${userId}`, {
+                receiver_id: friendId,
+                content: `Check out my itinerary: "${shareItinTitle}"`,
+                shared_itinerary_id: shareItinId,
+            });
+            setSharing(null);
+            setShareOpen(false);
+        } catch { /* silent */ }
+        finally { setSharing(null); }
+    };
+
     useEffect(() => {
         const userId = localStorage.getItem('userId');
         const userName = localStorage.getItem('userName');
@@ -111,13 +150,22 @@ const MyItineraries = () => {
             <Box sx={{ position: 'relative' }}>
                 <CardMedia component="img" height="160" image={trip.cover_photo ? `http://127.0.0.1:8000/places/photo?photo_reference=${trip.cover_photo}&max_width=600` : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'} alt={trip.title} />
                 <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
-                    <IconButton
-                        size="small"
-                        onClick={e => { e.stopPropagation(); setDeleteId(trip.id); }}
-                        sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.error, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(255,107,107,0.2)' } }}
-                    >
-                        <DeleteIcon fontSize="small" />
-                    </IconButton>
+                    <Stack direction="row" spacing={0.5}>
+                        <IconButton
+                            size="small"
+                            onClick={(e) => openShare(trip.id, trip.title, e)}
+                            sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.brand, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(51,204,204,0.2)' } }}
+                        >
+                            <ShareIcon fontSize="small" />
+                        </IconButton>
+                        <IconButton
+                            size="small"
+                            onClick={e => { e.stopPropagation(); setDeleteId(trip.id); }}
+                            sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.error, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(255,107,107,0.2)' } }}
+                        >
+                            <DeleteIcon fontSize="small" />
+                        </IconButton>
+                    </Stack>
                 </Box>
             </Box>
             <CardContent sx={{ p: 2.5 }}>
@@ -306,12 +354,59 @@ const MyItineraries = () => {
                 userId={user.id}
                 onSuccess={() => {
                     setCreateOpen(false);
-                    // reload itineraries
                     axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}`)
                         .then(r => setItineraries(r.data))
                         .catch(() => {});
                 }}
             />
+
+            {/* Share Itinerary Dialog */}
+            <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="xs" fullWidth
+                PaperProps={{ sx: { bgcolor: '#141627', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 4 } }}>
+                <DialogTitle sx={{ color: COLORS.headings, fontWeight: 'bold', borderBottom: '1px solid rgba(255,255,255,0.08)', pb: 1.5 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <ShareIcon sx={{ color: COLORS.brand, fontSize: 20 }} />
+                        <Typography fontWeight="bold" sx={{ color: COLORS.headings }}>Share Itinerary</Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mt: 0.5 }}>
+                        Send "{shareItinTitle}" to a friend
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2, px: 2 }}>
+                    {friendsLoading ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: COLORS.brand }} /></Box>
+                    ) : friends.length === 0 ? (
+                        <Box sx={{ py: 4, textAlign: 'center' }}>
+                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
+                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem' }}>Add friends from the community to share itineraries.</Typography>
+                        </Box>
+                    ) : (
+                        <Stack spacing={0.5}>
+                            {friends.map(f => (
+                                <Stack key={f.user_id} direction="row" alignItems="center" sx={{
+                                    px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer',
+                                    '&:hover': { bgcolor: 'rgba(51,204,204,0.06)' },
+                                }}>
+                                    <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
+                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                                    </Typography>
+                                    <Typography sx={{ color: COLORS.headings, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>
+                                        {f.username}
+                                    </Typography>
+                                    <IconButton size="small" onClick={() => shareToFriend(f.user_id)}
+                                        disabled={sharing === f.user_id}
+                                        sx={{ color: COLORS.brand, '&:hover': { bgcolor: 'rgba(51,204,204,0.12)' }, '&:disabled': { color: COLORS.fadedText } }}>
+                                        {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: COLORS.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                    </IconButton>
+                                </Stack>
+                            ))}
+                        </Stack>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 2, py: 1.5, borderTop: '1px solid rgba(255,255,255,0.08)' }}>
+                    <Button onClick={() => setShareOpen(false)} sx={{ color: COLORS.fadedText, borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                </DialogActions>
+            </Dialog>
         </Box>
     );
 };
