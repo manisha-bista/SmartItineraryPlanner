@@ -107,6 +107,13 @@ class ActivityUpdate(BaseModel):
 class ActivityOut(ActivityBase):
     id: int
     day_id: int
+    actual_cost: Optional[float] = 0.0   # Optional so NULL from DB coerces to 0
+    weather_temp: Optional[float] = None
+    weather_condition: Optional[str] = None
+    weather_description: Optional[str] = None
+    weather_icon: Optional[str] = None
+    weather_humidity: Optional[int] = None
+    weather_wind_speed: Optional[float] = None
 
     class Config:
         from_attributes = True
@@ -439,6 +446,7 @@ class ItineraryOut(ItineraryBase):
     like_count: int
     created_at: datetime
     updated_at: datetime
+    weather_fetched_at: Optional[datetime] = None  # from first day that has weather
 
     class Config:
         from_attributes = True

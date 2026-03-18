@@ -15,7 +15,7 @@ class User(Base):
     role = Column(String(20), default="user", nullable=False)  # user, admin
     
     # Profile fields
-    avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-20)
+    avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-30)
     profile_picture_url = Column(String(500), nullable=True)
     bio = Column(Text, nullable=True)
     location = Column(String(200), nullable=True)
@@ -169,6 +169,17 @@ class Activity(Base):
     # Order within the day
     display_order = Column(Integer, default=0)
     
+    # Weather (per-activity, fetched by time slot)
+    weather_temp = Column(Float, nullable=True)
+    weather_condition = Column(String(100), nullable=True)
+    weather_description = Column(String(200), nullable=True)
+    weather_icon = Column(String(50), nullable=True)
+    weather_humidity = Column(Integer, nullable=True)
+    weather_wind_speed = Column(Float, nullable=True)
+
+    # Actual spend (tracked separately from estimated cost)
+    actual_cost = Column(Float, default=0.0)
+
     # Notes
     notes = Column(Text, nullable=True)
     

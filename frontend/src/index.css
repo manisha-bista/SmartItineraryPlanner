@@ -1,4 +1,10 @@
-/* Ensure this is in your index.css */
+/* dark background from frame 0 — prevents white flash on page transitions */
+html, body, #root {
+    background-color: #141627;
+    margin: 0;
+    padding: 0;
+}
+
 .features-container {
     display: flex;
     justify-content: center;
@@ -11,7 +17,7 @@
 }
 
 .feature-card {
-    flex: 1 1 250px;   /* 250px min-width base */
+    flex: 1 1 250px;
     min-width: 250px;
     max-width: 400px;
     background: white;
