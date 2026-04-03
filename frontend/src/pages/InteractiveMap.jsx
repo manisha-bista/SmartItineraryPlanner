@@ -9,7 +9,10 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import Navbar, { DRAWER_WIDTH } from '../components/Navbar';
 import PlaceSearchAutocomplete from '../components/PlaceSearchAutocomplete';
+import CreateItineraryDialog from '../components/CreateItineraryDialog';
 
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import DragIndicatorIcon      from '@mui/icons-material/DragIndicator';
 import LocationOnIcon         from '@mui/icons-material/LocationOn';
 import CalendarTodayIcon      from '@mui/icons-material/CalendarToday';
 import KeyboardArrowDownIcon  from '@mui/icons-material/KeyboardArrowDown';
@@ -130,6 +133,69 @@ export default function InteractiveMap() {
     const [routingStatus, setRoutingStatus] = useState({});
     const [dayDistances, setDayDistances]   = useState({});
 
+    const [timePromptOpen, setTimePromptOpen] = useState(false);
+    const [pendingDrop, setPendingDrop]       = useState(null);
+    const [dropTime, setDropTime]             = useState('');
+
+    const onDragEnd = (result) => {
+        if (!detail) return;
+        const { source, destination, draggableId } = result;
+        if (!destination) return;
+        if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+        const srcDayId = parseInt(source.droppableId.replace('map-day-', ''));
+        const dstDayId = parseInt(destination.droppableId.replace('map-day-', ''));
+        const actId    = parseInt(draggableId.replace('map-act-', ''));
+        const srcDay   = detail.days.find(d => d.id === srcDayId);
+        const act      = srcDay?.activities?.find(a => a.id === actId);
+        if (!act) return;
+        const oldDetail = JSON.parse(JSON.stringify(detail));
+        const newDays = detail.days.map(day => {
+            if (day.id === srcDayId && day.id === dstDayId) {
+                const acts = [...day.activities];
+                acts.splice(source.index, 1);
+                acts.splice(destination.index, 0, act);
+                return { ...day, activities: acts.map((a, i) => ({ ...a, display_order: i })) };
+            } else if (day.id === srcDayId) {
+                return { ...day, activities: day.activities.filter(a => a.id !== actId).map((a, i) => ({ ...a, display_order: i })) };
+            } else if (day.id === dstDayId) {
+                const acts = [...day.activities];
+                acts.splice(destination.index, 0, { ...act, day_id: dstDayId });
+                return { ...day, activities: acts.map((a, i) => ({ ...a, display_order: i })) };
+            }
+            return day;
+        });
+        setDetail({ ...detail, days: newDays });
+        setPendingDrop({ actId, srcDayId, dstDayId, oldDetail });
+        setDropTime(act.start_time?.slice(0, 5) || '');
+        setTimePromptOpen(true);
+    };
+
+    const confirmMapDrop = async () => {
+        if (!pendingDrop) return;
+        const { actId, srcDayId, dstDayId } = pendingDrop;
+        const dstDay   = detail.days.find(d => d.id === dstDayId);
+        const newOrder = dstDay?.activities?.findIndex(a => a.id === actId) ?? 0;
+        try {
+            const payload = { start_time: dropTime || null, display_order: newOrder };
+            if (srcDayId !== dstDayId) payload.day_id = dstDayId;
+            await axios.put(`http://127.0.0.1:8000/activities/${actId}`, payload);
+            toast('Activity moved!');
+            if (selected) {
+                const r = await axios.get(`http://127.0.0.1:8000/itineraries/${selected.id}`);
+                setDetail(r.data);
+            }
+        } catch {
+            setDetail(pendingDrop.oldDetail);
+            toast('Failed to move activity.', 'error');
+        }
+        setTimePromptOpen(false); setPendingDrop(null); setDropTime('');
+    };
+
+    const cancelMapDrop = () => {
+        if (pendingDrop?.oldDetail) setDetail(pendingDrop.oldDetail);
+        setTimePromptOpen(false); setPendingDrop(null); setDropTime('');
+    };
+
     // edit activity dialog
     const [editOpen, setEditOpen]   = useState(false);
     const [editMode, setEditMode]   = useState(false);  // false = info view, true = edit form
@@ -137,6 +203,7 @@ export default function InteractiveMap() {
     const [editForm, setEditForm]   = useState({});
     const [editBusy, setEditBusy]   = useState(false);
     const [snack, setSnack]         = useState({ open: false, msg: '', sev: 'success' });
+    const [createOpen, setCreateOpen] = useState(false);
 
     const toast = (msg, sev = 'success') => setSnack({ open: true, msg, sev });
 
@@ -365,7 +432,7 @@ export default function InteractiveMap() {
                     <Box sx={{ px: 2.5, pt: 5, textAlign: 'center' }}>
                         <PlaceIcon sx={{ fontSize: 40, color: C.faded, mb: 1 }} />
                         <Typography variant="body2" sx={{ color: C.faded }}>No itineraries yet</Typography>
-                        <Button size="small" onClick={() => navigate('/itineraries')} sx={{ color: C.brand, mt: 1, textTransform: 'none', fontSize: '0.8rem' }}>
+                        <Button size="small" onClick={() => setCreateOpen(true)} sx={{ color: C.brand, mt: 1, textTransform: 'none', fontSize: '0.8rem' }}>
                             Create one →
                         </Button>
                     </Box>
@@ -440,6 +507,7 @@ export default function InteractiveMap() {
                                             </Stack>
 
                                             {/* Day rows */}
+                                            <DragDropContext onDragEnd={onDragEnd}>
                                             {(detail?.days || []).map((day, dayIdx) => {
                                                 const color      = DAY_COLORS[dayIdx % DAY_COLORS.length];
                                                 const isOpen     = expanded[day.id] !== false;
@@ -488,7 +556,11 @@ export default function InteractiveMap() {
                                                         </Stack>
 
                                                         <Collapse in={isOpen}>
-                                                            <Stack>
+                                                            <Droppable droppableId={`map-day-${day.id}`}>
+                                                            {(dropProvided, dropSnapshot) => (
+                                                            <Box ref={dropProvided.innerRef} {...dropProvided.droppableProps}
+                                                                sx={{ minHeight: 30, transition: 'background 0.2s', borderRadius: 1,
+                                                                      bgcolor: dropSnapshot.isDraggingOver ? `${C.brand}0A` : 'transparent' }}>
                                                                 {(day.activities || []).map((act, actIdx) => {
                                                                     const hasCoords = !!(act.latitude && act.longitude);
                                                                     const prev = day.activities[actIdx - 1];
@@ -496,14 +568,22 @@ export default function InteractiveMap() {
                                                                         ? haversine([prev.latitude, prev.longitude], [act.latitude, act.longitude])
                                                                         : null;
                                                                     return (
-                                                                        <Stack key={act.id} direction="row" alignItems="flex-start"
-                                                                            onClick={() => hasCoords && flyTo(act.latitude, act.longitude)}
+                                                                        <Draggable key={act.id} draggableId={`map-act-${act.id}`} index={actIdx}>
+                                                                        {(dragProvided, dragSnapshot) => (
+                                                                        <Stack ref={dragProvided.innerRef} {...dragProvided.draggableProps}
+                                                                            direction="row" alignItems="flex-start"
                                                                             sx={{
                                                                                 px: 2.5, py: 0.9,
-                                                                                cursor: hasCoords ? 'pointer' : 'default',
+                                                                                cursor: 'default',
                                                                                 opacity: hasCoords ? 1 : 0.45,
-                                                                                '&:hover': hasCoords ? { bgcolor: `${C.brand}0A` } : {},
+                                                                                bgcolor: dragSnapshot.isDragging ? `${C.brand}15` : 'transparent',
+                                                                                border: `1px solid ${dragSnapshot.isDragging ? C.brand + '40' : 'transparent'}`,
+                                                                                borderRadius: 1,
+                                                                                '&:hover': { bgcolor: `${C.brand}0A` },
                                                                             }}>
+                                                                            <Box {...dragProvided.dragHandleProps} onClick={e => e.stopPropagation()} sx={{ color: C.faded, display: 'flex', alignItems: 'center', cursor: 'grab', mr: 0.5, mt: 0.2, '&:hover': { color: C.brand } }}>
+                                                                                <DragIndicatorIcon sx={{ fontSize: 13 }} />
+                                                                            </Box>
                                                                             {hasCoords ? (
                                                                                 <Box sx={{ width: 20, height: 20, borderRadius: '50%', bgcolor: color, color: 'white', fontSize: '0.62rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, mt: 0.2, mr: 1.2 }}>
                                                                                     {actIdx + 1}
@@ -511,7 +591,7 @@ export default function InteractiveMap() {
                                                                             ) : (
                                                                                 <Box sx={{ width: 20, height: 20, borderRadius: '50%', border: `1px dashed ${C.faded}`, flexShrink: 0, mt: 0.2, mr: 1.2 }} />
                                                                             )}
-                                                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                                            <Box onClick={() => hasCoords && flyTo(act.latitude, act.longitude)} sx={{ flex: 1, minWidth: 0, cursor: hasCoords ? 'pointer' : 'default' }}>
                                                                                 <Typography noWrap sx={{ color: hasCoords ? C.text : C.faded, fontSize: '0.78rem', fontWeight: 600 }}>
                                                                                     {act.title || act.location}
                                                                                 </Typography>
@@ -544,13 +624,19 @@ export default function InteractiveMap() {
                                                                                 </Stack>
                                                                             </Box>
                                                                         </Stack>
+                                                                        )}
+                                                                        </Draggable>
                                                                     );
                                                                 })}
-                                                            </Stack>
+                                                                {dropProvided.placeholder}
+                                                            </Box>
+                                                            )}
+                                                            </Droppable>
                                                         </Collapse>
                                                     </Box>
                                                 );
                                             })}
+                                            </DragDropContext>
                                         </>}
                                     </Collapse>
                                 </Box>
@@ -624,6 +710,32 @@ export default function InteractiveMap() {
                 .leaflet-routing-alt { display: none !important; }
             `}</style>
         </Box>
+
+        {/* ── Drag Time Prompt ─────────────────────────────────────────────── */}
+        <Dialog open={timePromptOpen} onClose={cancelMapDrop} maxWidth="xs" fullWidth
+            PaperProps={{ sx: { bgcolor: C.card, borderRadius: 4 } }}>
+            <DialogTitle sx={{ color: C.heading, fontWeight: 'bold', pb: 0.5 }}>
+                {pendingDrop?.srcDayId === pendingDrop?.dstDayId ? 'Update Time' : 'Move to Another Day'}
+            </DialogTitle>
+            <DialogContent>
+                <Typography sx={{ color: C.faded, fontSize: '0.85rem', mb: 2 }}>
+                    {pendingDrop?.srcDayId === pendingDrop?.dstDayId
+                        ? 'Activity reordered. Set a new start time (optional):'
+                        : `Moving to ${(() => { const d = detail?.days?.find(d => d.id === pendingDrop?.dstDayId); return d ? `Day ${d.day_number}` : 'new day'; })()}. Set a start time (optional):`}
+                </Typography>
+                <TextField fullWidth type="time" label="Start Time (optional)" value={dropTime}
+                    onChange={e => setDropTime(e.target.value)}
+                    InputLabelProps={{ shrink: true }}
+                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.bg, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand } }} />
+            </DialogContent>
+            <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                <Button onClick={cancelMapDrop} sx={{ color: C.faded }}>Cancel</Button>
+                <Button onClick={confirmMapDrop} variant="contained"
+                    sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3, px: 3, '&:hover': { bgcolor: '#2db8b8' } }}>
+                    Confirm Move
+                </Button>
+            </DialogActions>
+        </Dialog>
 
         {/* ── Activity Info / Edit Dialog ──────────────────────────────────── */}
         <Dialog open={editOpen} onClose={() => { setEditOpen(false); setEditMode(false); }} maxWidth="sm" fullWidth
@@ -828,6 +940,14 @@ export default function InteractiveMap() {
                 </>
             )}
         </Dialog>
+
+        <CreateItineraryDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => {
+            setCreateOpen(false);
+            const userId = localStorage.getItem('userId');
+            axios.get('http://127.0.0.1:8000/itineraries/user/' + userId)
+                .then(r => { const list = r.data || []; setItineraries(list); if (list.length > 0) setSelected(list[0]); })
+                .catch(() => {});
+        }} />
 
         {/* Snackbar */}
         <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack(p => ({ ...p, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>

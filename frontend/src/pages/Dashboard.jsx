@@ -19,6 +19,7 @@ import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import Navbar, { DRAWER_WIDTH } from '../components/Navbar';
 import CreateItineraryDialog from '../components/CreateItineraryDialog';
+
 import SearchIcon        from '@mui/icons-material/Search';
 import AddIcon           from '@mui/icons-material/Add';
 import CalendarTodayIcon from '@mui/icons-material/CalendarToday';

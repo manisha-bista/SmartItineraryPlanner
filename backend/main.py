@@ -96,6 +96,118 @@ def require_admin(user_id: int, db: Session):
         raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
+def send_content_removal_email(recipient_email: str, user_name: str, content_type: str, post_title: str, report_reason: str):
+    """Send a professional content-removal notification email."""
+    if not EMAIL_SENDER or not EMAIL_PASSWORD:
+        logger.warning("Email credentials not configured — skipping removal notification.")
+        return
+
+    is_comment = content_type == "comment"
+    subject = f"Your {'comment' if is_comment else 'post'} has been removed — Smart Itinerary Planner"
+
+    if is_comment:
+        headline = "Your comment has been removed"
+        blurb    = f'Your comment on the post <strong style="color:#D0D2EB;">"{post_title}"</strong> was reviewed by our moderation team and has been permanently removed from the community.'
+    else:
+        headline = "Your post has been removed"
+        blurb    = f'Your post titled <strong style="color:#D0D2EB;">"{post_title}"</strong> was reviewed by our moderation team and has been permanently removed from the community.'
+
+    html = f"""<!DOCTYPE html>
+<html lang="en">
+<head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#0F1120;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#0F1120;padding:40px 0;">
+    <tr><td align="center">
+      <table width="520" cellpadding="0" cellspacing="0" style="background:#141627;border-radius:16px;border:1px solid #252845;overflow:hidden;">
+
+        <!-- Header -->
+        <tr>
+          <td style="background:linear-gradient(135deg,#1a1f3a 0%,#141627 100%);padding:28px 36px 20px;border-bottom:1px solid #252845;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td>
+                  <p style="margin:0;font-size:20px;font-weight:800;color:#33CCCC;letter-spacing:-0.3px;">Smart Itinerary Planner</p>
+                  <p style="margin:4px 0 0;font-size:12px;color:#7B809A;letter-spacing:0.5px;text-transform:uppercase;">Community Standards Notice</p>
+                </td>
+                <td align="right">
+                  <div style="width:36px;height:36px;background:rgba(255,107,107,0.12);border:1px solid rgba(255,107,107,0.3);border-radius:50%;text-align:center;line-height:36px;font-size:18px;">&#9888;</div>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding:32px 36px;">
+            <p style="margin:0 0 6px;font-size:22px;font-weight:700;color:#EAECF8;">{headline}</p>
+            <p style="margin:0 0 24px;font-size:13px;color:#7B809A;">Hi {user_name},</p>
+
+            <p style="margin:0 0 20px;font-size:14px;color:#A8AABD;line-height:1.7;">
+              {blurb}
+            </p>
+
+            <!-- Reason box -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr>
+                <td style="background:#1E2240;border-left:3px solid #FF6B6B;border-radius:0 8px 8px 0;padding:16px 20px;">
+                  <p style="margin:0 0 6px;font-size:11px;font-weight:700;color:#FF6B6B;text-transform:uppercase;letter-spacing:0.8px;">Reason for removal</p>
+                  <p style="margin:0;font-size:14px;color:#D0D2EB;line-height:1.6;">{report_reason}</p>
+                </td>
+              </tr>
+            </table>
+
+            <p style="margin:0 0 16px;font-size:14px;color:#A8AABD;line-height:1.7;">
+              We take community safety seriously and apply our
+              <span style="color:#33CCCC;">Community Guidelines</span> to all content. This action was taken to
+              maintain a respectful and trustworthy environment for all travellers.
+            </p>
+
+            <p style="margin:0 0 28px;font-size:14px;color:#A8AABD;line-height:1.7;">
+              If you believe this was a mistake, please reply to this email or reach out to our support team. We are happy to review the decision.
+            </p>
+
+            <!-- Divider -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+              <tr><td style="height:1px;background:#252845;"></td></tr>
+            </table>
+
+            <p style="margin:0;font-size:13px;color:#7B809A;line-height:1.7;">
+              Thank you for being part of the Smart Itinerary Planner community. We hope you continue to share your Nepal travel experiences with us.
+            </p>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#0F1120;padding:20px 36px;border-top:1px solid #252845;">
+            <p style="margin:0;font-size:11px;color:#4A4D6A;text-align:center;">
+              &copy; {datetime.utcnow().year} Smart Itinerary Planner &nbsp;&middot;&nbsp; This is an automated message, please do not reply directly.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = subject
+    msg["From"]    = f"Smart Itinerary Planner <{EMAIL_SENDER}>"
+    msg["To"]      = recipient_email
+    msg.attach(MIMEText(html, "html"))
+
+    try:
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+            server.login(EMAIL_SENDER, EMAIL_PASSWORD)
+            server.sendmail(EMAIL_SENDER, recipient_email, msg.as_string())
+        logger.info(f"Content removal email sent to {recipient_email}")
+    except Exception as e:
+        logger.error(f"Failed to send removal email to {recipient_email}: {e}")
+
+
 def send_otp_email(recipient_email: str, otp: str, user_name: str):
     """Send OTP email via Gmail SMTP SSL."""
     if not EMAIL_SENDER or not EMAIL_PASSWORD:
@@ -656,11 +768,21 @@ def get_itinerary_detail(itinerary_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=500, detail="Failed to fetch itinerary")
 
 @app.put("/itineraries/{itinerary_id}", response_model=schemas.ItineraryOut)
-def update_itinerary(itinerary_id: int, itinerary_update: schemas.ItineraryUpdate, db: Session = Depends(get_db)):
+def update_itinerary(itinerary_id: int, itinerary_update: schemas.ItineraryUpdate, user_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     try:
         itinerary = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
         if not itinerary:
             raise HTTPException(status_code=404, detail="Itinerary not found")
+        # If user_id provided, check owner or accepted collaborator
+        if user_id is not None:
+            is_owner = itinerary.user_id == user_id
+            is_collaborator = db.query(models.ItineraryCollaborator).filter(
+                models.ItineraryCollaborator.itinerary_id == itinerary_id,
+                models.ItineraryCollaborator.user_id == user_id,
+                models.ItineraryCollaborator.status == 'accepted',
+            ).first() is not None
+            if not is_owner and not is_collaborator:
+                raise HTTPException(status_code=403, detail="Not authorized to update this itinerary")
         for field, value in itinerary_update.dict(exclude_unset=True).items():
             setattr(itinerary, field, value)
         db.commit()
@@ -690,6 +812,264 @@ def delete_itinerary(itinerary_id: int, db: Session = Depends(get_db)):
         db.rollback()
         logger.error(f"Error deleting itinerary: {e}")
         raise HTTPException(status_code=500, detail="Failed to delete itinerary")
+
+
+# ============================================
+# ITINERARY COLLABORATION ENDPOINTS
+# ============================================
+
+@app.get("/itineraries/user/{user_id}/collaborations")
+def get_user_collaborations(user_id: int, db: Session = Depends(get_db)):
+    """Get itineraries where user is an accepted collaborator (not the owner)"""
+    try:
+        collab_records = db.query(models.ItineraryCollaborator).filter(
+            models.ItineraryCollaborator.user_id == user_id,
+            models.ItineraryCollaborator.status == 'accepted',
+        ).all()
+        result = []
+        for c in collab_records:
+            itin = db.query(models.Itinerary).filter(models.Itinerary.id == c.itinerary_id).first()
+            if itin:
+                result.append({
+                    "id": itin.id,
+                    "title": itin.title,
+                    "destination": itin.destination,
+                    "cover_image_url": itin.cover_image_url,
+                    "start_date": itin.start_date.isoformat(),
+                    "end_date": itin.end_date.isoformat(),
+                    "status": itin.status,
+                    "estimated_budget": itin.estimated_budget,
+                    "currency": itin.currency,
+                    "is_public": itin.is_public,
+                    "view_count": itin.view_count,
+                    "like_count": itin.like_count,
+                    "total_days": len(itin.days),
+                    "total_activities": sum(len(d.activities) for d in itin.days),
+                    "created_at": itin.created_at.isoformat(),
+                    "owner_username": itin.owner.username if itin.owner else None,
+                    "my_role": c.role,
+                })
+        return result
+    except Exception as e:
+        logger.error(f"Error fetching collaborations: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch collaborations")
+
+
+@app.get("/itineraries/user/{user_id}/pending-collabs")
+def get_pending_collaboration_invites(user_id: int, db: Session = Depends(get_db)):
+    """Get pending collaboration invites for a user."""
+    collabs = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.user_id == user_id,
+        models.ItineraryCollaborator.status == 'pending',
+    ).all()
+    result = []
+    for c in collabs:
+        itin = db.query(models.Itinerary).filter(models.Itinerary.id == c.itinerary_id).first()
+        inviter = db.query(models.User).filter(models.User.id == c.invited_by).first()
+        if itin:
+            result.append({
+                "collab_id": c.id,
+                "itinerary_id": c.itinerary_id,
+                "itinerary_title": itin.title,
+                "itinerary_destination": itin.destination,
+                "invited_by_username": inviter.username if inviter else "Unknown",
+                "invited_by_avatar_id": inviter.avatar_id if inviter else 1,
+                "created_at": c.created_at.isoformat(),
+            })
+    return result
+
+
+@app.post("/itineraries/{itinerary_id}/fork")
+def fork_itinerary(itinerary_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Create a copy of an itinerary in the requesting user's account."""
+    original = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
+    if not original:
+        raise HTTPException(status_code=404, detail="Itinerary not found")
+    if original.user_id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot fork your own itinerary")
+    # Check if already forked
+    existing = db.query(models.Itinerary).filter(
+        models.Itinerary.user_id == user_id,
+        models.Itinerary.forked_from == itinerary_id,
+    ).first()
+    if existing:
+        return {"id": existing.id, "forked": False, "message": "Already forked"}
+    try:
+        fork = models.Itinerary(
+            user_id=user_id,
+            title=f"{original.title} (copy)",
+            destination=original.destination,
+            description=original.description,
+            start_date=original.start_date,
+            end_date=original.end_date,
+            estimated_budget=original.estimated_budget,
+            currency=original.currency,
+            status="planning",
+            is_public=False,
+            forked_from=original.id,
+        )
+        db.add(fork)
+        db.flush()
+        for day in original.days:
+            new_day = models.ItineraryDay(
+                itinerary_id=fork.id,
+                day_number=day.day_number,
+                date=day.date,
+                title=day.title,
+                description=day.description,
+                estimated_cost=day.estimated_cost,
+                main_location=day.main_location,
+                main_latitude=day.main_latitude,
+                main_longitude=day.main_longitude,
+            )
+            db.add(new_day)
+            db.flush()
+            for act in day.activities:
+                new_act = models.Activity(
+                    day_id=new_day.id,
+                    title=act.title,
+                    description=act.description,
+                    location=act.location,
+                    latitude=act.latitude,
+                    longitude=act.longitude,
+                    place_id=act.place_id,
+                    formatted_address=act.formatted_address,
+                    place_types=act.place_types,
+                    rating=act.rating,
+                    start_time=act.start_time,
+                    end_time=act.end_time,
+                    duration_minutes=act.duration_minutes,
+                    activity_type=act.activity_type,
+                    cost=act.cost,
+                    priority=act.priority,
+                    display_order=act.display_order,
+                    notes=act.notes,
+                )
+                db.add(new_act)
+        db.commit()
+        db.refresh(fork)
+        return {"id": fork.id, "forked": True, "message": "Itinerary forked successfully"}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error forking itinerary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fork itinerary")
+
+
+@app.post("/itineraries/{itinerary_id}/collaborators")
+def invite_collaborator(itinerary_id: int, invite: schemas.CollaboratorInvite, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Invite a user (by username) to collaborate on an itinerary."""
+    itinerary = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="Itinerary not found")
+    if itinerary.user_id != user_id:
+        raise HTTPException(status_code=403, detail="Only the owner can invite collaborators")
+    target = db.query(models.User).filter(models.User.username == invite.username).first()
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    if target.id == user_id:
+        raise HTTPException(status_code=400, detail="Cannot invite yourself")
+    existing = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.itinerary_id == itinerary_id,
+        models.ItineraryCollaborator.user_id == target.id,
+    ).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User is already invited or a collaborator")
+    try:
+        collab = models.ItineraryCollaborator(
+            itinerary_id=itinerary_id,
+            user_id=target.id,
+            invited_by=user_id,
+            role="editor",
+            status="pending",
+        )
+        db.add(collab)
+        inviter = db.query(models.User).filter(models.User.id == user_id).first()
+        notif = models.Notification(
+            user_id=target.id,
+            type="collab_invite",
+            message=f"{inviter.username if inviter else 'Someone'} invited you to collaborate on '{itinerary.title}'",
+            from_user_id=user_id,
+        )
+        db.add(notif)
+        db.commit()
+        return {"status": "invited", "username": target.username}
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error inviting collaborator: {e}")
+        raise HTTPException(status_code=500, detail="Failed to invite collaborator")
+
+
+@app.get("/itineraries/{itinerary_id}/collaborators")
+def get_collaborators(itinerary_id: int, db: Session = Depends(get_db)):
+    """List all collaborators for an itinerary."""
+    collabs = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.itinerary_id == itinerary_id,
+    ).all()
+    result = []
+    for c in collabs:
+        user = db.query(models.User).filter(models.User.id == c.user_id).first()
+        if user:
+            result.append({
+                "id": c.id,
+                "user_id": c.user_id,
+                "username": user.username,
+                "avatar_id": user.avatar_id,
+                "role": c.role,
+                "status": c.status,
+                "invited_by": c.invited_by,
+                "created_at": c.created_at.isoformat(),
+                "accepted_at": c.accepted_at.isoformat() if c.accepted_at else None,
+            })
+    return result
+
+
+@app.patch("/itineraries/{itinerary_id}/collaborators/accept")
+def accept_collaboration(itinerary_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Accept a collaboration invite."""
+    from datetime import datetime as dt
+    collab = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.itinerary_id == itinerary_id,
+        models.ItineraryCollaborator.user_id == user_id,
+    ).first()
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration invite not found")
+    collab.status = "accepted"
+    collab.accepted_at = dt.utcnow()
+    db.commit()
+    return {"status": "accepted"}
+
+
+@app.patch("/itineraries/{itinerary_id}/collaborators/reject")
+def reject_collaboration(itinerary_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Reject a collaboration invite."""
+    collab = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.itinerary_id == itinerary_id,
+        models.ItineraryCollaborator.user_id == user_id,
+    ).first()
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaboration invite not found")
+    db.delete(collab)
+    db.commit()
+    return {"status": "rejected"}
+
+
+@app.delete("/itineraries/{itinerary_id}/collaborators/{collab_user_id}")
+def remove_collaborator(itinerary_id: int, collab_user_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    """Remove a collaborator (owner can remove anyone; collaborator can remove themselves)."""
+    itinerary = db.query(models.Itinerary).filter(models.Itinerary.id == itinerary_id).first()
+    if not itinerary:
+        raise HTTPException(status_code=404, detail="Itinerary not found")
+    collab = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.itinerary_id == itinerary_id,
+        models.ItineraryCollaborator.user_id == collab_user_id,
+    ).first()
+    if not collab:
+        raise HTTPException(status_code=404, detail="Collaborator not found")
+    if itinerary.user_id != user_id and collab_user_id != user_id:
+        raise HTTPException(status_code=403, detail="Not authorized")
+    db.delete(collab)
+    db.commit()
+    return {"status": "removed"}
 
 
 # ============================================
@@ -1056,8 +1436,8 @@ def create_community_post(post: schemas.CommunityPostCreate, user_id: int = Quer
         db.commit()
         db.refresh(new_post)
         result = schemas.CommunityPostOut.from_orm(new_post)
-        result.author_name = user.name
-        result.author_initial = user.name[0].upper() if user.name else 'U'
+        result.author_name = user.username
+        result.author_initial = user.username[0].upper()
         result.author_avatar_id = user.avatar_id or 1
         result.user_vote = None
         return result
@@ -1087,19 +1467,66 @@ def get_community_posts(tag: Optional[str] = Query(None), place: Optional[str] =
         results = []
         for p in posts:
             out = schemas.CommunityPostOut.from_orm(p)
-            out.author_name = p.author.username or p.author.name if p.author else "Unknown"
-            out.author_initial = (p.author.username or p.author.name or 'U')[0].upper() if p.author else "U"
+            out.author_name = p.author.username if p.author else "Unknown"
+            out.author_initial = p.author.username[0].upper() if p.author else "U"
             out.author_avatar_id = p.author.avatar_id if p.author else 1
             if user_id:
                 vote = db.query(models.PostVote).filter(models.PostVote.post_id == p.id, models.PostVote.user_id == user_id).first()
                 out.user_vote = vote.direction if vote else None
+                saved = db.query(models.SavedPost).filter(models.SavedPost.post_id == p.id, models.SavedPost.user_id == user_id).first()
+                out.saved = bool(saved)
             else:
                 out.user_vote = None
+                out.saved = False
             results.append(out)
         return results
     except Exception as e:
         logger.error(f"Error fetching posts: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch posts")
+
+@app.post("/community/posts/{post_id}/save")
+def toggle_save_post(post_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    try:
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        existing = db.query(models.SavedPost).filter(models.SavedPost.post_id == post_id, models.SavedPost.user_id == user_id).first()
+        if existing:
+            db.delete(existing)
+            db.commit()
+            return {"saved": False}
+        else:
+            db.add(models.SavedPost(user_id=user_id, post_id=post_id))
+            db.commit()
+            return {"saved": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error toggling save: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save post")
+
+@app.get("/community/saved", response_model=List[schemas.CommunityPostOut])
+def get_saved_posts(user_id: int = Query(...), db: Session = Depends(get_db)):
+    try:
+        saved = db.query(models.SavedPost).filter(models.SavedPost.user_id == user_id).order_by(models.SavedPost.created_at.desc()).all()
+        results = []
+        for s in saved:
+            p = s.post if hasattr(s, 'post') else db.query(models.CommunityPost).filter(models.CommunityPost.id == s.post_id).first()
+            if not p:
+                continue
+            out = schemas.CommunityPostOut.from_orm(p)
+            out.author_name = p.author.username if p.author else "Unknown"
+            out.author_initial = p.author.username[0].upper() if p.author else "U"
+            out.author_avatar_id = p.author.avatar_id if p.author else 1
+            vote = db.query(models.PostVote).filter(models.PostVote.post_id == p.id, models.PostVote.user_id == user_id).first()
+            out.user_vote = vote.direction if vote else None
+            out.saved = True
+            results.append(out)
+        return results
+    except Exception as e:
+        logger.error(f"Error fetching saved posts: {e}")
+        raise HTTPException(status_code=500, detail="Failed to fetch saved posts")
 
 @app.post("/community/posts/{post_id}/vote")
 def vote_on_post(post_id: int, vote: schemas.PostVoteRequest, user_id: int = Query(...), db: Session = Depends(get_db)):
@@ -1189,23 +1616,36 @@ def create_post_comment(post_id: int, comment: schemas.PostCommentCreate, user_i
         if not user:
             raise HTTPException(status_code=404, detail="User not found")
 
-        new_comment = models.PostComment(content=comment.content, post_id=post_id, user_id=user_id)
+        new_comment = models.PostComment(
+            content=comment.content,
+            post_id=post_id,
+            user_id=user_id,
+            parent_comment_id=comment.parent_comment_id,
+        )
         db.add(new_comment)
         post.comment_count += 1
         db.commit()
         db.refresh(new_comment)
 
-        result = schemas.PostCommentOut.from_orm(new_comment)
-        result.author_name = user.name
-        result.author_initial = user.name[0].upper() if user.name else 'U'
-        result.author_avatar_id = user.avatar_id or 1
+        result = schemas.PostCommentOut(
+            id=new_comment.id,
+            content=new_comment.content,
+            post_id=new_comment.post_id,
+            user_id=new_comment.user_id,
+            parent_comment_id=new_comment.parent_comment_id,
+            created_at=new_comment.created_at,
+            author_name=user.username,
+            author_initial=user.username[0].upper(),
+            author_avatar_id=user.avatar_id or 1,
+            reactions=[],
+        )
 
         # notify post owner if someone else commented
         if post.user_id != user_id:
             notif = models.Notification(
                 user_id=post.user_id,
                 type='comment',
-                message=f'{user.name} commented on your post "{post.title[:40]}"',
+                message=f'{user.username} commented on your post "{post.title[:40]}"',
                 post_id=post_id,
                 from_user_id=user_id,
             )
@@ -1221,8 +1661,18 @@ def create_post_comment(post_id: int, comment: schemas.PostCommentCreate, user_i
         logger.error(f"Error creating comment: {e}")
         raise HTTPException(status_code=500, detail="Failed to create comment")
 
+def _build_reaction_summary(comment, current_user_id):
+    counts = {}
+    for r in (comment.reactions or []):
+        counts[r.emoji] = counts.get(r.emoji, 0) + 1
+    user_emoji = next((r.emoji for r in (comment.reactions or []) if r.user_id == current_user_id), None)
+    return [
+        schemas.ReactionSummary(emoji=e, count=c, user_reacted=(e == user_emoji))
+        for e, c in sorted(counts.items(), key=lambda x: -x[1])
+    ]
+
 @app.get("/community/posts/{post_id}/comments", response_model=List[schemas.PostCommentOut])
-def get_post_comments(post_id: int, db: Session = Depends(get_db)):
+def get_post_comments(post_id: int, user_id: Optional[int] = Query(None), db: Session = Depends(get_db)):
     try:
         comments = db.query(models.PostComment).filter(
             models.PostComment.post_id == post_id
@@ -1230,15 +1680,211 @@ def get_post_comments(post_id: int, db: Session = Depends(get_db)):
 
         results = []
         for c in comments:
-            out = schemas.PostCommentOut.from_orm(c)
-            out.author_name = c.user.name if c.user else "Unknown"
-            out.author_initial = c.user.name[0].upper() if c.user and c.user.name else "U"
-            out.author_avatar_id = c.user.avatar_id if c.user else 1
+            out = schemas.PostCommentOut(
+                id=c.id,
+                content=c.content,
+                post_id=c.post_id,
+                user_id=c.user_id,
+                parent_comment_id=c.parent_comment_id,
+                created_at=c.created_at,
+                author_name=c.user.username if c.user else "Unknown",
+                author_initial=c.user.username[0].upper() if c.user else "U",
+                author_avatar_id=c.user.avatar_id if c.user else 1,
+                reactions=_build_reaction_summary(c, user_id),
+            )
             results.append(out)
         return results
     except Exception as e:
         logger.error(f"Error fetching comments: {e}")
         raise HTTPException(status_code=500, detail="Failed to fetch comments")
+
+@app.delete("/community/posts/{post_id}/comments/{comment_id}")
+def delete_post_comment(post_id: int, comment_id: int, user_id: int = Query(...), db: Session = Depends(get_db)):
+    try:
+        comment = db.query(models.PostComment).filter(
+            models.PostComment.id == comment_id,
+            models.PostComment.post_id == post_id,
+        ).first()
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == post_id).first()
+        is_comment_author = comment.user_id == user_id
+        is_post_author = post and post.user_id == user_id
+
+        if not is_comment_author and not is_post_author:
+            raise HTTPException(status_code=403, detail="Not allowed to delete this comment")
+
+        db.delete(comment)
+        if post and post.comment_count and post.comment_count > 0:
+            post.comment_count -= 1
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error deleting comment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to delete comment")
+
+@app.post("/community/posts/{post_id}/comments/{comment_id}/react")
+def react_to_comment(post_id: int, comment_id: int, user_id: int = Query(...), emoji: str = Query(...), db: Session = Depends(get_db)):
+    try:
+        comment = db.query(models.PostComment).filter(models.PostComment.id == comment_id).first()
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+
+        existing = db.query(models.PostCommentReaction).filter(
+            models.PostCommentReaction.comment_id == comment_id,
+            models.PostCommentReaction.user_id == user_id,
+        ).first()
+
+        if existing:
+            if existing.emoji == emoji:
+                # toggle off
+                db.delete(existing)
+            else:
+                # switch emoji
+                existing.emoji = emoji
+        else:
+            db.add(models.PostCommentReaction(comment_id=comment_id, user_id=user_id, emoji=emoji))
+
+        db.commit()
+        db.refresh(comment)
+        return {"reactions": _build_reaction_summary(comment, user_id)}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error reacting to comment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to react")
+
+
+# ============================================
+# REPORT ENDPOINTS
+# ============================================
+@app.post("/community/posts/{post_id}/report", status_code=status.HTTP_201_CREATED)
+def report_post(post_id: int, report: schemas.PostReportCreate, user_id: int = Query(...), db: Session = Depends(get_db)):
+    try:
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == post_id).first()
+        if not post:
+            raise HTTPException(status_code=404, detail="Post not found")
+        new_report = models.PostReport(reporter_id=user_id, post_id=post_id, reason=report.reason)
+        db.add(new_report)
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error reporting post: {e}")
+        raise HTTPException(status_code=500, detail="Failed to submit report")
+
+@app.post("/community/posts/{post_id}/comments/{comment_id}/report", status_code=status.HTTP_201_CREATED)
+def report_comment(post_id: int, comment_id: int, report: schemas.PostReportCreate, user_id: int = Query(...), db: Session = Depends(get_db)):
+    try:
+        comment = db.query(models.PostComment).filter(models.PostComment.id == comment_id).first()
+        if not comment:
+            raise HTTPException(status_code=404, detail="Comment not found")
+        new_report = models.PostReport(reporter_id=user_id, post_id=post_id, comment_id=comment_id, reason=report.reason)
+        db.add(new_report)
+        db.commit()
+        return {"ok": True}
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        logger.error(f"Error reporting comment: {e}")
+        raise HTTPException(status_code=500, detail="Failed to submit report")
+
+@app.get("/admin/reports")
+def admin_list_reports(admin_id: int = Query(...), db: Session = Depends(get_db)):
+    require_admin(admin_id, db)
+    reports = db.query(models.PostReport).order_by(models.PostReport.created_at.desc()).all()
+    result = []
+    for r in reports:
+        result.append({
+            "id": r.id,
+            "reporter_id": r.reporter_id,
+            "reporter_username": r.reporter.username if r.reporter else f"User #{r.reporter_id}",
+            "post_id": r.post_id,
+            "post_title": r.post.title if r.post else None,
+            "comment_id": r.comment_id,
+            "comment_content": r.comment.content[:100] if r.comment else None,
+            "reason": r.reason,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        })
+    return result
+
+@app.patch("/admin/reports/{report_id}")
+def admin_update_report(report_id: int, admin_id: int = Query(...), new_status: str = Query(...), db: Session = Depends(get_db)):
+    require_admin(admin_id, db)
+    report = db.query(models.PostReport).filter(models.PostReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    report.status = new_status
+    db.commit()
+    return {"ok": True}
+
+@app.delete("/admin/reports/{report_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_report(report_id: int, admin_id: int = Query(...), db: Session = Depends(get_db)):
+    require_admin(admin_id, db)
+    report = db.query(models.PostReport).filter(models.PostReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+    db.delete(report)
+    db.commit()
+
+@app.delete("/admin/reports/{report_id}/content", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_reported_content(report_id: int, admin_id: int = Query(...), db: Session = Depends(get_db)):
+    """Delete the reported post or comment, then dismiss the report and email the author."""
+    require_admin(admin_id, db)
+    report = db.query(models.PostReport).filter(models.PostReport.id == report_id).first()
+    if not report:
+        raise HTTPException(status_code=404, detail="Report not found")
+
+    # Collect info needed for the notification email before deleting
+    notify_email    = None
+    notify_username = None
+    content_type    = None
+    post_title      = None
+    report_reason   = report.reason or "Violation of community guidelines"
+
+    if report.comment_id:
+        comment = db.query(models.PostComment).filter(models.PostComment.id == report.comment_id).first()
+        if comment:
+            author = db.query(models.User).filter(models.User.id == comment.user_id).first()
+            parent_post = db.query(models.CommunityPost).filter(models.CommunityPost.id == comment.post_id).first()
+            notify_email    = author.email    if author      else None
+            notify_username = author.username if author      else None
+            post_title      = parent_post.title if parent_post else "a community post"
+            content_type    = "comment"
+            if parent_post and parent_post.comment_count and parent_post.comment_count > 0:
+                parent_post.comment_count -= 1
+            db.delete(comment)
+    elif report.post_id:
+        post = db.query(models.CommunityPost).filter(models.CommunityPost.id == report.post_id).first()
+        if post:
+            author = db.query(models.User).filter(models.User.id == post.user_id).first()
+            notify_email    = author.email    if author else None
+            notify_username = author.username if author else None
+            post_title      = post.title
+            content_type    = "post"
+            db.delete(post)
+
+    report.status = "reviewed"
+    db.commit()
+
+    # Send email notification after committing (non-blocking — failure won't roll back)
+    if notify_email and content_type and post_title:
+        send_content_removal_email(
+            recipient_email=notify_email,
+            user_name=notify_username or "Community Member",
+            content_type=content_type,
+            post_title=post_title,
+            report_reason=report_reason,
+        )
 
 
 # ============================================
@@ -1302,13 +1948,28 @@ def create_complaint(complaint: schemas.ComplaintCreate, user_id: int = Query(..
         logger.error(f"Error creating complaint: {e}")
         raise HTTPException(status_code=500, detail="Failed to create complaint")
 
-@app.get("/complaints/", response_model=List[schemas.ComplaintOut])
+@app.get("/complaints/")
 def list_complaints(status_filter: Optional[str] = Query(None), db: Session = Depends(get_db)):
     try:
         query = db.query(models.Complaint)
         if status_filter:
             query = query.filter(models.Complaint.status == status_filter)
-        return query.order_by(models.Complaint.created_at.desc()).all()
+        complaints = query.order_by(models.Complaint.created_at.desc()).all()
+        result = []
+        for c in complaints:
+            user = db.query(models.User).filter(models.User.id == c.user_id).first()
+            result.append({
+                "id": c.id,
+                "title": c.title,
+                "description": c.description,
+                "category": c.category,
+                "status": c.status,
+                "user_id": c.user_id,
+                "user_name": user.username if user else f"User #{c.user_id}",
+                "created_at": c.created_at.isoformat() if c.created_at else None,
+                "updated_at": c.updated_at.isoformat() if c.updated_at else None,
+            })
+        return result
     except Exception as e:
         logger.error(f"Error listing complaints: {e}")
         raise HTTPException(status_code=500, detail="Failed to list complaints")
@@ -1441,7 +2102,7 @@ def admin_list_posts(admin_id: int = Query(...), db: Session = Depends(get_db)):
             "upvotes": p.upvotes,
             "downvotes": p.downvotes,
             "user_id": p.user_id,
-            "author_name": p.author.name if p.author else "Unknown",
+            "author_name": p.author.username if p.author else "Unknown",
             "created_at": p.created_at.isoformat() if p.created_at else None,
         }
         for p in posts
@@ -1467,6 +2128,16 @@ def admin_delete_post(post_id: int, admin_id: int = Query(...), db: Session = De
     if not post:
         raise HTTPException(status_code=404, detail="Post not found")
     db.delete(post)
+    db.commit()
+
+
+@app.delete("/admin/places/{place_id}", status_code=status.HTTP_204_NO_CONTENT)
+def admin_delete_place(place_id: int, admin_id: int = Query(...), db: Session = Depends(get_db)):
+    require_admin(admin_id, db)
+    place = db.query(models.Place).filter(models.Place.id == place_id).first()
+    if not place:
+        raise HTTPException(status_code=404, detail="Place not found")
+    db.delete(place)
     db.commit()
 
 
@@ -1505,7 +2176,7 @@ def admin_user_profile(user_id: int, admin_id: int = Query(...), db: Session = D
 
     return {
         "user": {
-            "id": user.id, "name": user.name, "email": user.email, "role": user.role,
+            "id": user.id, "name": user.name, "username": user.username, "email": user.email, "role": user.role,
             "bio": user.bio, "location": user.location,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "last_login": user.last_login.isoformat() if user.last_login else None,
@@ -2194,6 +2865,50 @@ def send_message(msg: schemas.MessageCreate, user_id: int = Query(...), db: Sess
     result.sender_avatar_id = sender.avatar_id if sender else 1
     return result
 
+@app.get("/messages/{user_id}/unread-count")
+def get_message_unread_count(user_id: int, db: Session = Depends(get_db)):
+    count = db.query(models.Message).filter(
+        models.Message.receiver_id == user_id,
+        models.Message.is_read == False,
+    ).count()
+    return {"count": count}
+
+# get list of conversations (latest message per friend)
+# MUST be defined before /messages/{user_id}/{friend_id} to avoid route conflict
+@app.get("/messages/{user_id}/conversations")
+def get_conversations(user_id: int, db: Session = Depends(get_db)):
+
+    convos = []
+    for f in db.query(models.Friendship).filter(
+        or_(models.Friendship.requester_id == user_id, models.Friendship.receiver_id == user_id),
+        models.Friendship.status == 'accepted'
+    ).all():
+        friend_id = f.receiver_id if f.requester_id == user_id else f.requester_id
+        friend = db.query(models.User).filter(models.User.id == friend_id).first()
+        if not friend:
+            continue
+        last_msg = db.query(models.Message).filter(
+            or_(
+                (models.Message.sender_id == user_id) & (models.Message.receiver_id == friend_id),
+                (models.Message.sender_id == friend_id) & (models.Message.receiver_id == user_id),
+            )
+        ).order_by(models.Message.created_at.desc()).first()
+        unread = db.query(models.Message).filter(
+            models.Message.sender_id == friend_id,
+            models.Message.receiver_id == user_id,
+            models.Message.is_read == False,
+        ).count()
+        convos.append({
+            "friend_id": friend.id,
+            "username": friend.username,
+            "avatar_id": friend.avatar_id,
+            "last_message": last_msg.content[:60] if last_msg else None,
+            "last_message_time": last_msg.created_at.isoformat() if last_msg else None,
+            "unread_count": unread,
+        })
+    convos.sort(key=lambda c: c['last_message_time'] or '', reverse=True)
+    return {"conversations": convos}
+
 @app.get("/messages/{user_id}/{friend_id}")
 def get_conversation(user_id: int, friend_id: int, limit: int = Query(50, le=100), db: Session = Depends(get_db)):
     messages = db.query(models.Message).filter(
@@ -2218,54 +2933,6 @@ def get_conversation(user_id: int, friend_id: int, limit: int = Query(50, le=100
         results.append(d)
     return {"messages": results}
 
-@app.get("/messages/{user_id}/unread-count")
-def get_message_unread_count(user_id: int, db: Session = Depends(get_db)):
-    count = db.query(models.Message).filter(
-        models.Message.receiver_id == user_id,
-        models.Message.is_read == False,
-    ).count()
-    return {"count": count}
-
-# get list of conversations (latest message per friend)
-@app.get("/messages/{user_id}/conversations")
-def get_conversations(user_id: int, db: Session = Depends(get_db)):
-    # get all friends
-    friendships = db.query(models.Friendship).filter(
-        or_(models.Friendship.requester_id == user_id, models.Friendship.receiver_id == user_id),
-        models.Friendship.status == 'accepted'
-    ).all()
-
-    convos = []
-    for f in friendships:
-        friend_id = f.receiver_id if f.requester_id == user_id else f.requester_id
-        friend = db.query(models.User).filter(models.User.id == friend_id).first()
-        if not friend:
-            continue
-
-        last_msg = db.query(models.Message).filter(
-            or_(
-                (models.Message.sender_id == user_id) & (models.Message.receiver_id == friend_id),
-                (models.Message.sender_id == friend_id) & (models.Message.receiver_id == user_id),
-            )
-        ).order_by(models.Message.created_at.desc()).first()
-
-        unread = db.query(models.Message).filter(
-            models.Message.sender_id == friend_id,
-            models.Message.receiver_id == user_id,
-            models.Message.is_read == False,
-        ).count()
-
-        convos.append({
-            "friend_id": friend.id,
-            "username": friend.username,
-            "avatar_id": friend.avatar_id,
-            "last_message": last_msg.content[:60] if last_msg else None,
-            "last_message_time": last_msg.created_at.isoformat() if last_msg else None,
-            "unread_count": unread,
-        })
-
-    convos.sort(key=lambda c: c['last_message_time'] or '', reverse=True)
-    return {"conversations": convos}
 
 
 if __name__ == "__main__":

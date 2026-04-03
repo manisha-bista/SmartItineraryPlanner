@@ -99,6 +99,8 @@ class ActivityUpdate(BaseModel):
     duration_minutes: Optional[int] = None
     activity_type: Optional[str] = None
     cost: Optional[float] = None
+    actual_cost: Optional[float] = None
+    day_id: Optional[int] = None
     priority: Optional[str] = None
     is_completed: Optional[bool] = None
     display_order: Optional[int] = None
@@ -565,6 +567,7 @@ class CommunityPostCreate(BaseModel):
     image_url: Optional[str] = None
     tag: str = Field(default="Experience", pattern="^(Experience|Alert|Event|Tip|Question)$")
     place: str = Field(default="All", max_length=200)
+    shared_itinerary_id: Optional[int] = None
 
 class CommunityPostOut(BaseModel):
     id: int
@@ -578,10 +581,13 @@ class CommunityPostOut(BaseModel):
     comment_count: int
     user_id: int
     created_at: datetime
+    shared_itinerary_id: Optional[int] = None
     # added by the endpoint, not directly from the model
     author_name: Optional[str] = None
     author_initial: Optional[str] = None
+    author_avatar_id: Optional[int] = None
     user_vote: Optional[str] = None  # 'up', 'down', or None
+    saved: bool = False
 
     class Config:
         from_attributes = True
@@ -595,15 +601,24 @@ class PostVoteRequest(BaseModel):
 # ============================================
 class PostCommentCreate(BaseModel):
     content: str = Field(..., min_length=1, max_length=1000)
+    parent_comment_id: Optional[int] = None
+
+class ReactionSummary(BaseModel):
+    emoji: str
+    count: int
+    user_reacted: bool = False
 
 class PostCommentOut(BaseModel):
     id: int
     content: str
     post_id: int
     user_id: int
+    parent_comment_id: Optional[int] = None
     created_at: datetime
     author_name: Optional[str] = None
     author_initial: Optional[str] = None
+    author_avatar_id: Optional[int] = None
+    reactions: List[ReactionSummary] = []
 
     class Config:
         from_attributes = True
@@ -664,6 +679,51 @@ class MessageOut(BaseModel):
     created_at: datetime
     sender_username: Optional[str] = None
     sender_avatar_id: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# COLLABORATION SCHEMAS
+# ============================================
+class CollaboratorInvite(BaseModel):
+    username: str = Field(..., min_length=1)
+
+class CollaboratorOut(BaseModel):
+    id: int
+    user_id: int
+    username: str
+    avatar_id: int
+    role: str
+    status: str
+    invited_by: int
+    created_at: datetime
+    accepted_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+# ============================================
+# POST REPORT SCHEMAS
+# ============================================
+class PostReportCreate(BaseModel):
+    reason: str = Field(..., min_length=1, max_length=200)
+    post_id: Optional[int] = None
+    comment_id: Optional[int] = None
+
+class PostReportOut(BaseModel):
+    id: int
+    reporter_id: int
+    post_id: Optional[int] = None
+    comment_id: Optional[int] = None
+    reason: str
+    status: str
+    created_at: datetime
+    reporter_username: Optional[str] = None
+    post_title: Optional[str] = None
+    comment_content: Optional[str] = None
 
     class Config:
         from_attributes = True

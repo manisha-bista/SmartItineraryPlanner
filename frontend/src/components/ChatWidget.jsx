@@ -98,6 +98,19 @@ const ChatWidget = () => {
         return () => clearInterval(interval);
     }, [fetchConversations]);
 
+    useEffect(() => {
+        const handler = (e) => {
+            const { friendId, username, avatarId } = e.detail;
+            fetchConversations();
+            setOpen(true);
+            setActiveChat({ friend_id: friendId, username, avatar_id: avatarId });
+            setMessages([]);
+            setView('chat');
+        };
+        window.addEventListener('open-chat', handler);
+        return () => window.removeEventListener('open-chat', handler);
+    }, [fetchConversations]);
+
     const fetchMessages = useCallback(async () => {
         if (!activeChat) return;
         try {

@@ -11,16 +11,21 @@ import DashboardIcon   from '@mui/icons-material/Dashboard';
 import ExploreIcon     from '@mui/icons-material/Explore';
 import MapIcon         from '@mui/icons-material/Map';
 import GroupIcon       from '@mui/icons-material/Group';
+import PeopleIcon      from '@mui/icons-material/People';
 import PersonIcon      from '@mui/icons-material/Person';
 import LogoutIcon      from '@mui/icons-material/Logout';
 import NotificationsIcon from '@mui/icons-material/Notifications';
 import CheckCircleOutlineIcon from '@mui/icons-material/CheckCircleOutline';
 import PersonAddIcon   from '@mui/icons-material/PersonAdd';
 import ShareIcon       from '@mui/icons-material/Share';
+import HandshakeIcon   from '@mui/icons-material/Handshake';
+import ChatBubbleOutlineIcon from '@mui/icons-material/ChatBubbleOutline';
+import ThumbUpOutlinedIcon   from '@mui/icons-material/ThumbUpOutlined';
 import AdminPanelSettingsIcon from '@mui/icons-material/AdminPanelSettings';
 import LightModeIcon   from '@mui/icons-material/LightMode';
 import DarkModeIcon    from '@mui/icons-material/DarkMode';
 import axios from 'axios';
+import FriendsPopup from './FriendsPopup';
 
 const DRAWER_WIDTH = 240;
 
@@ -67,13 +72,18 @@ const NAV_ITEMS = [
     { text: 'My Itineraries',  icon: <ExploreIcon />,   path: '/itineraries' },
     { text: 'Interactive Map', icon: <MapIcon />,        path: '/map'         },
     { text: 'Community Feed',  icon: <GroupIcon />,      path: '/community'   },
+    { text: 'Friends',         icon: <PeopleIcon />,     path: '/friends'     },
     { text: 'Profile',         icon: <PersonIcon />,     path: '/profile'     },
 ];
 
 const NOTIF_ICON = {
-    friend_request: <PersonAddIcon sx={{ fontSize: 18 }} />,
-    friend_accepted: <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />,
-    itinerary_shared: <ShareIcon sx={{ fontSize: 18 }} />,
+    friend_request:   <PersonAddIcon          sx={{ fontSize: 18 }} />,
+    friend_accepted:  <CheckCircleOutlineIcon sx={{ fontSize: 18 }} />,
+    itinerary_shared: <ShareIcon              sx={{ fontSize: 18 }} />,
+    collab_invite:    <HandshakeIcon          sx={{ fontSize: 18 }} />,
+    comment:          <ChatBubbleOutlineIcon  sx={{ fontSize: 18 }} />,
+    upvote:           <ThumbUpOutlinedIcon    sx={{ fontSize: 18 }} />,
+    message:          <ChatBubbleOutlineIcon  sx={{ fontSize: 18, color: '#42A5F5' }} />,
 };
 
 const Navbar = () => {
@@ -91,6 +101,22 @@ const Navbar = () => {
     const [unreadCount, setUnreadCount]       = useState(0);
     const [notifAnchor, setNotifAnchor]       = useState(null);
     const notifOpen = Boolean(notifAnchor);
+
+    // pending friend requests count for Friends badge
+    const [pendingFriends, setPendingFriends] = useState(0);
+    const [friendsOpen, setFriendsOpen]       = useState(false);
+
+    useEffect(() => {
+        if (!userId) return;
+        const fetchPending = () => {
+            axios.get(`http://127.0.0.1:8000/friends/${userId}/pending`)
+                .then(r => setPendingFriends((r.data || []).length))
+                .catch(() => {});
+        };
+        fetchPending();
+        const interval = setInterval(fetchPending, 60000);
+        return () => clearInterval(interval);
+    }, [userId]);
 
     const fetchNotifications = () => {
         if (!userId) return;
@@ -113,18 +139,46 @@ const Navbar = () => {
 
     const handleMarkAllRead = () => {
         if (!userId) return;
-        axios.post(`http://127.0.0.1:8000/notifications/${userId}/mark-all-read`)
+        axios.patch(`http://127.0.0.1:8000/notifications/${userId}/read-all`)
             .then(() => fetchNotifications())
             .catch(() => {});
     };
 
-    const handleNotifAction = (notif) => {
-        // mark read then navigate if relevant
-        axios.post(`http://127.0.0.1:8000/notifications/${notif.id}/read`).catch(() => {});
-        if (notif.type === 'friend_request' || notif.type === 'friend_accepted') navigate('/profile');
-        if (notif.type === 'itinerary_shared') navigate('/itineraries');
+    const handleNotifAction = async (notif) => {
+        axios.patch(`http://127.0.0.1:8000/notifications/${notif.id}/read`).catch(() => {});
         handleNotifClose();
         fetchNotifications();
+
+        switch (notif.type) {
+            case 'friend_request':
+            case 'friend_accepted':
+            case 'collab_invite':
+                setFriendsOpen(true);
+                break;
+
+            case 'itinerary_shared':
+                navigate('/itineraries');
+                break;
+
+            case 'comment':
+            case 'upvote':
+                navigate('/community', { state: { highlightPostId: notif.post_id } });
+                break;
+
+            case 'message':
+                if (notif.from_user_id) {
+                    try {
+                        const res = await axios.get(`http://127.0.0.1:8000/users/${notif.from_user_id}/public`);
+                        window.dispatchEvent(new CustomEvent('open-chat', {
+                            detail: { friendId: notif.from_user_id, username: res.data.username, avatarId: res.data.avatar_id }
+                        }));
+                    } catch { /* silent */ }
+                }
+                break;
+
+            default:
+                break;
+        }
     };
 
     const handleLogout = () => {
@@ -178,11 +232,12 @@ const Navbar = () => {
             <List sx={{ px: 2, mt: 1, flexGrow: 1 }}>
                 {NAV_ITEMS.map((item) => {
                     const active = isActive(item.path);
+                    const isFriends = item.path === '/friends';
                     return (
                         <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                             <ListItemButton
-                                onClick={() => navigate(item.path)}
-                                selected={active}
+                                onClick={() => isFriends ? setFriendsOpen(true) : navigate(item.path)}
+                                selected={!isFriends && active}
                                 sx={{
                                     borderRadius: 2,
                                     color: active ? activeText : inactiveText,
@@ -199,7 +254,11 @@ const Navbar = () => {
                                     color: active ? activeText : inactiveText,
                                     minWidth: 40,
                                 }}>
-                                    {item.icon}
+                                    {item.path === '/friends' && pendingFriends > 0 ? (
+                                        <Badge badgeContent={pendingFriends} color="error" max={9} sx={{ '& .MuiBadge-badge': { fontSize: '0.6rem', height: 16, minWidth: 16 } }}>
+                                            {item.icon}
+                                        </Badge>
+                                    ) : item.icon}
                                 </ListItemIcon>
                                 <ListItemText
                                     primary={item.text}
@@ -335,6 +394,9 @@ const Navbar = () => {
                     </Button>
                 </Stack>
             </Box>
+
+            {/* Friends Popup Drawer */}
+            <FriendsPopup open={friendsOpen} onClose={() => setFriendsOpen(false)} />
 
             {/* Notifications Popover */}
             <Popover

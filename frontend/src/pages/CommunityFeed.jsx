@@ -6,7 +6,7 @@ import {
     CircularProgress, Select, MenuItem, Alert, Divider, ListSubheader,
     Collapse, Menu,
 } from '@mui/material';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import Navbar, { DRAWER_WIDTH } from '../components/Navbar';
@@ -33,8 +33,21 @@ import PersonAddIcon       from '@mui/icons-material/PersonAdd';
 import CheckCircleIcon     from '@mui/icons-material/CheckCircle';
 import HourglassEmptyIcon  from '@mui/icons-material/HourglassEmpty';
 import ChatIcon            from '@mui/icons-material/Chat';
+import ContentCopyIcon     from '@mui/icons-material/ContentCopy';
+import CalendarTodayIcon   from '@mui/icons-material/CalendarToday';
+import ExploreIcon         from '@mui/icons-material/Explore';
+import OpenInNewIcon       from '@mui/icons-material/OpenInNew';
+import ChevronLeftIcon     from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon    from '@mui/icons-material/ChevronRight';
+import DeleteOutlineIcon   from '@mui/icons-material/DeleteOutline';
+import AddReactionOutlinedIcon from '@mui/icons-material/AddReactionOutlined';
+import Tooltip             from '@mui/material/Tooltip';
+import Popover             from '@mui/material/Popover';
+import MoreVertIcon        from '@mui/icons-material/MoreVert';
+import FlagOutlinedIcon    from '@mui/icons-material/FlagOutlined';
 
 // ── constants ──────────────────────────────────────────────────────────────
+const EMOJI_LIST = ['👍', '❤️', '😂', '😮', '😢', '👏'];
 const TAG_OPTIONS = ['Experience', 'Alert', 'Event', 'Tip', 'Question'];
 const TAG_COLORS  = {
     Experience: '#33CCCC', Alert: '#FFB74D', Event: '#4CAF50',
@@ -68,6 +81,136 @@ const getAvatarColor = (id) => {
     return colors[(id || 1) - 1] || '#33CCCC';
 };
 
+const fmtDate = (s) => { if (!s) return ''; return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); };
+
+// ── ItineraryEmbed ───────────────────────────────────────────────────────────
+const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
+    const [itin, setItin]         = useState(null);
+    const [dayIndex, setDayIndex] = useState(0);
+    const [forking, setForking]   = useState(false);
+
+    useEffect(() => {
+        if (!itineraryId) return;
+        axios.get(`http://127.0.0.1:8000/itineraries/${itineraryId}`)
+            .then(r => { setItin(r.data); setDayIndex(0); })
+            .catch(() => {});
+    }, [itineraryId]);
+
+    const forkIt = async (e) => {
+        e.stopPropagation();
+        setForking(true);
+        try {
+            const res = await axios.post(`http://127.0.0.1:8000/itineraries/${itineraryId}/fork?user_id=${userId}`);
+            window.location.href = `/itinerary/${res.data.id}`;
+        } catch { setForking(false); }
+    };
+
+    if (!itin) return (
+        <Box sx={{ px: 2, py: 1.5, bgcolor: `${COLORS.brand}08`, borderRadius: 2, mt: 1.5, border: `1px solid ${COLORS.cardBorder}`, display: 'flex', alignItems: 'center', gap: 1 }}>
+            <CircularProgress size={14} sx={{ color: COLORS.brand }} />
+            <Typography sx={{ fontSize: '0.72rem', color: COLORS.fadedText }}>Loading itinerary…</Typography>
+        </Box>
+    );
+
+    const days    = itin.days || [];
+    const totalActs = days.reduce((s, d) => s + (d.activities?.length || 0), 0);
+    const isOwn   = itin.user_id === parseInt(userId);
+    const cur     = days[dayIndex];
+
+    return (
+        <Box sx={{ mt: 2, bgcolor: `${COLORS.brand}08`, border: `1px solid ${COLORS.brand}30`, borderRadius: 3, overflow: 'hidden', minHeight: 220 }}>
+
+            {/* ── Header row ── */}
+            <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2, borderBottom: days.length > 0 ? `1px solid ${COLORS.cardBorder}` : 'none' }}>
+                <ExploreIcon sx={{ fontSize: 24, color: COLORS.brand, mr: 1.5, flexShrink: 0 }} />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                    <Typography sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '1.05rem', lineHeight: 1.2 }} noWrap>{itin.title}</Typography>
+                    <Stack direction="row" spacing={0.8} sx={{ mt: 0.4, flexWrap: 'wrap', gap: 0.3 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.3}>
+                            <LocationOnIcon sx={{ fontSize: 14, color: COLORS.fadedText }} />
+                            <Typography sx={{ fontSize: '0.82rem', color: COLORS.fadedText }}>{itin.destination}</Typography>
+                        </Stack>
+                        <Typography sx={{ fontSize: '0.82rem', color: COLORS.fadedText }}>·</Typography>
+                        <Typography sx={{ fontSize: '0.82rem', color: COLORS.fadedText }}>{days.length} day{days.length !== 1 ? 's' : ''} · {totalActs} stops</Typography>
+                    </Stack>
+                </Box>
+                <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0, ml: 1.5 }}>
+                    <Button size="small"
+                        startIcon={forking ? <CircularProgress size={13} sx={{ color: COLORS.background || '#141627' }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+                        onClick={forkIt} disabled={forking}
+                        sx={{ bgcolor: COLORS.brand, color: COLORS.background || '#141627', fontWeight: 700, borderRadius: 2, px: 2, py: 0.5, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>
+                        {forking ? 'Forking…' : 'Fork & Edit'}
+                    </Button>
+                    <Button size="small" startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
+                        onClick={(e) => { e.stopPropagation(); window.open(`/itinerary/${itineraryId}`, '_blank'); }}
+                        sx={{ color: COLORS.brand, borderRadius: 2, px: 1.5, py: 0.5, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: `${COLORS.brand}18` } }}>
+                        View
+                    </Button>
+                </Stack>
+            </Stack>
+
+            {/* ── Day tabs + pagination ── */}
+            {days.length > 0 && cur && (
+                <>
+                    {/* Day chips */}
+                    <Stack direction="row" spacing={0} sx={{ px: 3, pt: 1.5, pb: 0.75, flexWrap: 'wrap', gap: 0.6 }}>
+                        {days.map((day, idx) => (
+                            <Chip key={day.id} label={`D${day.day_number}`} size="small" onClick={() => setDayIndex(idx)}
+                                sx={{
+                                    height: 28, fontSize: '0.75rem', cursor: 'pointer',
+                                    bgcolor: idx === dayIndex ? `${COLORS.brand}22` : 'transparent',
+                                    color: idx === dayIndex ? COLORS.brand : COLORS.fadedText,
+                                    border: `1px solid ${idx === dayIndex ? COLORS.brand + '50' : COLORS.cardBorder}`,
+                                    fontWeight: idx === dayIndex ? 700 : 400,
+                                    '&:hover': { bgcolor: `${COLORS.brand}14`, color: COLORS.brand },
+                                    '& .MuiChip-label': { px: 1.2 },
+                                }} />
+                        ))}
+                    </Stack>
+
+                    {/* Day header with prev/next */}
+                    <Stack direction="row" alignItems="center" sx={{ px: 2, py: 1 }}>
+                        <IconButton size="small" onClick={() => setDayIndex(i => i - 1)} disabled={dayIndex === 0}
+                            sx={{ p: 0.4, color: dayIndex > 0 ? COLORS.brand : COLORS.fadedText, '&:hover': { bgcolor: `${COLORS.brand}14` } }}>
+                            <ChevronLeftIcon sx={{ fontSize: 22 }} />
+                        </IconButton>
+                        <Typography sx={{ color: COLORS.subheadings, fontSize: '0.88rem', fontWeight: 700, flex: 1, textAlign: 'center' }}>
+                            Day {cur.day_number}{cur.title && !/^day\s*\d+$/i.test(cur.title.trim()) ? ` · ${cur.title}` : ''}{cur.date ? ` — ${fmtDate(cur.date)}` : ''}
+                        </Typography>
+                        <IconButton size="small" onClick={() => setDayIndex(i => i + 1)} disabled={dayIndex === days.length - 1}
+                            sx={{ p: 0.4, color: dayIndex < days.length - 1 ? COLORS.brand : COLORS.fadedText, '&:hover': { bgcolor: `${COLORS.brand}14` } }}>
+                            <ChevronRightIcon sx={{ fontSize: 22 }} />
+                        </IconButton>
+                    </Stack>
+
+                    {/* Activities for current day */}
+                    <Box sx={{ px: 3, pb: 2.5 }}>
+                        {(cur.activities || []).length === 0 ? (
+                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem', fontStyle: 'italic' }}>No activities for this day.</Typography>
+                        ) : (
+                            (cur.activities || []).map(act => (
+                                <Stack key={act.id} direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+                                    <Box sx={{ width: 7, height: 7, borderRadius: '50%', bgcolor: COLORS.brand, flexShrink: 0 }} />
+                                    <Typography sx={{ fontSize: '0.9rem', color: COLORS.text, flex: 1 }}>{act.title || act.location}</Typography>
+                                    {act.location && act.title && act.title !== act.location && (
+                                        <Stack direction="row" alignItems="center" spacing={0.3}>
+                                            <LocationOnIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
+                                            <Typography sx={{ fontSize: '0.78rem', color: COLORS.fadedText }} noWrap>{act.location}</Typography>
+                                        </Stack>
+                                    )}
+                                    {act.start_time && (
+                                        <Typography sx={{ fontSize: '0.78rem', color: COLORS.fadedText, flexShrink: 0 }}>@ {act.start_time.slice(0, 5)}</Typography>
+                                    )}
+                                </Stack>
+                            ))
+                        )}
+                    </Box>
+                </>
+            )}
+        </Box>
+    );
+};
+
 const FILTER_OPTIONS = [
     { label: 'New',     icon: <NewReleasesIcon sx={{ fontSize: 16 }} />, sort: 'new'     },
     { label: 'Popular', icon: <WhatshotIcon    sx={{ fontSize: 16 }} />, sort: 'popular' },
@@ -90,7 +233,7 @@ const timeAgo = (dateStr) => {
 
 // ── PostCard ────────────────────────────────────────────────────────────────
 // COLORS passed as prop since defined outside CommunityFeed
-const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
+const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLORS, navigate, highlighted }) => {
     const tagColor = TAG_COLORS[post.tag] || COLORS.brand;
     const netVotes = (post.upvotes || 0) - (post.downvotes || 0);
     const [showComments, setShowComments] = useState(false);
@@ -98,6 +241,9 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
     const [commentsLoading, setCommentsLoading] = useState(false);
     const [newComment, setNewComment]     = useState('');
     const [posting, setPosting]           = useState(false);
+    const [replyTo, setReplyTo]           = useState(null);
+    const [replyText, setReplyText]       = useState('');
+    const [replyPosting, setReplyPosting] = useState(false);
 
     const voteColor = (dir) => post.user_vote === dir
         ? (dir === 'up' ? COLORS.brand : '#ff6b6b')
@@ -106,7 +252,7 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
     const loadComments = async () => {
         setCommentsLoading(true);
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/community/posts/${post.id}/comments`);
+            const res = await axios.get(`http://127.0.0.1:8000/community/posts/${post.id}/comments`, { params: { user_id: userId } });
             setComments(res.data || []);
         } catch { /* silent */ }
         finally { setCommentsLoading(false); }
@@ -118,16 +264,178 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
         if (!newComment.trim()) return;
         setPosting(true);
         try {
-            await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments?user_id=${userId}`, { content: newComment.trim() });
-            setNewComment(''); loadComments();
+            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments?user_id=${userId}`, { content: newComment.trim() });
+            setNewComment('');
+            setComments(prev => [...prev, res.data]);
+            setLocalCommentCount(c => c + 1);
         } catch { /* silent */ }
         finally { setPosting(false); }
     };
 
+    const submitReply = async (parentId) => {
+        if (!replyText.trim()) return;
+        setReplyPosting(true);
+        try {
+            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments?user_id=${userId}`, { content: replyText.trim(), parent_comment_id: parentId });
+            setReplyText(''); setReplyTo(null);
+            setComments(prev => [...prev, res.data]);
+            setLocalCommentCount(c => c + 1);
+        } catch { /* silent */ }
+        finally { setReplyPosting(false); }
+    };
+
+    const [emojiAnchor, setEmojiAnchor] = useState(null); // { el, commentId }
+    const [localCommentCount, setLocalCommentCount] = useState(post.comment_count || 0);
+    const [postMenuAnchor, setPostMenuAnchor] = useState(null);
+    const [reportDialog, setReportDialog] = useState({ open: false, target: null, commentId: null }); // target: 'post'|'comment'
+    const [reportReason, setReportReason] = useState('');
+    const [reportSubmitting, setReportSubmitting] = useState(false);
+    const [reportSuccess, setReportSuccess] = useState(false);
+
+    const submitReport = async () => {
+        if (!reportReason.trim()) return;
+        setReportSubmitting(true);
+        try {
+            if (reportDialog.target === 'comment') {
+                await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${reportDialog.commentId}/report?user_id=${userId}`, { reason: reportReason.trim() });
+            } else {
+                await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/report?user_id=${userId}`, { reason: reportReason.trim() });
+            }
+            setReportSuccess(true);
+            setTimeout(() => { setReportDialog({ open: false, target: null, commentId: null }); setReportReason(''); setReportSuccess(false); }, 1500);
+        } catch { /* silent */ }
+        finally { setReportSubmitting(false); }
+    };
+
+    const deletePost = async () => {
+        try {
+            await axios.delete(`http://127.0.0.1:8000/community/posts/${post.id}?user_id=${userId}`);
+            onDelete?.(post.id);
+        } catch { /* silent */ }
+    };
+
+    const submitReaction = async (commentId, emoji, anchorEl) => {
+        setEmojiAnchor(null);
+        try {
+            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${commentId}/react?user_id=${userId}&emoji=${encodeURIComponent(emoji)}`);
+            setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions: res.data.reactions } : c));
+        } catch { /* silent */ }
+    };
+
+    const deleteComment = async (commentId) => {
+        try {
+            await axios.delete(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${commentId}?user_id=${userId}`);
+            // Compute removed count from current snapshot BEFORE updating state
+            const removed = comments.filter(c => c.id === commentId || c.parent_comment_id === commentId);
+            setLocalCommentCount(c => Math.max(0, c - removed.length));
+            setComments(prev => prev.filter(c => c.id !== commentId && c.parent_comment_id !== commentId));
+        } catch { /* silent */ }
+    };
+
+    // Computed outside JSX to avoid IIFE rendering issues
+    const topLevel = comments.filter(c => !c.parent_comment_id);
+    const repliesMap = {};
+    comments.forEach(c => {
+        if (c.parent_comment_id) {
+            if (!repliesMap[c.parent_comment_id]) repliesMap[c.parent_comment_id] = [];
+            repliesMap[c.parent_comment_id].push(c);
+        }
+    });
+    const canDelete = (c) => c.user_id === userId || post.user_id === userId;
+
+    const renderComment = (c, isReply = false) => {
+        const activeReactions = (c.reactions || []).filter(r => r.count > 0);
+        return (
+            <Box key={c.id}>
+                <Stack direction="row" spacing={1} sx={{ py: 0.5 }}>
+                    <Avatar sx={{ width: isReply ? 20 : 24, height: isReply ? 20 : 24, bgcolor: COLORS.cardSecondary, mt: 0.3, flexShrink: 0 }} src={getAvatarUrl(c.author_avatar_id)} />
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                        <Stack direction="row" alignItems="center" spacing={0.8}>
+                            <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.subheadings, fontSize: isReply ? '0.72rem' : '0.78rem' }}>{c.author_name || 'User'}</Typography>
+                            <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.65rem' }}>{timeAgo(c.created_at)}</Typography>
+                            <Box sx={{ flex: 1 }} />
+                            {canDelete(c) && (
+                                <Tooltip title="Delete comment" placement="top">
+                                    <IconButton size="small" onClick={() => deleteComment(c.id)}
+                                        sx={{ p: 0.2, color: COLORS.fadedText, '&:hover': { color: '#ff6b6b', bgcolor: 'rgba(255,107,107,0.08)' } }}>
+                                        <DeleteOutlineIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
+                        </Stack>
+                        <Typography variant="body2" sx={{ color: COLORS.text, fontSize: '0.82rem', lineHeight: 1.5, mt: 0.1 }}>{c.content}</Typography>
+                        {activeReactions.length > 0 && (
+                            <Stack direction="row" spacing={0.4} alignItems="center" sx={{ mt: 0.5, flexWrap: 'wrap', gap: 0.3 }}>
+                                {activeReactions.map(r => (
+                                    <Box key={r.emoji} onClick={() => submitReaction(c.id, r.emoji)}
+                                        sx={{
+                                            display: 'flex', alignItems: 'center', gap: '3px', cursor: 'pointer',
+                                            px: 0.7, py: 0.15, borderRadius: 10,
+                                            border: `1px solid ${r.user_reacted ? COLORS.brand + '70' : COLORS.cardBorder}`,
+                                            bgcolor: r.user_reacted ? `${COLORS.brand}18` : COLORS.cardSecondary,
+                                            transition: 'all 0.15s',
+                                            '&:hover': { borderColor: COLORS.brand + '60', bgcolor: `${COLORS.brand}12` },
+                                        }}>
+                                        <span style={{ fontSize: '0.82rem', lineHeight: 1 }}>{r.emoji}</span>
+                                        <Typography sx={{ fontSize: '0.68rem', color: r.user_reacted ? COLORS.brand : COLORS.fadedText, fontWeight: r.user_reacted ? 700 : 500, lineHeight: 1 }}>{r.count}</Typography>
+                                    </Box>
+                                ))}
+                            </Stack>
+                        )}
+                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ mt: 0.5 }}>
+                            <Tooltip title="Add reaction" placement="top">
+                                <IconButton size="small"
+                                    onClick={e => setEmojiAnchor({ el: e.currentTarget, commentId: c.id })}
+                                    sx={{ p: 0.3, color: emojiAnchor?.commentId === c.id ? COLORS.brand : COLORS.fadedText, borderRadius: 1.5, '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}12` } }}>
+                                    <AddReactionOutlinedIcon sx={{ fontSize: 15 }} />
+                                </IconButton>
+                            </Tooltip>
+                            {!isReply && (
+                                <Typography onClick={() => setReplyTo(replyTo === c.id ? null : c.id)}
+                                    sx={{ fontSize: '0.75rem', fontWeight: 600, color: replyTo === c.id ? COLORS.brand : COLORS.fadedText, cursor: 'pointer', '&:hover': { color: COLORS.brand } }}>
+                                    Reply
+                                </Typography>
+                            )}
+                            {c.user_id !== parseInt(userId) && (
+                                <Typography onClick={() => setReportDialog({ open: true, target: 'comment', commentId: c.id })}
+                                    sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.fadedText, cursor: 'pointer', '&:hover': { color: '#fb923c' }, display: 'flex', alignItems: 'center', gap: '3px' }}>
+                                    <FlagOutlinedIcon sx={{ fontSize: 13 }} /> Report
+                                </Typography>
+                            )}
+                        </Stack>
+                        {replyTo === c.id && (
+                            <Stack direction="row" spacing={0.75} alignItems="center" sx={{ mt: 0.75 }}>
+                                <TextField size="small" placeholder={`Reply to ${c.author_name}…`}
+                                    value={replyText} onChange={e => setReplyText(e.target.value)} autoFocus
+                                    onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submitReply(c.id); } if (e.key === 'Escape') { setReplyTo(null); setReplyText(''); } }}
+                                    sx={{
+                                        flex: 1,
+                                        '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardSecondary, borderRadius: 2, color: COLORS.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: COLORS.brand }, '&.Mui-focused fieldset': { borderColor: COLORS.brand } },
+                                        '& .MuiInputBase-input': { py: '6px', fontSize: '0.78rem' },
+                                        '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
+                                    }} />
+                                <IconButton size="small" onClick={() => submitReply(c.id)} disabled={!replyText.trim() || replyPosting}
+                                    sx={{ color: COLORS.brand, '&:disabled': { color: COLORS.fadedText } }}>
+                                    {replyPosting ? <CircularProgress size={14} sx={{ color: COLORS.brand }} /> : <SendIcon sx={{ fontSize: 15 }} />}
+                                </IconButton>
+                            </Stack>
+                        )}
+                    </Box>
+                </Stack>
+                {(repliesMap[c.id] || []).length > 0 && (
+                    <Box sx={{ ml: 4, pl: 1.5, borderLeft: `2px solid ${COLORS.cardBorder}` }}>
+                        {(repliesMap[c.id] || []).map(reply => renderComment(reply, true))}
+                    </Box>
+                )}
+            </Box>
+        );
+    };
+
     return (
-        <Card sx={{
+        <Card id={`post-${post.id}`} sx={{
             bgcolor: COLORS.cardPrimary, borderRadius: 4,
-            border: `1px solid ${COLORS.cardBorder}`, boxShadow: 'none',
+            border: highlighted ? `2px solid ${COLORS.brand}` : `1px solid ${COLORS.cardBorder}`,
+            boxShadow: highlighted ? `0 0 0 2px ${COLORS.brand}40, 0 4px 24px rgba(51,204,204,0.25)` : 'none',
             transition: 'all 0.25s', overflow: 'hidden',
             '&:hover': { border: `1px solid rgba(51,204,204,0.25)`, boxShadow: `0 4px 24px rgba(0,0,0,0.3)` },
         }}>
@@ -192,11 +500,16 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
                             }}>{post.body}</Typography>
                         )}
 
+                        {/* Embedded itinerary */}
+                        {post.shared_itinerary_id && (
+                            <ItineraryEmbed itineraryId={post.shared_itinerary_id} userId={userId} COLORS={COLORS} />
+                        )}
+
                         {/* actions */}
                         <Stack direction="row" spacing={0.5} alignItems="center">
                             <Button startIcon={<ChatBubbleOutlineIcon sx={{ fontSize: '14px !important' }} />} size="small" onClick={toggleComments}
                                 sx={{ color: showComments ? COLORS.brand : COLORS.fadedText, borderRadius: 2, fontSize: '0.75rem', px: 1.5, textTransform: 'none', '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}14` } }}>
-                                {post.comment_count || 0} comments
+                                {localCommentCount} comments
                             </Button>
                             <Button startIcon={<ShareIcon sx={{ fontSize: '14px !important' }} />} size="small"
                                 sx={{ color: COLORS.fadedText, borderRadius: 2, fontSize: '0.75rem', px: 1.5, textTransform: 'none', '&:hover': { color: COLORS.subheadings, bgcolor: COLORS.cardSecondary } }}>
@@ -207,6 +520,26 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
                                 sx={{ color: post.saved ? COLORS.brand : COLORS.fadedText, borderRadius: 2, fontSize: '0.75rem', px: 1.5, textTransform: 'none', '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}14` } }}>
                                 Save
                             </Button>
+                            <>
+                                <IconButton size="small" onClick={e => setPostMenuAnchor(e.currentTarget)}
+                                    sx={{ color: COLORS.fadedText, ml: 'auto', '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}14` } }}>
+                                    <MoreVertIcon sx={{ fontSize: 16 }} />
+                                </IconButton>
+                                <Menu anchorEl={postMenuAnchor} open={Boolean(postMenuAnchor)} onClose={() => setPostMenuAnchor(null)}
+                                    PaperProps={{ sx: { bgcolor: COLORS.cardPrimary, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 2, minWidth: 140 } }}>
+                                    {post.user_id === parseInt(userId) ? (
+                                        <MenuItem onClick={() => { setPostMenuAnchor(null); deletePost(); }}
+                                            sx={{ color: '#ff6b6b', fontSize: '0.82rem', gap: 1, '&:hover': { bgcolor: 'rgba(255,107,107,0.08)' } }}>
+                                            <DeleteOutlineIcon sx={{ fontSize: 15 }} /> Delete Post
+                                        </MenuItem>
+                                    ) : (
+                                        <MenuItem onClick={() => { setPostMenuAnchor(null); setReportDialog({ open: true, target: 'post', commentId: null }); }}
+                                            sx={{ color: '#fb923c', fontSize: '0.82rem', gap: 1, '&:hover': { bgcolor: 'rgba(251,146,60,0.08)' } }}>
+                                            <FlagOutlinedIcon sx={{ fontSize: 15 }} /> Report Post
+                                        </MenuItem>
+                                    )}
+                                </Menu>
+                            </>
                         </Stack>
                     </Box>
 
@@ -230,26 +563,71 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
 
                             {commentsLoading ? (
                                 <Box sx={{ py: 2, textAlign: 'center' }}><CircularProgress size={18} sx={{ color: COLORS.brand }} /></Box>
-                            ) : comments.length === 0 ? (
+                            ) : topLevel.length === 0 ? (
                                 <Typography variant="caption" sx={{ color: COLORS.fadedText, fontStyle: 'italic' }}>No comments yet</Typography>
                             ) : (
-                                <Stack spacing={1}>
-                                    {comments.map(c => (
-                                        <Stack key={c.id} direction="row" spacing={1} sx={{ py: 0.5 }}>
-                                            <Avatar sx={{ width: 22, height: 22, bgcolor: COLORS.cardSecondary, mt: 0.2, flexShrink: 0 }} src={getAvatarUrl(c.author_avatar_id)} />
-                                            <Box sx={{ flex: 1, minWidth: 0 }}>
-                                                <Stack direction="row" spacing={0.8} alignItems="center">
-                                                    <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.subheadings }}>{c.author_name || 'User'}</Typography>
-                                                    <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.65rem' }}>{timeAgo(c.created_at)}</Typography>
-                                                </Stack>
-                                                <Typography variant="body2" sx={{ color: COLORS.text, fontSize: '0.82rem', lineHeight: 1.5 }}>{c.content}</Typography>
-                                            </Box>
-                                        </Stack>
-                                    ))}
+                                <Stack spacing={0.5}>
+                                    {topLevel.map(c => renderComment(c))}
                                 </Stack>
                             )}
                         </Box>
                     </Collapse>
+
+                    {/* Report Dialog */}
+                    <Dialog open={reportDialog.open} onClose={() => { setReportDialog({ open: false, target: null, commentId: null }); setReportReason(''); setReportSuccess(false); }} maxWidth="xs" fullWidth
+                        PaperProps={{ sx: { bgcolor: COLORS.cardPrimary, borderRadius: 3, border: `1px solid ${COLORS.cardBorder}` } }}>
+                        <DialogTitle sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '0.95rem', pb: 1 }}>
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <FlagOutlinedIcon sx={{ fontSize: 18, color: '#fb923c' }} />
+                                <span>Report {reportDialog.target === 'comment' ? 'Comment' : 'Post'}</span>
+                            </Stack>
+                        </DialogTitle>
+                        <DialogContent>
+                            {reportSuccess ? (
+                                <Alert severity="success" sx={{ borderRadius: 2 }}>Report submitted. Thank you!</Alert>
+                            ) : (
+                                <TextField fullWidth multiline minRows={2} placeholder="Why are you reporting this?" value={reportReason} onChange={e => setReportReason(e.target.value)}
+                                    sx={{ mt: 1, '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardSecondary, borderRadius: 2, color: COLORS.text, '& fieldset': { borderColor: COLORS.cardBorder }, '&:hover fieldset': { borderColor: '#fb923c' }, '&.Mui-focused fieldset': { borderColor: '#fb923c' } }, '& .MuiInputBase-input': { color: COLORS.text, fontSize: '0.85rem' } }} />
+                            )}
+                        </DialogContent>
+                        {!reportSuccess && (
+                            <DialogActions sx={{ px: 2, pb: 2 }}>
+                                <Button onClick={() => { setReportDialog({ open: false, target: null, commentId: null }); setReportReason(''); }} sx={{ color: COLORS.fadedText, textTransform: 'none', borderRadius: 2 }}>Cancel</Button>
+                                <Button onClick={submitReport} disabled={!reportReason.trim() || reportSubmitting} variant="contained"
+                                    sx={{ bgcolor: '#fb923c', color: '#fff', borderRadius: 2, fontWeight: 700, textTransform: 'none', '&:hover': { bgcolor: '#f97316' }, '&:disabled': { opacity: 0.5 } }}>
+                                    {reportSubmitting ? <CircularProgress size={14} sx={{ color: '#fff' }} /> : 'Submit Report'}
+                                </Button>
+                            </DialogActions>
+                        )}
+                    </Dialog>
+
+                    {/* Emoji picker popover — outside Collapse so it's not clipped */}
+                    <Popover
+                        open={Boolean(emojiAnchor)}
+                        anchorEl={emojiAnchor?.el}
+                        onClose={() => setEmojiAnchor(null)}
+                        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+                        transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+                        PaperProps={{ sx: { bgcolor: COLORS.cardPrimary, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 3, boxShadow: '0 8px 32px rgba(0,0,0,0.5)', p: 0.5 } }}>
+                        <Stack direction="row" spacing={0.25} sx={{ p: 0.5 }}>
+                            {EMOJI_LIST.map(emoji => {
+                                const cmt = comments.find(c => c.id === emojiAnchor?.commentId);
+                                const active = cmt?.reactions?.find(r => r.emoji === emoji)?.user_reacted;
+                                return (
+                                    <Box key={emoji} onClick={() => emojiAnchor && submitReaction(emojiAnchor.commentId, emoji)}
+                                        sx={{
+                                            fontSize: '1.3rem', lineHeight: 1, cursor: 'pointer', p: 0.6, borderRadius: 2,
+                                            bgcolor: active ? `${COLORS.brand}20` : 'transparent',
+                                            border: `1px solid ${active ? COLORS.brand + '50' : 'transparent'}`,
+                                            transition: 'transform 0.1s',
+                                            '&:hover': { transform: 'scale(1.3)', bgcolor: `${COLORS.brand}14` },
+                                        }}>
+                                        {emoji}
+                                    </Box>
+                                );
+                            })}
+                        </Stack>
+                    </Popover>
                 </Box>
             </Stack>
         </Card>
@@ -257,7 +635,7 @@ const PostCard = ({ post, onVote, onSave, userId, onProfileClick, COLORS }) => {
 };
 
 // ── CreatePostDialog ────────────────────────────────────────────────────────
-const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, defaultTag, COLORS }) => {
+const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, defaultTag, COLORS, sharedItineraryId: defaultItinId }) => {
     const [title, setTitle]     = useState('');
     const [body, setBody]       = useState('');
     const [tag, setTag]         = useState('Experience');
@@ -265,11 +643,17 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
     const [imageUrl, setImageUrl] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [error, setError]     = useState('');
+    const [attachedItinId, setAttachedItinId] = useState(null);
 
-    useEffect(() => { if (open && defaultTag) setTag(defaultTag); }, [open, defaultTag]);
+    useEffect(() => {
+        if (open) {
+            if (defaultTag) setTag(defaultTag);
+            if (defaultItinId) setAttachedItinId(defaultItinId);
+        }
+    }, [open, defaultTag, defaultItinId]);
 
     const handleClose = () => {
-        setTitle(''); setBody(''); setTag('Experience'); setPlaces([]); setImageUrl(''); setError('');
+        setTitle(''); setBody(''); setTag('Experience'); setPlaces([]); setImageUrl(''); setError(''); setAttachedItinId(null);
         onClose();
     };
 
@@ -278,10 +662,12 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
         setSubmitting(true); setError('');
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, {
+            const payload = {
                 title: title.trim(), body: body.trim() || null, tag,
                 place: places.join(', '), image_url: imageUrl.trim() || null,
-            });
+            };
+            if (attachedItinId) payload.shared_itinerary_id = attachedItinId;
+            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, payload);
             handleClose(); if (onCreated) onCreated();
         } catch { setError('Failed to create post. Please try again.'); }
         finally { setSubmitting(false); }
@@ -433,6 +819,40 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
                             </Box>
                         )}
                     </Box>
+
+                    {/* Attach Itinerary */}
+                    {myItineraries.length > 0 && (
+                        <Box>
+                            <Typography variant="caption" sx={{ color: COLORS.fadedText, mb: 1, display: 'block', fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                                Attach Itinerary (optional)
+                            </Typography>
+                            <Select
+                                value={attachedItinId || ''}
+                                onChange={e => setAttachedItinId(e.target.value || null)}
+                                displayEmpty size="small" fullWidth
+                                renderValue={() => {
+                                    if (!attachedItinId) return <span style={{ color: COLORS.fadedText, fontSize: '0.82rem' }}>None</span>;
+                                    const itin = myItineraries.find(i => i.id === attachedItinId);
+                                    return itin?.title || 'Selected';
+                                }}
+                                sx={{
+                                    bgcolor: COLORS.cardSecondary, borderRadius: 2.5, color: COLORS.text, fontSize: '0.82rem',
+                                    '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' },
+                                    '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: COLORS.brand },
+                                    '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: COLORS.brand },
+                                    '& .MuiSelect-icon': { color: COLORS.fadedText },
+                                }}
+                                MenuProps={{ PaperProps: { sx: { bgcolor: COLORS.cardPrimary, border: `1px solid ${COLORS.cardBorder}`, maxHeight: 240 } } }}>
+                                <MenuItem value="" sx={{ color: COLORS.fadedText, fontSize: '0.82rem' }}>None</MenuItem>
+                                {myItineraries.map(itin => (
+                                    <MenuItem key={itin.id} value={itin.id} sx={{ color: COLORS.text, fontSize: '0.82rem', '&:hover': { bgcolor: `${COLORS.brand}14` } }}>
+                                        <ExploreIcon sx={{ fontSize: 13, color: COLORS.brand, mr: 1 }} />
+                                        <Typography noWrap sx={{ fontSize: '0.82rem' }}>{itin.title}</Typography>
+                                    </MenuItem>
+                                ))}
+                            </Select>
+                        </Box>
+                    )}
                 </Stack>
             </DialogContent>
 
@@ -453,7 +873,9 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
 // ── Main Component ───────────────────────────────────────────────────────────
 const CommunityFeed = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { COLORS } = useTheme();
+    const [highlightPostId, setHighlightPostId] = useState(location.state?.highlightPostId || null);
 
     const [user, setUser]               = useState({ id: null, name: 'User', initial: 'U', avatarId: 1 });
     const [posts, setPosts]             = useState([]);
@@ -466,6 +888,9 @@ const CommunityFeed = () => {
     const [myItineraries, setMyItineraries] = useState([]);
     const [recentAlerts, setRecentAlerts]   = useState([]);
     const [defaultTag, setDefaultTag]   = useState(null);
+    const [showSaved, setShowSaved]     = useState(false);
+    const [savedPosts, setSavedPosts]   = useState([]);
+    const [savedLoading, setSavedLoading] = useState(false);
     const [sidebarPlace, setSidebarPlace] = useState('All');
 
     // profile dialog
@@ -577,7 +1002,7 @@ const CommunityFeed = () => {
             if (placeFilter) params.place = placeFilter;
             if (activeTag) params.tag = activeTag;
             const res = await axios.get('http://127.0.0.1:8000/community/posts', { params });
-            let results = (res.data || []).map(p => ({ ...p, saved: false }));
+            let results = res.data || [];
             if (typeof filterMode === 'number' && sidebarPlace === 'All') {
                 const names = getItinPlaceNames();
                 if (names.length > 0) results = results.filter(p => p.place && names.some(n => p.place.toLowerCase().includes(n) || n.includes(p.place.toLowerCase())));
@@ -588,6 +1013,21 @@ const CommunityFeed = () => {
     }, [activeSort, activeTag, filterMode, sidebarPlace, searchedPlace, getPlaceFilter, getItinPlaceNames]);
 
     useEffect(() => { if (user.id) fetchPosts(); }, [user.id, fetchPosts]);
+
+    // Scroll to and highlight a post when navigated from a notification
+    useEffect(() => {
+        if (!highlightPostId || posts.length === 0) return;
+        const el = document.getElementById(`post-${highlightPostId}`);
+        if (el) {
+            el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            el.style.transition = 'box-shadow 0.3s';
+            el.style.boxShadow = `0 0 0 2px #33CCCC, 0 4px 24px rgba(51,204,204,0.35)`;
+            setTimeout(() => { el.style.boxShadow = ''; }, 2500);
+            setHighlightPostId(null);
+            // Clear navigation state so re-renders don't re-trigger
+            window.history.replaceState({}, '');
+        }
+    }, [highlightPostId, posts]);
 
     const handleVote = async (postId, direction) => {
         const userId = localStorage.getItem('userId');
@@ -603,7 +1043,40 @@ const CommunityFeed = () => {
         catch { fetchPosts(); }
     };
 
-    const handleSave         = (postId) => setPosts(prev => prev.map(p => p.id === postId ? { ...p, saved: !p.saved } : p));
+    const handleSave = async (postId) => {
+        const userId = localStorage.getItem('userId');
+        const targetPost = posts.find(p => p.id === postId) || savedPosts.find(p => p.id === postId);
+        const isSaved = targetPost?.saved;
+        // optimistic toggle
+        setPosts(prev => prev.map(p => p.id === postId ? { ...p, saved: !p.saved } : p));
+        setSavedPosts(prev => {
+            if (isSaved) return prev.filter(p => p.id !== postId);
+            if (targetPost && !prev.some(p => p.id === postId)) return [...prev, { ...targetPost, saved: true }];
+            return prev;
+        });
+        try {
+            await axios.post(`http://127.0.0.1:8000/community/posts/${postId}/save?user_id=${userId}`);
+        } catch { /* revert on failure */
+            setPosts(prev => prev.map(p => p.id === postId ? { ...p, saved: !p.saved } : p));
+            setSavedPosts(prev => {
+                if (isSaved && targetPost) return [...prev, { ...targetPost, saved: true }];
+                return prev.filter(p => p.id !== postId);
+            });
+        }
+    };
+
+    const fetchSavedPosts = async () => {
+        const userId = localStorage.getItem('userId');
+        setSavedLoading(true);
+        try {
+            const res = await axios.get(`http://127.0.0.1:8000/community/saved?user_id=${userId}`);
+            setSavedPosts(res.data || []);
+        } catch { /* silent */ }
+        finally { setSavedLoading(false); }
+    };
+
+    // load saved posts whenever showSaved is toggled on
+    useEffect(() => { if (showSaved) fetchSavedPosts(); }, [showSaved]);
     const handleFilterChange = (val) => { setSidebarPlace('All'); setSearchedPlace(''); setFilterMode(val === 'all' ? 'all' : val); };
 
     const openUserProfile = async (targetUserId) => {
@@ -657,19 +1130,9 @@ const CommunityFeed = () => {
                 '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
                 '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 3 },
             }}>
-                {/* top bar */}
-                <Box sx={{ px: 3, py: 2, flexShrink: 0 }}>
-                    <Stack direction="row" justifyContent="flex-end" alignItems="center">
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{
-                            bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 5, px: 3, py: 1.25,
-                            textTransform: 'uppercase', '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
-                            transition: 'all 0.3s',
-                        }}>New Post</Button>
-                    </Stack>
-                </Box>
 
                 {/* 3-column body */}
-                <Box sx={{ flex: 1, px: 4, pb: 3, display: 'flex', gap: 3, minHeight: 0 }}>
+                <Box sx={{ flex: 1, px: 4, pt: 2, pb: 3, display: 'flex', gap: 3, minHeight: 0 }}>
 
                     {/* CENTER: posts feed */}
                     <Box sx={{ flex: 'none', width: 850, marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -733,6 +1196,23 @@ const CommunityFeed = () => {
                                         '&:hover': { bgcolor: `${TAG_COLORS[t]}12`, color: TAG_COLORS[t] },
                                     }} />
                                 ))}
+
+                                <Box sx={{ width: '1px', height: 20, bgcolor: COLORS.cardBorder, flexShrink: 0 }} />
+
+                                <Button
+                                    startIcon={showSaved ? <BookmarkIcon sx={{ fontSize: '13px !important', color: COLORS.brand }} /> : <BookmarkBorderIcon sx={{ fontSize: '13px !important' }} />}
+                                    size="small"
+                                    onClick={() => setShowSaved(v => !v)}
+                                    sx={{
+                                        color: showSaved ? COLORS.brand : COLORS.fadedText,
+                                        fontWeight: showSaved ? 700 : 500, borderRadius: 2,
+                                        bgcolor: showSaved ? `${COLORS.brand}1A` : 'transparent',
+                                        py: '4px', px: 1.5, textTransform: 'none', fontSize: '0.78rem', whiteSpace: 'nowrap',
+                                        '& .MuiButton-startIcon': { mr: 0.4 },
+                                        '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}14` },
+                                    }}>
+                                    Saved{savedPosts.length > 0 ? ` (${savedPosts.length})` : ''}
+                                </Button>
                             </Stack>
                         </Box>
 
@@ -764,7 +1244,36 @@ const CommunityFeed = () => {
 
                         {/* posts list */}
                         <Box sx={{ flex: 1, overflowY: 'auto', pr: 0.5, '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 2 } }}>
-                            {loading ? (
+                            {showSaved ? (
+                                <Stack spacing={2.5}>
+                                    {/* saved posts header */}
+                                    <Stack direction="row" alignItems="center" spacing={1} sx={{ px: 0.5 }}>
+                                        <BookmarkIcon sx={{ fontSize: 18, color: COLORS.brand }} />
+                                        <Typography fontWeight={700} sx={{ color: COLORS.headings, fontSize: '0.95rem' }}>Saved Posts</Typography>
+                                        <Chip label={savedPosts.length} size="small" sx={{ height: 20, fontSize: '0.7rem', bgcolor: `${COLORS.brand}20`, color: COLORS.brand, border: `1px solid ${COLORS.brand}40`, '& .MuiChip-label': { px: 0.8 } }} />
+                                        <Box sx={{ flex: 1 }} />
+                                        <Button size="small" onClick={() => setShowSaved(false)}
+                                            sx={{ color: COLORS.fadedText, textTransform: 'none', fontSize: '0.75rem', borderRadius: 2, '&:hover': { color: COLORS.brand } }}>
+                                            ← Back to feed
+                                        </Button>
+                                    </Stack>
+                                    {savedLoading ? (
+                                        <Box sx={{ display: 'flex', justifyContent: 'center', pt: 8 }}><CircularProgress sx={{ color: COLORS.brand }} /></Box>
+                                    ) : savedPosts.length === 0 ? (
+                                        <Box sx={{ textAlign: 'center', py: 8 }}>
+                                            <BookmarkBorderIcon sx={{ fontSize: 48, color: COLORS.fadedText, mb: 1.5 }} />
+                                            <Typography sx={{ color: COLORS.fadedText, mb: 0.5 }}>No saved posts yet</Typography>
+                                            <Typography variant="body2" sx={{ color: COLORS.fadedText }}>Bookmark posts to find them here later.</Typography>
+                                        </Box>
+                                    ) : (
+                                        savedPosts.map((post) => (
+                                            <PostCard key={post.id} post={post} onVote={handleVote} onSave={handleSave}
+                                                onDelete={(id) => { setSavedPosts(p => p.filter(x => x.id !== id)); setPosts(p => p.filter(x => x.id !== id)); }}
+                                                userId={user.id} onProfileClick={(uid) => openUserProfile(uid)} COLORS={COLORS} navigate={navigate} highlighted={false} />
+                                        ))
+                                    )}
+                                </Stack>
+                            ) : loading ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', pt: 8 }}><CircularProgress sx={{ color: COLORS.brand }} /></Box>
                             ) : (
                                 <Stack spacing={2.5}>
@@ -795,7 +1304,8 @@ const CommunityFeed = () => {
 
                                     {posts.map((post) => (
                                         <PostCard key={post.id} post={post} onVote={handleVote} onSave={handleSave}
-                                            userId={user.id} onProfileClick={(uid) => openUserProfile(uid)} COLORS={COLORS} />
+                                            onDelete={(id) => setPosts(p => p.filter(x => x.id !== id))}
+                                            userId={user.id} onProfileClick={(uid) => openUserProfile(uid)} COLORS={COLORS} navigate={navigate} highlighted={highlightPostId === post.id} />
                                     ))}
                                 </Stack>
                             )}
@@ -819,6 +1329,32 @@ const CommunityFeed = () => {
                                     bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 2.5,
                                     textTransform: 'none', fontSize: '0.82rem', py: 0.8, '&:hover': { bgcolor: '#2db8b8' },
                                 }}>Create Post</Button>
+                            </CardContent>
+                        </Card>
+
+                        {/* saved posts card */}
+                        <Card sx={{ bgcolor: COLORS.cardPrimary, border: `1px solid ${showSaved ? COLORS.brand + '60' : COLORS.cardBorder}`, borderRadius: 4, boxShadow: 'none', transition: 'border-color 0.2s' }}>
+                            <CardContent sx={{ py: 2, px: 2.5, pb: '16px !important' }}>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                                    <BookmarkIcon sx={{ fontSize: 15, color: COLORS.brand }} />
+                                    <Typography variant="caption" fontWeight="bold" sx={{ color: COLORS.fadedText, textTransform: 'uppercase', letterSpacing: 1, flex: 1 }}>Saved Posts</Typography>
+                                    {savedPosts.length > 0 && (
+                                        <Chip label={savedPosts.length} size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: `${COLORS.brand}20`, color: COLORS.brand, border: `1px solid ${COLORS.brand}40`, '& .MuiChip-label': { px: 0.7 } }} />
+                                    )}
+                                </Stack>
+                                <Button fullWidth size="small"
+                                    startIcon={showSaved ? <BookmarkIcon sx={{ fontSize: '14px !important', color: COLORS.brand }} /> : <BookmarkBorderIcon sx={{ fontSize: '14px !important' }} />}
+                                    onClick={() => setShowSaved(v => !v)}
+                                    sx={{
+                                        color: showSaved ? COLORS.brand : COLORS.fadedText,
+                                        bgcolor: showSaved ? `${COLORS.brand}14` : COLORS.cardSecondary,
+                                        borderRadius: 2, textTransform: 'none', fontSize: '0.8rem', fontWeight: showSaved ? 700 : 500,
+                                        border: `1px solid ${showSaved ? COLORS.brand + '40' : 'transparent'}`,
+                                        py: 0.6, '&:hover': { color: COLORS.brand, bgcolor: `${COLORS.brand}14` },
+                                        justifyContent: 'flex-start', px: 1.5,
+                                    }}>
+                                    {showSaved ? 'Viewing saved posts' : savedPosts.length > 0 ? `View ${savedPosts.length} saved post${savedPosts.length !== 1 ? 's' : ''}` : 'View saved posts'}
+                                </Button>
                             </CardContent>
                         </Card>
 

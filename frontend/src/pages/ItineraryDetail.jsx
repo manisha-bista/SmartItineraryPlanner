@@ -11,6 +11,8 @@ import { useTheme } from '../context/ThemeContext';
 import Navbar, { DRAWER_WIDTH } from '../components/Navbar';
 import PlaceSearchAutocomplete from '../components/PlaceSearchAutocomplete';
 
+import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
+import DragIndicatorIcon      from '@mui/icons-material/DragIndicator';
 import ArrowBackIcon          from '@mui/icons-material/ArrowBack';
 import EditIcon               from '@mui/icons-material/Edit';
 import DeleteIcon             from '@mui/icons-material/Delete';
@@ -36,6 +38,12 @@ import ThunderstormIcon       from '@mui/icons-material/Thunderstorm';
 import DeviceThermostatIcon   from '@mui/icons-material/DeviceThermostat';
 import ShareIcon              from '@mui/icons-material/Share';
 import SendIcon               from '@mui/icons-material/Send';
+import GroupIcon              from '@mui/icons-material/Group';
+import PersonAddIcon          from '@mui/icons-material/PersonAdd';
+import ContentCopyIcon        from '@mui/icons-material/ContentCopy';
+import ForumIcon              from '@mui/icons-material/Forum';
+import CheckCircleIcon        from '@mui/icons-material/CheckCircle';
+import HourglassEmptyIcon     from '@mui/icons-material/HourglassEmpty';
 
 // ── Activity type meta ────────────────────────────────────────────────────────
 const ACT_META = {
@@ -116,19 +124,57 @@ export default function ItineraryDetail() {
     const [weatherLoading, setWeatherLoading] = useState(false);
 
     const [shareOpen, setShareOpen]       = useState(false);
+    const [shareTab, setShareTab]         = useState('chat'); // 'chat' | 'community'
     const [friends, setFriends]           = useState([]);
     const [friendsLoading, setFriendsLoading] = useState(false);
     const [sharing, setSharing]           = useState(null);
+    const [communitySharing, setCommunitySharing] = useState(false);
+    const [feedTitle, setFeedTitle]       = useState('');
+    const [feedBody, setFeedBody]         = useState('');
+    const [feedPlaces, setFeedPlaces]     = useState([]);
+
+    const [collabOpen, setCollabOpen]     = useState(false);
+    const [collaborators, setCollaborators] = useState([]);
+    const [collabsLoading, setCollabsLoading] = useState(false);
+    const [inviteUsername, setInviteUsername] = useState('');
+    const [inviting, setInviting]         = useState(false);
+    const [inviteErr, setInviteErr]       = useState('');
+    const [forking, setForking]           = useState(false);
+    const [isAcceptedCollaborator, setIsAcceptedCollaborator] = useState(false);
+
+    const [timePromptOpen, setTimePromptOpen] = useState(false);
+    const [pendingDrop, setPendingDrop]       = useState(null);
+    const [dropTime, setDropTime]             = useState('');
+
+    const currentUserId = parseInt(localStorage.getItem('userId'));
+    const isOwner       = itinerary?.user_id === currentUserId;
+    const canEdit       = isOwner || isAcceptedCollaborator;
 
     // ── Fetch ─────────────────────────────────────────────────────────────────
     const load = async () => {
         try {
             setLoading(true);
+            const uid = parseInt(localStorage.getItem('userId'));
             const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
             setItinerary(r.data);
             checkAndUpdateStatus(r.data);
+            if (r.data.user_id !== uid) {
+                try {
+                    const collabs = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
+                    const me = (collabs.data || []).find(c => c.user_id === uid && c.status === 'accepted');
+                    setIsAcceptedCollaborator(!!me);
+                } catch { /* silent */ }
+            }
         } catch { toast('Failed to load itinerary.', 'error'); }
         finally { setLoading(false); }
+    };
+    // Silent refresh used after mutations — no full-page spinner
+    const reload = async () => {
+        try {
+            const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
+            setItinerary(r.data);
+            checkAndUpdateStatus(r.data);
+        } catch { /* non-critical */ }
     };
     useEffect(() => { load(); }, [id]);
 
@@ -151,19 +197,87 @@ export default function ItineraryDetail() {
         try {
             const userId = localStorage.getItem('userId');
             await axios.post(`http://127.0.0.1:8000/itineraries/${itinerary.id}/fetch-weather?user_id=${userId}`);
-            await load(); toast('Weather updated!');
+            await reload(); toast('Weather updated!');
         } catch (e) { toast(e.response?.data?.detail || 'Failed to fetch weather.', 'error'); }
         finally { setWeatherLoading(false); }
     };
 
     const openShare = async () => {
-        setShareOpen(true); setFriendsLoading(true);
+        if (itinerary) {
+            // Pre-populate feed form
+            const ps = new Set();
+            if (itinerary.destination) ps.add(itinerary.destination);
+            (itinerary.days || []).forEach(day =>
+                (day.activities || []).forEach(act => { if (act.location) ps.add(act.location); })
+            );
+            setFeedPlaces([...ps]);
+            setFeedTitle(`Check out my itinerary: ${itinerary.title}`);
+            setFeedBody(`A ${itinerary.days?.length || 0}-day trip to ${itinerary.destination}`);
+        }
+        setShareOpen(true); setShareTab('chat'); setFriendsLoading(true);
         try {
             const userId = localStorage.getItem('userId');
             const res = await axios.get(`http://127.0.0.1:8000/friends/${userId}`);
             setFriends(res.data?.friends || []);
         } catch { setFriends([]); }
         finally { setFriendsLoading(false); }
+    };
+
+    const shareToCommunity = async () => {
+        if (!itinerary || !feedTitle.trim()) return;
+        setCommunitySharing(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, {
+                title: feedTitle.trim(),
+                body: feedBody.trim() || null,
+                tag: 'Experience',
+                place: feedPlaces.join(', ') || itinerary.destination || 'Nepal',
+                shared_itinerary_id: itinerary.id,
+            });
+            setShareOpen(false); toast('Shared to community feed!');
+        } catch { toast('Failed to share to community.', 'error'); }
+        finally { setCommunitySharing(false); }
+    };
+
+    const openCollaborators = async () => {
+        setCollabOpen(true); setCollabsLoading(true); setInviteErr('');
+        try {
+            const res = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
+            setCollaborators(res.data || []);
+        } catch { setCollaborators([]); }
+        finally { setCollabsLoading(false); }
+    };
+
+    const inviteCollaborator = async () => {
+        if (!inviteUsername.trim()) return;
+        setInviting(true); setInviteErr('');
+        try {
+            await axios.post(`http://127.0.0.1:8000/itineraries/${id}/collaborators`, { username: inviteUsername.trim() });
+            setInviteUsername('');
+            toast(`Invite sent to ${inviteUsername.trim()}!`);
+            const res = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
+            setCollaborators(res.data || []);
+        } catch (e) { setInviteErr(e.response?.data?.detail || 'Failed to invite.'); }
+        finally { setInviting(false); }
+    };
+
+    const removeCollaborator = async (collabUserId) => {
+        try {
+            await axios.delete(`http://127.0.0.1:8000/itineraries/${id}/collaborators/${collabUserId}`);
+            setCollaborators(prev => prev.filter(c => c.user_id !== collabUserId));
+            toast('Collaborator removed.');
+        } catch { toast('Failed to remove.', 'error'); }
+    };
+
+    const forkItinerary = async () => {
+        setForking(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            const res = await axios.post(`http://127.0.0.1:8000/itineraries/${id}/fork?user_id=${userId}`);
+            toast('Itinerary forked! Opening your copy...');
+            setTimeout(() => { window.location.href = `/itinerary/${res.data.id}`; }, 1200);
+        } catch (e) { toast(e.response?.data?.detail || 'Failed to fork.', 'error'); setForking(false); }
     };
 
     const shareToFriend = async (friendId) => {
@@ -233,13 +347,13 @@ export default function ItineraryDetail() {
             const payload = { day_number: dayForm.day_number, date: dayForm.date, title: dayForm.title.trim(), description: dayForm.description.trim(), estimated_cost: parseFloat(dayForm.estimated_cost) || 0, actual_cost: editDay?.actual_cost || 0, itinerary_id: parseInt(id), activities: [] };
             if (editDay) { await axios.put(`http://127.0.0.1:8000/itinerary-days/${editDay.id}`, payload); toast('Day updated!'); }
             else         { await axios.post('http://127.0.0.1:8000/itinerary-days', payload); toast('Day added!'); }
-            await load(); setDayOpen(false);
+            await reload(); setDayOpen(false);
         } catch (e) { toast(e.response?.data?.detail || 'Failed.', 'error'); }
         finally { setDayBusy(false); }
     };
 
     const deleteDay = async (day) => {
-        try { await axios.delete(`http://127.0.0.1:8000/itinerary-days/${day.id}`); toast('Day deleted.'); await load(); }
+        try { await axios.delete(`http://127.0.0.1:8000/itinerary-days/${day.id}`); toast('Day deleted.'); await reload(); }
         catch { toast('Failed to delete day.', 'error'); }
         setDelOpen(false); setDelTarget(null);
     };
@@ -267,15 +381,71 @@ export default function ItineraryDetail() {
             const payload = { title: actForm.title?.trim() || actForm.location.trim(), description: actForm.description.trim(), location: actForm.location.trim(), formatted_address: actForm.formatted_address || null, latitude: actForm.latitude || null, longitude: actForm.longitude || null, place_id: actForm.place_id || null, place_types: actForm.place_types || null, rating: actForm.rating || null, start_time: actForm.start_time || null, end_time: actForm.end_time || null, activity_type: actForm.activity_type || 'sightseeing', cost: parseFloat(actForm.cost) || 0, actual_cost: parseFloat(actForm.actual_cost) || 0, is_completed: editAct?.is_completed || false, day_id: actDayId };
             if (editAct) { await axios.put(`http://127.0.0.1:8000/activities/${editAct.id}`, payload); toast('Activity updated!'); }
             else         { await axios.post('http://127.0.0.1:8000/activities', payload); toast('Activity added!'); }
-            await load(); setActOpen(false);
+            await reload(); setActOpen(false);
         } catch (e) { toast(e.response?.data?.detail || 'Failed.', 'error'); }
         finally { setActBusy(false); }
     };
 
     const deleteAct = async (act) => {
-        try { await axios.delete(`http://127.0.0.1:8000/activities/${act.id}`); toast('Activity deleted.'); await load(); }
+        try { await axios.delete(`http://127.0.0.1:8000/activities/${act.id}`); toast('Activity deleted.'); await reload(); }
         catch { toast('Failed to delete.', 'error'); }
         setDelOpen(false); setDelTarget(null);
+    };
+
+    const onDragEnd = (result) => {
+        if (!canEdit) return;
+        const { source, destination, draggableId } = result;
+        if (!destination) return;
+        if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+        const srcDayId = parseInt(source.droppableId.replace('day-', ''));
+        const dstDayId = parseInt(destination.droppableId.replace('day-', ''));
+        const actId    = parseInt(draggableId.replace('act-', ''));
+        const srcDay   = itinerary.days.find(d => d.id === srcDayId);
+        const act      = srcDay?.activities?.find(a => a.id === actId);
+        if (!act) return;
+        const oldItinerary = JSON.parse(JSON.stringify(itinerary));
+        const newDays = itinerary.days.map(day => {
+            if (day.id === srcDayId && day.id === dstDayId) {
+                const acts = [...day.activities];
+                acts.splice(source.index, 1);
+                acts.splice(destination.index, 0, act);
+                return { ...day, activities: acts.map((a, i) => ({ ...a, display_order: i })) };
+            } else if (day.id === srcDayId) {
+                return { ...day, activities: day.activities.filter(a => a.id !== actId).map((a, i) => ({ ...a, display_order: i })) };
+            } else if (day.id === dstDayId) {
+                const acts = [...day.activities];
+                acts.splice(destination.index, 0, { ...act, day_id: dstDayId });
+                return { ...day, activities: acts.map((a, i) => ({ ...a, display_order: i })) };
+            }
+            return day;
+        });
+        setItinerary({ ...itinerary, days: newDays });
+        setPendingDrop({ actId, srcDayId, dstDayId, oldItinerary });
+        setDropTime(act.start_time?.slice(0, 5) || '');
+        setTimePromptOpen(true);
+    };
+
+    const confirmDrop = async () => {
+        if (!pendingDrop) return;
+        const { actId, srcDayId, dstDayId } = pendingDrop;
+        const dstDay   = itinerary.days.find(d => d.id === dstDayId);
+        const newOrder = dstDay?.activities?.findIndex(a => a.id === actId) ?? 0;
+        try {
+            const payload = { start_time: dropTime || null, display_order: newOrder };
+            if (srcDayId !== dstDayId) payload.day_id = dstDayId;
+            await axios.put(`http://127.0.0.1:8000/activities/${actId}`, payload);
+            toast('Activity moved!');
+            await reload();
+        } catch {
+            setItinerary(pendingDrop.oldItinerary);
+            toast('Failed to move activity.', 'error');
+        }
+        setTimePromptOpen(false); setPendingDrop(null); setDropTime('');
+    };
+
+    const cancelDrop = () => {
+        if (pendingDrop?.oldItinerary) setItinerary(pendingDrop.oldItinerary);
+        setTimePromptOpen(false); setPendingDrop(null); setDropTime('');
     };
 
     const saveInlineActual = async (act) => {
@@ -283,7 +453,7 @@ export default function ItineraryDetail() {
         if (raw === undefined) return;
         const value = parseFloat(raw) || 0;
         if (value === (act.actual_cost || 0)) return;
-        try { await axios.put(`http://127.0.0.1:8000/activities/${act.id}`, { actual_cost: value }); await load(); }
+        try { await axios.put(`http://127.0.0.1:8000/activities/${act.id}`, { actual_cost: value }); await reload(); }
         catch { toast('Failed to save actual cost.', 'error'); }
     };
 
@@ -376,19 +546,39 @@ export default function ItineraryDetail() {
                         sx={{ color: C.sub, bgcolor: C.surface, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}14`, color: C.brand } }}>
                         Share
                     </Button>
+                    {isOwner && (
+                        <Button size="small" startIcon={<GroupIcon sx={{ fontSize: 16 }} />} onClick={openCollaborators}
+                            sx={{ color: C.sub, bgcolor: C.surface, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}14`, color: C.brand } }}>
+                            Collaborate
+                        </Button>
+                    )}
+                    {!isOwner && itinerary && (
+                        <Button size="small" startIcon={forking ? <CircularProgress size={14} sx={{ color: C.brand }} /> : <ContentCopyIcon sx={{ fontSize: 16 }} />}
+                            onClick={forkItinerary} disabled={forking}
+                            sx={{ color: C.brand, bgcolor: `${C.brand}14`, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}26` } }}>
+                            {forking ? 'Forking...' : 'Fork & Edit'}
+                        </Button>
+                    )}
                 </Box>
 
                 {/* ── Days ─────────────────────────────────────────────────── */}
                 {!itinerary.days?.length ? (
                     <Box sx={{ textAlign: 'center', py: 12 }}>
                         <Typography variant="h6" sx={{ color: C.sub, mb: 1 }}>No days planned yet</Typography>
-                        <Typography variant="body2" sx={{ color: C.faded, mb: 3 }}>Start by adding your first day.</Typography>
-                        <Button startIcon={<AddIcon />} onClick={openAddDay}
-                            sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3, px: 3, textTransform: 'none', '&:hover': { bgcolor: '#2db8b8' } }}>
-                            Add First Day
-                        </Button>
+                        {canEdit ? (
+                            <>
+                                <Typography variant="body2" sx={{ color: C.faded, mb: 3 }}>Start by adding your first day.</Typography>
+                                <Button startIcon={<AddIcon />} onClick={openAddDay}
+                                    sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3, px: 3, textTransform: 'none', '&:hover': { bgcolor: '#2db8b8' } }}>
+                                    Add First Day
+                                </Button>
+                            </>
+                        ) : (
+                            <Typography variant="body2" sx={{ color: C.faded }}>Fork this itinerary to start planning your own version.</Typography>
+                        )}
                     </Box>
                 ) : (
+                    <DragDropContext onDragEnd={onDragEnd}>
                     <Stack spacing={2.5}>
                         {itinerary.days.map((day) => {
                             const isOpen    = !collapsed[day.id];
@@ -443,17 +633,21 @@ export default function ItineraryDetail() {
                                             </Stack>
                                         </Stack>
 
-                                        <IconButton size="small" onClick={() => { setDelTarget({ type: 'day', item: day }); setDelOpen(true); }}
-                                            sx={{ color: C.faded, '&:hover': { color: C.red } }}>
-                                            <DeleteIcon fontSize="small" />
-                                        </IconButton>
+                                        {canEdit && (
+                                            <IconButton size="small" onClick={() => { setDelTarget({ type: 'day', item: day }); setDelOpen(true); }}
+                                                sx={{ color: C.faded, '&:hover': { color: C.red } }}>
+                                                <DeleteIcon fontSize="small" />
+                                            </IconButton>
+                                        )}
 
-                                        <Button size="small" startIcon={<AddIcon />} onClick={() => openAddAct(day.id)} sx={{
-                                            ml: 1.5, bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3,
-                                            textTransform: 'none', px: 2, py: 0.75, fontSize: '0.82rem',
-                                            '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-1px)', boxShadow: `0 4px 12px ${C.brand}40` },
-                                            transition: 'all 0.25s',
-                                        }}>Add Destination</Button>
+                                        {canEdit && (
+                                            <Button size="small" startIcon={<AddIcon />} onClick={() => openAddAct(day.id)} sx={{
+                                                ml: 1.5, bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3,
+                                                textTransform: 'none', px: 2, py: 0.75, fontSize: '0.82rem',
+                                                '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-1px)', boxShadow: `0 4px 12px ${C.brand}40` },
+                                                transition: 'all 0.25s',
+                                            }}>Add Destination</Button>
+                                        )}
                                     </Stack>
 
                                     {day.description && isOpen && (
@@ -463,6 +657,11 @@ export default function ItineraryDetail() {
                                     {/* Activities */}
                                     <Collapse in={isOpen}>
                                         <Box sx={{ px: 2, pb: 2 }}>
+                                            <Droppable droppableId={`day-${day.id}`}>
+                                            {(dropProvided, dropSnapshot) => (
+                                            <Box ref={dropProvided.innerRef} {...dropProvided.droppableProps}
+                                                sx={{ minHeight: 50, borderRadius: 2, transition: 'background 0.2s',
+                                                      bgcolor: dropSnapshot.isDraggingOver ? `${C.brand}0A` : 'transparent' }}>
                                             {!day.activities?.length ? (
                                                 <Box sx={{ textAlign: 'center', py: 4 }}>
                                                     <Typography variant="body2" sx={{ color: C.faded }}>
@@ -470,17 +669,28 @@ export default function ItineraryDetail() {
                                                     </Typography>
                                                 </Box>
                                             ) : (
-                                                <Stack spacing={1.5}>
-                                                    {day.activities.map((act) => {
-                                                        const meta = actMeta(act.activity_type);
-                                                        return (
-                                                            <Box key={act.id} sx={{
+                                                day.activities.map((act, actIdx) => {
+                                                    const meta = actMeta(act.activity_type);
+                                                    return (
+                                                        <Draggable key={act.id} draggableId={`act-${act.id}`} index={actIdx}>
+                                                        {(dragProvided, dragSnapshot) => (
+                                                        <Box ref={dragProvided.innerRef} {...dragProvided.draggableProps}
+                                                            sx={{
                                                                 display: 'flex', alignItems: 'center', gap: 2,
-                                                                bgcolor: C.surface, borderRadius: 3, px: 2.5, py: 1.75,
+                                                                bgcolor: dragSnapshot.isDragging ? C.card : C.surface,
+                                                                borderRadius: 3, px: 2.5, py: 1.75, mb: 1.5,
+                                                                boxShadow: dragSnapshot.isDragging ? `0 8px 24px ${C.brand}30` : 'none',
+                                                                border: `1px solid ${dragSnapshot.isDragging ? C.brand + '40' : 'transparent'}`,
                                                                 opacity: act.is_completed ? 0.55 : 1,
-                                                                transition: 'all 0.2s',
-                                                                '&:hover': { bgcolor: COLORS.cardSecondary },
+                                                                transition: 'box-shadow 0.2s, border 0.2s',
                                                             }}>
+                                                            {canEdit ? (
+                                                                <Box {...dragProvided.dragHandleProps} sx={{ color: C.faded, display: 'flex', cursor: 'grab', flexShrink: 0, '&:hover': { color: C.brand } }}>
+                                                                    <DragIndicatorIcon sx={{ fontSize: 18 }} />
+                                                                </Box>
+                                                            ) : (
+                                                                <Box sx={{ width: 18, flexShrink: 0 }} />
+                                                            )}
                                                                 {/* Time badge */}
                                                                 <Box sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', fontSize: '0.72rem', px: 1.5, py: 0.5, borderRadius: 2, whiteSpace: 'nowrap', flexShrink: 0, minWidth: 68, textAlign: 'center', visibility: act.start_time ? 'visible' : 'hidden' }}>
                                                                     {fmtTime(act.start_time)}
@@ -550,42 +760,60 @@ export default function ItineraryDetail() {
                                                                     {fmtNum(act.cost)}
                                                                 </Box>
 
-                                                                {/* Actual cost — inline editable */}
-                                                                <Box onClick={e => e.stopPropagation()} sx={{ bgcolor: `${C.brand}1A`, borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', '&:hover': { bgcolor: `${C.brand}30` }, '&:focus-within': { bgcolor: `${C.brand}38`, outline: `1.5px solid ${C.brand}` } }}>
-                                                                    <input
-                                                                        type="text" inputMode="numeric"
-                                                                        value={inlineActual[act.id] !== undefined ? inlineActual[act.id] : (act.actual_cost || 0)}
-                                                                        onChange={e => { const val = e.target.value.replace(/[^0-9.]/g, ''); setInlineActual(p => ({ ...p, [act.id]: val })); }}
-                                                                        onFocus={e => { setInlineActual(p => ({ ...p, [act.id]: act.actual_cost || 0 })); e.target.select(); }}
-                                                                        onBlur={() => saveInlineActual(act)}
-                                                                        onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { setInlineActual(p => { const n = { ...p }; delete n[act.id]; return n; }); e.target.blur(); } }}
-                                                                        style={{ width: '100%', background: 'transparent', border: 'none', color: C.brand, fontWeight: 700, fontSize: '1.05rem', textAlign: 'center', padding: '0 8px', outline: 'none', cursor: 'text' }}
-                                                                    />
-                                                                </Box>
+                                                                {/* Actual cost — inline editable for editors, read-only for viewers */}
+                                                                {canEdit ? (
+                                                                    <Box onClick={e => e.stopPropagation()} sx={{ bgcolor: `${C.brand}1A`, borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', '&:hover': { bgcolor: `${C.brand}30` }, '&:focus-within': { bgcolor: `${C.brand}38`, outline: `1.5px solid ${C.brand}` } }}>
+                                                                        <input
+                                                                            type="text" inputMode="numeric"
+                                                                            value={inlineActual[act.id] !== undefined ? inlineActual[act.id] : (act.actual_cost || 0)}
+                                                                            onChange={e => { const val = e.target.value.replace(/[^0-9.]/g, ''); setInlineActual(p => ({ ...p, [act.id]: val })); }}
+                                                                            onFocus={e => { setInlineActual(p => ({ ...p, [act.id]: act.actual_cost || 0 })); e.target.select(); }}
+                                                                            onBlur={() => saveInlineActual(act)}
+                                                                            onKeyDown={e => { if (e.key === 'Enter') e.target.blur(); if (e.key === 'Escape') { setInlineActual(p => { const n = { ...p }; delete n[act.id]; return n; }); e.target.blur(); } }}
+                                                                            style={{ width: '100%', background: 'transparent', border: 'none', color: C.brand, fontWeight: 700, fontSize: '1.05rem', textAlign: 'center', padding: '0 8px', outline: 'none', cursor: 'text' }}
+                                                                        />
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box sx={{ bgcolor: `${C.brand}1A`, borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                        <Typography sx={{ color: C.brand, fontWeight: 700, fontSize: '1.05rem' }}>{fmtNum(act.actual_cost || 0)}</Typography>
+                                                                    </Box>
+                                                                )}
 
-                                                                <IconButton size="small" onClick={() => openEditAct(act, day.id)} sx={{ color: C.faded, '&:hover': { color: C.brand } }}>
-                                                                    <EditIcon sx={{ fontSize: '1.1rem' }} />
-                                                                </IconButton>
-                                                                <IconButton size="small" onClick={() => { setDelTarget({ type: 'activity', item: act }); setDelOpen(true); }} sx={{ color: C.faded, '&:hover': { color: C.red } }}>
-                                                                    <DeleteIcon sx={{ fontSize: '1.1rem' }} />
-                                                                </IconButton>
-                                                            </Box>
-                                                        );
-                                                    })}
-                                                </Stack>
+                                                                {canEdit && (
+                                                                    <IconButton size="small" onClick={() => openEditAct(act, day.id)} sx={{ color: C.faded, '&:hover': { color: C.brand } }}>
+                                                                        <EditIcon sx={{ fontSize: '1.1rem' }} />
+                                                                    </IconButton>
+                                                                )}
+                                                                {canEdit && (
+                                                                    <IconButton size="small" onClick={() => { setDelTarget({ type: 'activity', item: act }); setDelOpen(true); }} sx={{ color: C.faded, '&:hover': { color: C.red } }}>
+                                                                        <DeleteIcon sx={{ fontSize: '1.1rem' }} />
+                                                                    </IconButton>
+                                                                )}
+                                                        </Box>
+                                                        )}
+                                                        </Draggable>
+                                                    );
+                                                })
                                             )}
+                                            {dropProvided.placeholder}
+                                            </Box>
+                                            )}
+                                            </Droppable>
                                         </Box>
                                     </Collapse>
                                 </Box>
                             );
                         })}
 
-                        <Box>
-                            <Button startIcon={<AddIcon />} onClick={openAddDay} sx={{ color: C.brand, bgcolor: `${C.brand}14`, fontWeight: 'bold', borderRadius: 3, px: 3, textTransform: 'none', '&:hover': { bgcolor: `${C.brand}26` } }}>
-                                Add Another Day
-                            </Button>
-                        </Box>
+                        {canEdit && (
+                            <Box>
+                                <Button startIcon={<AddIcon />} onClick={openAddDay} sx={{ color: C.brand, bgcolor: `${C.brand}14`, fontWeight: 'bold', borderRadius: 3, px: 3, textTransform: 'none', '&:hover': { bgcolor: `${C.brand}26` } }}>
+                                    Add Another Day
+                                </Button>
+                            </Box>
+                        )}
                     </Stack>
+                    </DragDropContext>
                 )}
 
                 {/* Community Alerts */}
@@ -742,27 +970,141 @@ export default function ItineraryDetail() {
                         <ShareIcon sx={{ color: C.brand, fontSize: 20 }} />
                         <Typography fontWeight="bold" sx={{ color: C.heading }}>Share Itinerary</Typography>
                     </Stack>
-                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.5 }}>Send "{itinerary?.title}" to a friend</Typography>
+                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.5 }}>"{itinerary?.title}"</Typography>
+                    {/* Tab row */}
+                    <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                        {[{ key: 'chat', label: 'Send to Friend', icon: <ForumIcon sx={{ fontSize: 14 }} /> },
+                          { key: 'community', label: 'Post to Feed', icon: <GroupIcon sx={{ fontSize: 14 }} /> }].map(t => (
+                            <Button key={t.key} size="small" startIcon={t.icon} onClick={() => setShareTab(t.key)}
+                                sx={{ flex: 1, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', fontWeight: shareTab === t.key ? 700 : 400,
+                                    color: shareTab === t.key ? C.brand : C.faded,
+                                    bgcolor: shareTab === t.key ? `${C.brand}18` : 'transparent',
+                                    border: `1px solid ${shareTab === t.key ? C.brand + '40' : 'transparent'}` }}>
+                                {t.label}
+                            </Button>
+                        ))}
+                    </Stack>
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2, px: 2 }}>
-                    {friendsLoading ? (
-                        <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: C.brand }} /></Box>
-                    ) : friends.length === 0 ? (
-                        <Box sx={{ py: 4, textAlign: 'center' }}>
-                            <Typography sx={{ color: C.faded, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
-                            <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>Add friends from the community to share itineraries.</Typography>
+                    {shareTab === 'chat' ? (
+                        friendsLoading ? (
+                            <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: C.brand }} /></Box>
+                        ) : friends.length === 0 ? (
+                            <Box sx={{ py: 4, textAlign: 'center' }}>
+                                <Typography sx={{ color: C.faded, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
+                                <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>Add friends to share itineraries via chat.</Typography>
+                            </Box>
+                        ) : (
+                            <Stack spacing={0.5}>
+                                {friends.map(f => (
+                                    <Stack key={f.user_id} direction="row" alignItems="center" sx={{ px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: `${C.brand}0F` } }}>
+                                        <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
+                                            {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                                        </Typography>
+                                        <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>{f.username}</Typography>
+                                        <IconButton size="small" onClick={() => shareToFriend(f.user_id)} disabled={sharing === f.user_id}
+                                            sx={{ color: C.brand, '&:hover': { bgcolor: `${C.brand}20` }, '&:disabled': { color: C.faded } }}>
+                                            {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: C.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                        </IconButton>
+                                    </Stack>
+                                ))}
+                            </Stack>
+                        )
+                    ) : (
+                        <Box sx={{ py: 1 }}>
+                            <Stack spacing={1.5}>
+                                <TextField fullWidth size="small" label="Post Title"
+                                    value={feedTitle} onChange={e => setFeedTitle(e.target.value)}
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand }, '& .MuiInputBase-input': { color: C.text }, '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 } }} />
+                                <TextField fullWidth size="small" label="Add context (optional)" multiline rows={2}
+                                    value={feedBody} onChange={e => setFeedBody(e.target.value)} placeholder="Share what makes this trip special..."
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand }, '& .MuiInputBase-input': { color: C.text }, '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 } }} />
+                                {feedPlaces.length > 0 && (
+                                    <Box>
+                                        <Typography sx={{ color: C.faded, fontSize: '0.7rem', mb: 0.75, fontWeight: 600 }}>Place tags (auto-generated):</Typography>
+                                        <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                                            {feedPlaces.map(p => (
+                                                <Chip key={p} label={p} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: `${C.brand}15`, color: C.brand, border: `1px solid ${C.brand}35`, '& .MuiChip-label': { px: 0.8 } }} />
+                                            ))}
+                                        </Stack>
+                                    </Box>
+                                )}
+                                <Button fullWidth variant="contained" onClick={shareToCommunity}
+                                    disabled={communitySharing || !feedTitle.trim()}
+                                    startIcon={communitySharing ? <CircularProgress size={16} sx={{ color: C.bg }} /> : <GroupIcon sx={{ fontSize: 18 }} />}
+                                    sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3, py: 1.2, textTransform: 'none', '&:hover': { bgcolor: '#2db8b8' }, '&:disabled': { opacity: 0.5 } }}>
+                                    {communitySharing ? 'Posting...' : 'Share to Community Feed'}
+                                </Button>
+                            </Stack>
                         </Box>
+                    )}
+                </DialogContent>
+                <DialogActions sx={{ px: 2, py: 1.5, borderTop: `1px solid ${C.border}` }}>
+                    <Button onClick={() => setShareOpen(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Collaborators Dialog ─────────────────────────────────────── */}
+            <Dialog open={collabOpen} onClose={() => { setCollabOpen(false); setInviteErr(''); }} maxWidth="sm" fullWidth
+                PaperProps={{ sx: { bgcolor: C.bg, border: `1px solid ${C.border}`, borderRadius: 4 } }}>
+                <DialogTitle sx={{ color: C.heading, fontWeight: 'bold', borderBottom: `1px solid ${C.border}`, pb: 1.5 }}>
+                    <Stack direction="row" spacing={1} alignItems="center">
+                        <GroupIcon sx={{ color: C.brand, fontSize: 20 }} />
+                        <Typography fontWeight="bold" sx={{ color: C.heading }}>Collaborators</Typography>
+                    </Stack>
+                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.5 }}>
+                        Collaborators can edit this itinerary and see it in their account.
+                    </Typography>
+                </DialogTitle>
+                <DialogContent sx={{ pt: 2 }}>
+                    {/* Invite row */}
+                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                        <TextField fullWidth size="small" placeholder="Enter username to invite…"
+                            value={inviteUsername} onChange={e => { setInviteUsername(e.target.value); setInviteErr(''); }}
+                            onKeyDown={e => { if (e.key === 'Enter') inviteCollaborator(); }}
+                            error={!!inviteErr}
+                            helperText={inviteErr}
+                            sx={{
+                                '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } },
+                                '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 },
+                                '& .MuiFormHelperText-root': { color: C.red },
+                            }} />
+                        <Button variant="contained" onClick={inviteCollaborator} disabled={inviting || !inviteUsername.trim()}
+                            startIcon={inviting ? <CircularProgress size={14} sx={{ color: C.bg }} /> : <PersonAddIcon sx={{ fontSize: 16 }} />}
+                            sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 2, px: 2, textTransform: 'none', whiteSpace: 'nowrap', '&:hover': { bgcolor: '#2db8b8' }, '&:disabled': { bgcolor: C.surface, color: C.faded } }}>
+                            Invite
+                        </Button>
+                    </Stack>
+
+                    {collabsLoading ? (
+                        <Box sx={{ py: 3, textAlign: 'center' }}><CircularProgress size={20} sx={{ color: C.brand }} /></Box>
+                    ) : collaborators.length === 0 ? (
+                        <Typography sx={{ color: C.faded, fontSize: '0.82rem', textAlign: 'center', py: 2 }}>
+                            No collaborators yet. Invite someone above.
+                        </Typography>
                     ) : (
                         <Stack spacing={0.5}>
-                            {friends.map(f => (
-                                <Stack key={f.user_id} direction="row" alignItems="center" sx={{ px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: `${C.brand}0F` } }}>
-                                    <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
-                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                            {collaborators.map(c => (
+                                <Stack key={c.user_id} direction="row" alignItems="center" sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: C.surface }}>
+                                    <Typography sx={{ fontSize: '0.9rem', mr: 1.2 }}>
+                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(c.avatar_id || 1) - 1] || '🏔️'}
                                     </Typography>
-                                    <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>{f.username}</Typography>
-                                    <IconButton size="small" onClick={() => shareToFriend(f.user_id)} disabled={sharing === f.user_id}
-                                        sx={{ color: C.brand, '&:hover': { bgcolor: `${C.brand}20` }, '&:disabled': { color: C.faded } }}>
-                                        {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: C.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                    <Box sx={{ flex: 1 }}>
+                                        <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600 }}>{c.username}</Typography>
+                                        <Typography sx={{ color: C.faded, fontSize: '0.7rem' }}>{c.role}</Typography>
+                                    </Box>
+                                    <Chip size="small" label={c.status}
+                                        icon={c.status === 'accepted' ? <CheckCircleIcon sx={{ fontSize: '12px !important' }} /> : <HourglassEmptyIcon sx={{ fontSize: '12px !important' }} />}
+                                        sx={{
+                                            height: 20, fontSize: '0.65rem', fontWeight: 700,
+                                            bgcolor: c.status === 'accepted' ? 'rgba(76,175,80,0.12)' : 'rgba(255,183,77,0.12)',
+                                            color: c.status === 'accepted' ? '#4CAF50' : '#FFB74D',
+                                            border: `1px solid ${c.status === 'accepted' ? 'rgba(76,175,80,0.3)' : 'rgba(255,183,77,0.3)'}`,
+                                            mr: 1,
+                                        }} />
+                                    <IconButton size="small" onClick={() => removeCollaborator(c.user_id)}
+                                        sx={{ color: C.faded, '&:hover': { color: C.red } }}>
+                                        <DeleteIcon sx={{ fontSize: 16 }} />
                                     </IconButton>
                                 </Stack>
                             ))}
@@ -770,7 +1112,33 @@ export default function ItineraryDetail() {
                     )}
                 </DialogContent>
                 <DialogActions sx={{ px: 2, py: 1.5, borderTop: `1px solid ${C.border}` }}>
-                    <Button onClick={() => setShareOpen(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button onClick={() => { setCollabOpen(false); setInviteErr(''); }} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none' }}>Close</Button>
+                </DialogActions>
+            </Dialog>
+
+            {/* ── Time Prompt (after drag) ─────────────────────────────────── */}
+            <Dialog open={timePromptOpen} onClose={cancelDrop} maxWidth="xs" fullWidth
+                PaperProps={{ sx: { bgcolor: C.card, borderRadius: 4 } }}>
+                <DialogTitle sx={{ color: C.heading, fontWeight: 'bold', pb: 0.5 }}>
+                    {pendingDrop?.srcDayId === pendingDrop?.dstDayId ? 'Update Time' : 'Move to Another Day'}
+                </DialogTitle>
+                <DialogContent>
+                    <Typography sx={{ color: C.faded, fontSize: '0.85rem', mb: 2 }}>
+                        {pendingDrop?.srcDayId === pendingDrop?.dstDayId
+                            ? 'Activity reordered. Set a new start time (optional):'
+                            : `Moving to ${(() => { const d = itinerary.days?.find(d => d.id === pendingDrop?.dstDayId); return d ? `Day ${d.day_number}` : 'new day'; })()}. Set a start time (optional):`}
+                    </Typography>
+                    <TextField fullWidth type="time" label="Start Time (optional)" value={dropTime}
+                        onChange={e => setDropTime(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.bg, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand } }} />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                    <Button onClick={cancelDrop} sx={{ color: C.faded }}>Cancel</Button>
+                    <Button onClick={confirmDrop} variant="contained"
+                        sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3, px: 3, '&:hover': { bgcolor: '#2db8b8' } }}>
+                        Confirm Move
+                    </Button>
                 </DialogActions>
             </Dialog>
 

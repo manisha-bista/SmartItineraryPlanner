@@ -84,7 +84,7 @@ const StatusChip = ({ label, color }) => (
     <Chip label={label} size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 700, bgcolor: `${color}18`, color, border: `1px solid ${color}30` }} />
 );
 
-const RowMenu = ({ onView, onDelete, onResolve, COLORS }) => {
+const RowMenu = ({ onView, onDelete, onResolve, onDismiss, resolveLabel, deleteLabel, COLORS }) => {
     const [anchor, setAnchor] = useState(null);
     return (
         <>
@@ -98,10 +98,13 @@ const RowMenu = ({ onView, onDelete, onResolve, COLORS }) => {
                     <VisibilityOutlinedIcon sx={{ fontSize: 15, color: COLORS.brand }} /> View
                 </MenuItem>}
                 {onResolve && <MenuItem onClick={() => { onResolve(); setAnchor(null); }} sx={{ color: COLORS.text, fontSize: '0.82rem', gap: 1, '&:hover': { bgcolor: 'rgba(74,222,128,0.08)' } }}>
-                    <CheckCircleOutlineIcon sx={{ fontSize: 15, color: '#4ade80' }} /> Resolve
+                    <CheckCircleOutlineIcon sx={{ fontSize: 15, color: '#4ade80' }} /> {resolveLabel || 'Resolve'}
+                </MenuItem>}
+                {onDismiss && <MenuItem onClick={() => { onDismiss(); setAnchor(null); }} sx={{ color: '#fb923c', fontSize: '0.82rem', gap: 1, '&:hover': { bgcolor: 'rgba(251,146,60,0.08)' } }}>
+                    <CloseIcon sx={{ fontSize: 15, color: '#fb923c' }} /> Dismiss
                 </MenuItem>}
                 {onDelete && <MenuItem onClick={() => { onDelete(); setAnchor(null); }} sx={{ color: '#ff6b6b', fontSize: '0.82rem', gap: 1, '&:hover': { bgcolor: 'rgba(255,107,107,0.08)' } }}>
-                    <DeleteOutlineIcon sx={{ fontSize: 15 }} /> Delete
+                    <DeleteOutlineIcon sx={{ fontSize: 15 }} /> {deleteLabel || 'Delete'}
                 </MenuItem>}
             </Menu>
         </>
@@ -163,6 +166,7 @@ const AdminDashboard = () => {
     const [complaints, setComplaints]   = useState([]);
     const [places, setPlaces]           = useState([]);
     const [communityPosts, setCommunityPosts] = useState([]);
+    const [reports, setReports]           = useState([]);
 
     const [statsLoading, setStatsLoading] = useState(false);
     const [usersLoading, setUsersLoading] = useState(false);
@@ -170,6 +174,7 @@ const AdminDashboard = () => {
     const [compLoading, setCompLoading]   = useState(false);
     const [placesLoading, setPlacesLoading] = useState(false);
     const [postsLoading, setPostsLoading]   = useState(false);
+    const [reportsLoading, setReportsLoading] = useState(false);
 
     const [alert, setAlert]           = useState({ show: false, msg: '', type: 'success' });
     const [detailDialog, setDetailDialog] = useState({ open: false, type: '', data: null });
@@ -205,7 +210,7 @@ const AdminDashboard = () => {
         setTimeout(() => setAlert(a => ({ ...a, show: false })), 3500);
     };
 
-    const loadAll = () => { fetchStats(); fetchUsers(); fetchItineraries(); fetchComplaints(); fetchPlaces(); fetchCommunityPosts(); };
+    const loadAll = () => { fetchStats(); fetchUsers(); fetchItineraries(); fetchComplaints(); fetchPlaces(); fetchCommunityPosts(); fetchReports(); };
 
     const fetchStats = async () => {
         setStatsLoading(true);
@@ -230,6 +235,7 @@ const AdminDashboard = () => {
     const fetchComplaints = async () => { setCompLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/complaints/'); setComplaints(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load complaints', 'error'); } finally { setCompLoading(false); } };
     const fetchPlaces = async () => { setPlacesLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`); setPlaces(Array.isArray(r.data.places) ? r.data.places : []); } catch { showAlert('Failed to load places', 'error'); } finally { setPlacesLoading(false); } };
     const fetchCommunityPosts = async () => { setPostsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/posts?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load posts', 'error'); } finally { setPostsLoading(false); } };
+    const fetchReports = async () => { setReportsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/reports?admin_id=${localStorage.getItem('userId')}`); setReports(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load reports', 'error'); } finally { setReportsLoading(false); } };
 
     const viewUserProfile = async (userId) => {
         setUserProfile({ open: true, loading: true, data: null });
@@ -252,6 +258,13 @@ const AdminDashboard = () => {
     const resolveComplaint = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/complaints/${id}`, { status: 'resolved' }); setComplaints(p => p.map(c => c.id === id ? { ...c, status: 'resolved' } : c)); showAlert('Complaint resolved'); } catch { showAlert('Failed to resolve', 'error'); } };
     const deleteComplaint  = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/complaints/${id}`); setComplaints(p => p.filter(c => c.id !== id)); setStats(s => ({ ...s, totalComplaints: s.totalComplaints - 1 })); showAlert('Complaint deleted'); } catch { showAlert('Failed to delete', 'error'); } };
     const deletePost       = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/posts/${id}?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(p => p.filter(x => x.id !== id)); showAlert('Post deleted'); } catch { showAlert('Failed to delete post', 'error'); } };
+    const promoteUser      = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=admin`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'admin' } : u)); showAlert('User promoted to admin'); } catch { showAlert('Failed to promote user', 'error'); } };
+    const demoteUser       = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=user`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'user' } : u)); showAlert('User demoted to regular user'); } catch { showAlert('Failed to demote user', 'error'); } };
+    const deletePlace      = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/places/${id}?admin_id=${localStorage.getItem('userId')}`); setPlaces(p => p.filter(x => x.id !== id)); showAlert('Place deleted'); } catch { showAlert('Failed to delete place', 'error'); } };
+    const resolveReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=reviewed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Report marked as reviewed'); } catch { showAlert('Failed to update report', 'error'); } };
+    const dismissReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=dismissed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); showAlert('Report dismissed'); } catch { showAlert('Failed to dismiss report', 'error'); } };
+    const deleteReport     = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.filter(r => r.id !== id)); showAlert('Report deleted'); } catch { showAlert('Failed to delete report', 'error'); } };
+    const deleteReportContent = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}/content?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Reported content removed'); } catch { showAlert('Failed to remove content', 'error'); } };
 
     const handleSaveEmail = async () => {
         setSettingsError('');
@@ -287,7 +300,7 @@ const AdminDashboard = () => {
     const getItinStatusColor    = (s) => ({ draft: '#a78bfa', planning: COLORS.brand, confirmed: '#4ade80', ongoing: '#fb923c', completed: COLORS.fadedText, cancelled: '#ff6b6b' }[s] || COLORS.fadedText);
     const getComplaintStatusColor = (s) => ({ open: '#ff6b6b', resolved: '#4ade80', pending: '#fb923c' }[s] || COLORS.fadedText);
 
-    const filteredUsers       = users.filter(u => u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
+    const filteredUsers       = users.filter(u => u.username?.toLowerCase().includes(search.toLowerCase()) || u.name?.toLowerCase().includes(search.toLowerCase()) || u.email?.toLowerCase().includes(search.toLowerCase()));
     const filteredItineraries = itineraries.filter(i => i.title?.toLowerCase().includes(search.toLowerCase()) || i.destination?.toLowerCase().includes(search.toLowerCase()));
     const filteredComplaints  = complaints.filter(c => c.title?.toLowerCase().includes(search.toLowerCase()) || c.description?.toLowerCase().includes(search.toLowerCase()));
     const filteredPlaces      = places.filter(p => p.name?.toLowerCase().includes(search.toLowerCase()) || p.address?.toLowerCase().includes(search.toLowerCase()) || (p.aliases || []).some(a => a.toLowerCase().includes(search.toLowerCase())));
@@ -299,7 +312,9 @@ const AdminDashboard = () => {
         { label: 'Posts',       count: communityPosts.length,  color: '#38bdf8' },
         { label: 'Complaints',  count: stats.totalComplaints,  color: '#fb923c' },
         { label: 'Places',      count: stats.totalPlaces,      color: '#4ade80' },
+        { label: 'Reports',     count: reports.filter(r => r.status === 'pending').length, color: '#ff6b6b' },
     ];
+    const filteredReports = reports.filter(r => r.reason?.toLowerCase().includes(search.toLowerCase()) || r.reporter_username?.toLowerCase().includes(search.toLowerCase()) || r.post_title?.toLowerCase().includes(search.toLowerCase()));
 
     const TAG_COLORS = { Experience: '#33CCCC', Alert: '#FFB74D', Event: '#4CAF50', Tip: '#9C27B0', Question: '#42A5F5' };
 
@@ -392,15 +407,25 @@ const AdminDashboard = () => {
                                             <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{idx + 1}</TableCell>
                                             <TableCell sx={tdSx}>
                                                 <Stack direction="row" alignItems="center" spacing={1.5}>
-                                                    <Avatar sx={{ width: 30, height: 30, bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.75rem', fontWeight: 700 }}>{(u.name || 'U')[0].toUpperCase()}</Avatar>
-                                                    <Typography sx={{ color: COLORS.headings, fontWeight: 600, fontSize: '0.82rem' }}>{u.name || '—'}</Typography>
+                                                    <Avatar sx={{ width: 30, height: 30, bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.75rem', fontWeight: 700 }}>{(u.username || u.name || 'U')[0].toUpperCase()}</Avatar>
+                                                    <Box>
+                                                        <Typography sx={{ color: COLORS.headings, fontWeight: 600, fontSize: '0.82rem' }}>{u.username || '—'}</Typography>
+                                                        {u.name && u.name !== u.username && <Typography sx={{ color: COLORS.fadedText, fontSize: '0.7rem' }}>{u.name}</Typography>}
+                                                    </Box>
                                                 </Stack>
                                             </TableCell>
                                             <TableCell sx={tdSx}><Stack direction="row" alignItems="center" spacing={0.5}><EmailOutlinedIcon sx={{ fontSize: 13, color: COLORS.fadedText }} /><span>{u.email || '—'}</span></Stack></TableCell>
                                             <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{formatDate(u.created_at)}</TableCell>
                                             <TableCell sx={tdSx}><Box sx={{ bgcolor: `${COLORS.brand}1A`, color: COLORS.brand, borderRadius: 1.5, px: 1.2, py: 0.2, display: 'inline-block', fontSize: '0.75rem', fontWeight: 700 }}>{itineraries.filter(i => i.user_id === u.id).length}</Box></TableCell>
                                             <TableCell sx={tdSx}><StatusChip label={u.role?.toUpperCase() || 'USER'} color={u.role === 'admin' ? '#a78bfa' : COLORS.brand} /></TableCell>
-                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }} onClick={e => e.stopPropagation()}><RowMenu COLORS={COLORS} onView={() => viewUserProfile(u.id)} onDelete={() => deleteUser(u.id)} /></TableCell>
+                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }} onClick={e => e.stopPropagation()}>
+                                                <RowMenu COLORS={COLORS}
+                                                    onView={() => viewUserProfile(u.id)}
+                                                    onResolve={u.role !== 'admin' ? () => promoteUser(u.id) : null}
+                                                    resolveLabel="Promote to Admin"
+                                                    onDismiss={u.role === 'admin' ? () => demoteUser(u.id) : null}
+                                                    onDelete={() => deleteUser(u.id)} />
+                                            </TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -449,10 +474,10 @@ const AdminDashboard = () => {
                         <SectionHeader COLORS={COLORS} title="All Community Posts" onRefresh={fetchCommunityPosts} loading={postsLoading} />
                         <TableContainer component={Paper} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 4, boxShadow: 'none', border: `1px solid ${COLORS.cardBorder}` }}>
                             <Table size="small">
-                                <TableHead><TableRow>{['#','Title','Author','Tag','Place','Votes','Date',''].map((h, i) => <TableCell key={i} sx={{ ...thSx, textAlign: i === 7 ? 'right' : 'left' }}>{h}</TableCell>)}</TableRow></TableHead>
+                                <TableHead><TableRow>{['#','Title','Author','Tag','Place','Votes','Comments','Date',''].map((h, i) => <TableCell key={i} sx={{ ...thSx, textAlign: i === 8 ? 'right' : 'left' }}>{h}</TableCell>)}</TableRow></TableHead>
                                 <TableBody>
-                                    {postsLoading ? <LoadingRow COLORS={COLORS} cols={8} /> :
-                                     filteredPosts.length === 0 ? <EmptyRow COLORS={COLORS} cols={8} msg="No posts found." /> :
+                                    {postsLoading ? <LoadingRow COLORS={COLORS} cols={9} /> :
+                                     filteredPosts.length === 0 ? <EmptyRow COLORS={COLORS} cols={9} msg="No posts found." /> :
                                      filteredPosts.map((p, idx) => (
                                         <TableRow key={p.id} sx={{ '&:hover': { bgcolor: 'rgba(56,189,248,0.03)' }, '&:last-child td': { borderBottom: 'none' } }}>
                                             <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{idx + 1}</TableCell>
@@ -461,8 +486,9 @@ const AdminDashboard = () => {
                                             <TableCell sx={tdSx}><Chip label={p.tag} size="small" sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600, bgcolor: `${TAG_COLORS[p.tag] || COLORS.brand}18`, color: TAG_COLORS[p.tag] || COLORS.brand }} /></TableCell>
                                             <TableCell sx={tdSx}><Typography sx={{ fontSize: '0.78rem', color: p.place === 'All' ? COLORS.fadedText : COLORS.brand }}>{p.place}</Typography></TableCell>
                                             <TableCell sx={tdSx}><Stack direction="row" spacing={0.5} alignItems="center"><Typography sx={{ color: '#4ade80', fontSize: '0.78rem', fontWeight: 600 }}>+{p.upvotes || 0}</Typography><Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem' }}>/</Typography><Typography sx={{ color: '#ff6b6b', fontSize: '0.78rem' }}>-{p.downvotes || 0}</Typography></Stack></TableCell>
+                                            <TableCell sx={tdSx}><Typography sx={{ color: COLORS.fadedText, fontSize: '0.78rem' }}>{p.comment_count ?? 0}</Typography></TableCell>
                                             <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{formatDate(p.created_at)}</TableCell>
-                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }}><RowMenu COLORS={COLORS} onView={() => viewUserProfile(p.user_id)} onDelete={() => deletePost(p.id)} /></TableCell>
+                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }}><RowMenu COLORS={COLORS} onView={() => navigate('/community', { state: { highlightPostId: p.id } })} onDelete={() => deletePost(p.id)} /></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -498,16 +524,70 @@ const AdminDashboard = () => {
                     </Box>
                 )}
 
+                {/* Reports Table */}
+                {activeTab === 5 && (
+                    <Box>
+                        <SectionHeader COLORS={COLORS} title="Reported Posts & Comments" onRefresh={fetchReports} loading={reportsLoading} />
+                        <TableContainer component={Paper} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 4, boxShadow: 'none', border: `1px solid ${COLORS.cardBorder}` }}>
+                            <Table size="small">
+                                <TableHead><TableRow>{['#','Type','Content','Reason','Reporter','Date','Status',''].map((h, i) => <TableCell key={i} sx={{ ...thSx, textAlign: i === 7 ? 'right' : 'left' }}>{h}</TableCell>)}</TableRow></TableHead>
+                                <TableBody>
+                                    {reportsLoading ? <LoadingRow COLORS={COLORS} cols={8} /> :
+                                     filteredReports.length === 0 ? <EmptyRow COLORS={COLORS} cols={8} msg="No reports found." /> :
+                                     filteredReports.map((r, idx) => (
+                                        <TableRow key={r.id} sx={{ '&:hover': { bgcolor: 'rgba(255,107,107,0.03)' }, '&:last-child td': { borderBottom: 'none' } }}>
+                                            <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{idx + 1}</TableCell>
+                                            <TableCell sx={tdSx}>
+                                                <Chip label={r.comment_id ? 'Comment' : 'Post'} size="small"
+                                                    sx={{ height: 18, fontSize: '0.6rem', fontWeight: 600,
+                                                        bgcolor: r.comment_id ? 'rgba(167,139,250,0.15)' : 'rgba(56,189,248,0.15)',
+                                                        color: r.comment_id ? '#a78bfa' : '#38bdf8' }} />
+                                            </TableCell>
+                                            <TableCell sx={{ ...tdSx, maxWidth: 200 }}>
+                                                <Typography noWrap sx={{ fontSize: '0.78rem', color: COLORS.headings, fontWeight: 600 }}>
+                                                    {r.comment_id ? (r.comment_content || '—') : (r.post_title || '—')}
+                                                </Typography>
+                                            </TableCell>
+                                            <TableCell sx={{ ...tdSx, maxWidth: 180 }}>
+                                                <Typography noWrap sx={{ fontSize: '0.78rem', color: COLORS.fadedText }}>{r.reason}</Typography>
+                                            </TableCell>
+                                            <TableCell sx={tdSx}>
+                                                <Stack direction="row" alignItems="center" spacing={0.8}>
+                                                    <Avatar sx={{ width: 22, height: 22, bgcolor: '#ff6b6b', color: 'white', fontSize: '0.6rem', fontWeight: 700 }}>{(r.reporter_username || 'U')[0].toUpperCase()}</Avatar>
+                                                    <Typography sx={{ fontSize: '0.78rem', color: COLORS.text }}>{r.reporter_username || `User #${r.reporter_id}`}</Typography>
+                                                </Stack>
+                                            </TableCell>
+                                            <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{formatDate(r.created_at)}</TableCell>
+                                            <TableCell sx={tdSx}>
+                                                <StatusChip label={r.status?.toUpperCase() || 'PENDING'}
+                                                    color={{ pending: '#ff6b6b', reviewed: '#4ade80', dismissed: COLORS.fadedText }[r.status] || '#ff6b6b'} />
+                                            </TableCell>
+                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }}>
+                                                <RowMenu COLORS={COLORS}
+                                                    onResolve={() => deleteReportContent(r.id)}
+                                                    resolveLabel="Remove Content"
+                                                    onDismiss={r.status === 'pending' ? () => dismissReport(r.id) : null}
+                                                    onDelete={() => deleteReport(r.id)}
+                                                    deleteLabel="Delete Report" />
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Box>
+                )}
+
                 {/* Places Table */}
                 {activeTab === 4 && (
                     <Box>
                         <SectionHeader COLORS={COLORS} title="Cached Places & Search Aliases" onRefresh={fetchPlaces} loading={placesLoading} />
                         <TableContainer component={Paper} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 4, boxShadow: 'none', border: `1px solid ${COLORS.cardBorder}` }}>
                             <Table size="small">
-                                <TableHead><TableRow>{['#','Place Name','Address','City','Rating','Search Aliases','Coords'].map((h) => <TableCell key={h} sx={thSx}>{h}</TableCell>)}</TableRow></TableHead>
+                                <TableHead><TableRow>{['#','Place Name','Address','City','Rating','Search Aliases','Coords',''].map((h, i) => <TableCell key={i} sx={{ ...thSx, textAlign: i === 7 ? 'right' : 'left' }}>{h}</TableCell>)}</TableRow></TableHead>
                                 <TableBody>
-                                    {placesLoading ? <LoadingRow COLORS={COLORS} cols={7} /> :
-                                     filteredPlaces.length === 0 ? <EmptyRow COLORS={COLORS} cols={7} msg="No cached places yet. Places are cached automatically when users search." /> :
+                                    {placesLoading ? <LoadingRow COLORS={COLORS} cols={8} /> :
+                                     filteredPlaces.length === 0 ? <EmptyRow COLORS={COLORS} cols={8} msg="No cached places yet. Places are cached automatically when users search." /> :
                                      filteredPlaces.map((p, idx) => (
                                         <TableRow key={p.google_place_id || idx} sx={{ '&:hover': { bgcolor: 'rgba(56,189,248,0.03)' }, '&:last-child td': { borderBottom: 'none' } }}>
                                             <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{idx + 1}</TableCell>
@@ -517,6 +597,7 @@ const AdminDashboard = () => {
                                             <TableCell sx={tdSx}>{p.rating ? <Stack direction="row" alignItems="center" spacing={0.3}><Typography sx={{ color: '#FFD700', fontSize: '0.82rem', fontWeight: 600 }}>{p.rating}</Typography><Typography sx={{ color: COLORS.fadedText, fontSize: '0.7rem' }}>★</Typography></Stack> : <Typography sx={{ color: COLORS.fadedText, fontSize: '0.78rem' }}>—</Typography>}</TableCell>
                                             <TableCell sx={{ ...tdSx, maxWidth: 260 }}>{p.aliases?.length > 0 ? <Stack direction="row" flexWrap="wrap" gap={0.5}>{p.aliases.map((alias, ai) => <Chip key={ai} label={alias} size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 500, bgcolor: 'rgba(167,139,250,0.1)', color: '#a78bfa', border: '1px solid rgba(167,139,250,0.2)' }} />)}</Stack> : <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem', fontStyle: 'italic' }}>no aliases yet</Typography>}</TableCell>
                                             <TableCell sx={tdSx}>{p.latitude && p.longitude ? <Typography sx={{ color: COLORS.fadedText, fontSize: '0.7rem', fontFamily: 'monospace' }}>{p.latitude.toFixed(4)}, {p.longitude.toFixed(4)}</Typography> : <Typography sx={{ color: COLORS.fadedText, fontSize: '0.78rem' }}>—</Typography>}</TableCell>
+                                            <TableCell sx={{ ...tdSx, textAlign: 'right' }} onClick={e => e.stopPropagation()}><RowMenu COLORS={COLORS} onDelete={() => deletePlace(p.id)} deleteLabel="Delete Place" /></TableCell>
                                         </TableRow>
                                     ))}
                                 </TableBody>
@@ -652,9 +733,9 @@ const AdminDashboard = () => {
                         <DialogTitle sx={{ pb: 1, borderBottom: `1px solid ${COLORS.cardBorder}` }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center">
                                 <Stack direction="row" spacing={2} alignItems="center">
-                                    <Avatar sx={{ width: 48, height: 48, bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 800, fontSize: '1.2rem' }}>{(userProfile.data.user.name || 'U')[0].toUpperCase()}</Avatar>
+                                    <Avatar sx={{ width: 48, height: 48, bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 800, fontSize: '1.2rem' }}>{(userProfile.data.user.username || userProfile.data.user.name || 'U')[0].toUpperCase()}</Avatar>
                                     <Box>
-                                        <Typography variant="h6" fontWeight={800} sx={{ color: COLORS.headings }}>{userProfile.data.user.name}</Typography>
+                                        <Typography variant="h6" fontWeight={800} sx={{ color: COLORS.headings }}>{userProfile.data.user.username || userProfile.data.user.name}</Typography>
                                         <Stack direction="row" spacing={1} alignItems="center">
                                             <Typography sx={{ color: COLORS.fadedText, fontSize: '0.78rem' }}>{userProfile.data.user.email}</Typography>
                                             <StatusChip label={userProfile.data.user.role?.toUpperCase() || 'USER'} color={userProfile.data.user.role === 'admin' ? '#a78bfa' : COLORS.brand} />

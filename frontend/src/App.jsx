@@ -8,7 +8,7 @@ import Dashboard from './pages/Dashboard';
 import ItineraryDetail from './pages/ItineraryDetail.jsx';
 import CommunityFeed from './pages/CommunityFeed';
 import MyItineraries from './pages/MyItineraries';
-import ProfileSettings from './pages/ProfileSettings';
+import ProfileSettings from './pages/ProfileSettings.jsx';
 import PlaceDetail from './pages/PlaceDetail';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import InteractiveMap from './pages/InteractiveMap';

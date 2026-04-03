@@ -18,6 +18,10 @@ import LocationOnIcon    from '@mui/icons-material/LocationOn';
 import DeleteIcon        from '@mui/icons-material/Delete';
 import ShareIcon         from '@mui/icons-material/Share';
 import SendIcon          from '@mui/icons-material/Send';
+import GroupIcon         from '@mui/icons-material/Group';
+import HandshakeIcon     from '@mui/icons-material/Handshake';
+import CheckCircleIcon   from '@mui/icons-material/CheckCircle';
+import CloseIcon         from '@mui/icons-material/Close';
 import WbSunnyIcon       from '@mui/icons-material/WbSunny';
 import CloudIcon         from '@mui/icons-material/Cloud';
 import UmbrellaIcon      from '@mui/icons-material/Umbrella';
@@ -223,20 +227,32 @@ const MyItineraries = () => {
     const [deleting, setDeleting]       = useState(false);
     const [createOpen, setCreateOpen]   = useState(false);
 
+    // collaborations
+    const [collaborations, setCollaborations] = useState([]);
+    const [pendingCollabs, setPendingCollabs] = useState([]);
+    const [collabsLoading, setCollabsLoading] = useState(false);
+
     // share state
     const [shareOpen, setShareOpen]           = useState(false);
+    const [shareTab, setShareTab]             = useState('chat');
     const [shareItinId, setShareItinId]       = useState(null);
     const [shareItinTitle, setShareItinTitle] = useState('');
+    const [shareItinDestination, setShareItinDestination] = useState('');
     const [friends, setFriends]               = useState([]);
     const [friendsLoading, setFriendsLoading] = useState(false);
     const [sharing, setSharing]               = useState(null);
+    const [feedSharing, setFeedSharing]       = useState(false);
+    const [feedTitle, setFeedTitle]           = useState('');
+    const [feedBody, setFeedBody]             = useState('');
+    const [shareItinPlaces, setShareItinPlaces] = useState([]);
 
     useEffect(() => {
         const userId   = localStorage.getItem('userId');
         const userName = localStorage.getItem('userName');
         if (!userId) { navigate('/login'); return; }
+        const uid = parseInt(userId);
         setUser({
-            id: parseInt(userId),
+            id: uid,
             name: userName || 'User',
             avatarId: parseInt(localStorage.getItem('avatarId')) || 1,
         });
@@ -244,7 +260,36 @@ const MyItineraries = () => {
             .then(r => setItineraries(r.data))
             .catch(() => setError('Could not load itineraries. Is the backend running?'))
             .finally(() => setLoading(false));
+
+        // fetch collaborations
+        setCollabsLoading(true);
+        Promise.all([
+            axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}/collaborations`).then(r => r.data).catch(() => []),
+            axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}/pending-collabs`).then(r => r.data).catch(() => []),
+        ]).then(([collabs, pending]) => {
+            setCollaborations(collabs);
+            setPendingCollabs(pending);
+        }).finally(() => setCollabsLoading(false));
     }, [navigate]);
+
+    const acceptCollab = async (itineraryId) => {
+        try {
+            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/accept?user_id=${user.id}`);
+            const [collabs, pending] = await Promise.all([
+                axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}/collaborations`).then(r => r.data).catch(() => []),
+                axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}/pending-collabs`).then(r => r.data).catch(() => []),
+            ]);
+            setCollaborations(collabs);
+            setPendingCollabs(pending);
+        } catch { setError('Failed to accept collaboration.'); }
+    };
+
+    const rejectCollab = async (itineraryId) => {
+        try {
+            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/reject?user_id=${user.id}`);
+            setPendingCollabs(prev => prev.filter(p => p.id !== itineraryId));
+        } catch { setError('Failed to decline collaboration.'); }
+    };
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
     const filtered = itineraries.filter(t =>
@@ -265,18 +310,48 @@ const MyItineraries = () => {
         finally { setDeleting(false); }
     };
 
-    const openShare = async (tripId, tripTitle, e) => {
+    const openShare = async (trip, e) => {
         e.stopPropagation();
-        setShareItinId(tripId);
-        setShareItinTitle(tripTitle);
+        setShareItinId(trip.id);
+        setShareItinTitle(trip.title);
+        setShareItinDestination(trip.destination || '');
+        setFeedTitle(`Check out my itinerary: ${trip.title}`);
+        setFeedBody(`A trip to ${trip.destination || ''}`);
+        setShareTab('chat');
         setShareOpen(true);
         setFriendsLoading(true);
         try {
             const userId = localStorage.getItem('userId');
-            const res = await axios.get(`http://127.0.0.1:8000/friends/${userId}`);
-            setFriends(res.data?.friends || []);
-        } catch { setFriends([]); }
+            const [friendsRes, itinRes] = await Promise.all([
+                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
+                axios.get(`http://127.0.0.1:8000/itineraries/${trip.id}`),
+            ]);
+            setFriends(friendsRes.data?.friends || []);
+            const ps = new Set();
+            if (trip.destination) ps.add(trip.destination);
+            (itinRes.data?.days || []).forEach(day =>
+                (day.activities || []).forEach(act => { if (act.location) ps.add(act.location); })
+            );
+            setShareItinPlaces([...ps]);
+        } catch { setFriends([]); setShareItinPlaces(trip.destination ? [trip.destination] : []); }
         finally { setFriendsLoading(false); }
+    };
+
+    const shareToFeed = async () => {
+        if (!feedTitle.trim()) return;
+        setFeedSharing(true);
+        try {
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, {
+                title: feedTitle.trim(),
+                body: feedBody.trim() || null,
+                tag: 'Experience',
+                place: shareItinPlaces.join(', ') || shareItinDestination || 'Nepal',
+                shared_itinerary_id: shareItinId,
+            });
+            setShareOpen(false);
+        } catch { /* silent */ }
+        finally { setFeedSharing(false); }
     };
 
     const shareToFriend = async (friendId) => {
@@ -311,7 +386,7 @@ const MyItineraries = () => {
                 />
                 <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
                     <Stack direction="row" spacing={0.5}>
-                        <IconButton size="small" onClick={(e) => openShare(trip.id, trip.title, e)}
+                        <IconButton size="small" onClick={(e) => openShare(trip, e)}
                             sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.brand, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(51,204,204,0.2)' } }}>
                             <ShareIcon fontSize="small" />
                         </IconButton>
@@ -457,6 +532,77 @@ const MyItineraries = () => {
                                 </Button>
                             </Box>
                         )}
+
+                        {/* Pending Collaboration Invites */}
+                        {pendingCollabs.length > 0 && (
+                            <Box sx={{ mt: 4 }}>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 2 }}>
+                                    <HandshakeIcon sx={{ color: '#FFB74D', fontSize: 22 }} />
+                                    <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>
+                                        Collaboration Invites
+                                        <Typography component="span" sx={{ ml: 1.5, color: '#FFB74D', fontSize: '0.85rem', fontWeight: 700 }}>
+                                            ({pendingCollabs.length})
+                                        </Typography>
+                                    </Typography>
+                                </Stack>
+                                <Stack spacing={1.5}>
+                                    {pendingCollabs.map(itin => (
+                                        <Box key={itin.id} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 3, px: 3, py: 2, border: `1px solid rgba(255,183,77,0.25)`, borderLeft: '3px solid #FFB74D' }}>
+                                            <Stack direction="row" alignItems="center">
+                                                <Box sx={{ flex: 1 }}>
+                                                    <Typography sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '0.95rem' }}>{itin.title}</Typography>
+                                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                                        <LocationOnIcon sx={{ fontSize: 12, color: '#ff6b6b' }} />
+                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText }}>{itin.destination}</Typography>
+                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText }}>·</Typography>
+                                                        <CalendarTodayIcon sx={{ fontSize: 11, color: COLORS.fadedText }} />
+                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText }}>{formatDate(itin.start_date)} – {formatDate(itin.end_date)}</Typography>
+                                                    </Stack>
+                                                </Box>
+                                                <Stack direction="row" spacing={1}>
+                                                    <Button size="small" variant="contained"
+                                                        startIcon={<CheckCircleIcon sx={{ fontSize: 15 }} />}
+                                                        onClick={() => acceptCollab(itin.id)}
+                                                        sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 700, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 2, '&:hover': { bgcolor: '#2db8b8' } }}>
+                                                        Accept
+                                                    </Button>
+                                                    <Button size="small"
+                                                        startIcon={<CloseIcon sx={{ fontSize: 15 }} />}
+                                                        onClick={() => rejectCollab(itin.id)}
+                                                        sx={{ color: COLORS.fadedText, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 2, '&:hover': { color: '#ff6b6b', bgcolor: 'rgba(255,107,107,0.08)' } }}>
+                                                        Decline
+                                                    </Button>
+                                                </Stack>
+                                            </Stack>
+                                        </Box>
+                                    ))}
+                                </Stack>
+                            </Box>
+                        )}
+
+                        {/* Collaborations */}
+                        {(collabsLoading || collaborations.length > 0) && (
+                            <Box sx={{ mt: 4 }}>
+                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
+                                    <GroupIcon sx={{ color: COLORS.brand, fontSize: 22 }} />
+                                    <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>
+                                        Collaborations
+                                        <Typography component="span" sx={{ ml: 1.5, color: COLORS.brand, fontSize: '0.85rem', fontWeight: 700 }}>
+                                            ({collaborations.length})
+                                        </Typography>
+                                    </Typography>
+                                </Stack>
+                                {collabsLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress sx={{ color: COLORS.brand }} /></Box>
+                                ) : (
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+                                        {collaborations.map(trip => (
+                                            <TripCard key={`collab-${trip.id}`} trip={trip} />
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+                        )}
                     </Box>
                 )}
             </Box>
@@ -492,40 +638,77 @@ const MyItineraries = () => {
 
             {/* Share dialog */}
             <Dialog open={shareOpen} onClose={() => setShareOpen(false)} maxWidth="xs" fullWidth
-                PaperProps={{ sx: { bgcolor: COLORS.cardPrimary, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 4 } }}>
+                PaperProps={{ sx: { bgcolor: COLORS.background, border: `1px solid ${COLORS.cardBorder}`, borderRadius: 4 } }}>
                 <DialogTitle sx={{ color: COLORS.headings, fontWeight: 'bold', borderBottom: `1px solid ${COLORS.cardBorder}`, pb: 1.5 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
                         <ShareIcon sx={{ color: COLORS.brand, fontSize: 20 }} />
-                        <Typography fontWeight="bold" sx={{ color: COLORS.headings }}>Share Itinerary</Typography>
+                        <Typography fontWeight="bold" sx={{ color: COLORS.headings }}>Share "{shareItinTitle}"</Typography>
                     </Stack>
-                    <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mt: 0.5 }}>
-                        Send "{shareItinTitle}" to a friend
-                    </Typography>
+                    <Stack direction="row" spacing={1} sx={{ mt: 1.5 }}>
+                        {[{ key: 'chat', label: 'Send to Friend' }, { key: 'feed', label: 'Post to Feed' }].map(t => (
+                            <Button key={t.key} size="small" onClick={() => setShareTab(t.key)}
+                                sx={{ flex: 1, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', fontWeight: shareTab === t.key ? 700 : 400,
+                                    color: shareTab === t.key ? COLORS.brand : COLORS.fadedText,
+                                    bgcolor: shareTab === t.key ? `${COLORS.brand}18` : 'transparent',
+                                    border: `1px solid ${shareTab === t.key ? COLORS.brand + '40' : 'transparent'}` }}>
+                                {t.label}
+                            </Button>
+                        ))}
+                    </Stack>
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2, px: 2 }}>
-                    {friendsLoading ? (
-                        <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: COLORS.brand }} /></Box>
-                    ) : friends.length === 0 ? (
-                        <Box sx={{ py: 4, textAlign: 'center' }}>
-                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
-                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem' }}>Add friends from the community to share itineraries.</Typography>
-                        </Box>
+                    {shareTab === 'chat' ? (
+                        friendsLoading ? (
+                            <Box sx={{ py: 4, textAlign: 'center' }}><CircularProgress size={22} sx={{ color: COLORS.brand }} /></Box>
+                        ) : friends.length === 0 ? (
+                            <Box sx={{ py: 4, textAlign: 'center' }}>
+                                <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem', mb: 0.5 }}>No friends yet</Typography>
+                                <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem' }}>Add friends to share via chat.</Typography>
+                            </Box>
+                        ) : (
+                            <Stack spacing={0.5}>
+                                {friends.map(f => (
+                                    <Stack key={f.user_id} direction="row" alignItems="center"
+                                        sx={{ px: 1.5, py: 1, borderRadius: 2, '&:hover': { bgcolor: `${COLORS.brand}10` } }}>
+                                        <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
+                                            {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                                        </Typography>
+                                        <Typography sx={{ color: COLORS.headings, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>{f.username}</Typography>
+                                        <IconButton size="small" onClick={() => shareToFriend(f.user_id)} disabled={sharing === f.user_id}
+                                            sx={{ color: COLORS.brand, '&:hover': { bgcolor: `${COLORS.brand}20` }, '&:disabled': { color: COLORS.fadedText } }}>
+                                            {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: COLORS.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
+                                        </IconButton>
+                                    </Stack>
+                                ))}
+                            </Stack>
+                        )
                     ) : (
-                        <Stack spacing={0.5}>
-                            {friends.map(f => (
-                                <Stack key={f.user_id} direction="row" alignItems="center"
-                                    sx={{ px: 1.5, py: 1, borderRadius: 2, cursor: 'pointer', '&:hover': { bgcolor: `${COLORS.brand}10` } }}>
-                                    <Typography sx={{ fontSize: '1rem', mr: 1.2 }}>
-                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
-                                    </Typography>
-                                    <Typography sx={{ color: COLORS.headings, fontSize: '0.85rem', fontWeight: 600, flex: 1 }}>{f.username}</Typography>
-                                    <IconButton size="small" onClick={() => shareToFriend(f.user_id)} disabled={sharing === f.user_id}
-                                        sx={{ color: COLORS.brand, '&:hover': { bgcolor: `${COLORS.brand}20` }, '&:disabled': { color: COLORS.fadedText } }}>
-                                        {sharing === f.user_id ? <CircularProgress size={16} sx={{ color: COLORS.brand }} /> : <SendIcon sx={{ fontSize: 18 }} />}
-                                    </IconButton>
-                                </Stack>
-                            ))}
-                        </Stack>
+                        <Box sx={{ py: 1 }}>
+                            <Stack spacing={1.5}>
+                                <TextField fullWidth size="small" label="Post Title"
+                                    value={feedTitle} onChange={e => setFeedTitle(e.target.value)}
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardSecondary, borderRadius: 2, color: COLORS.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: COLORS.brand }, '&.Mui-focused fieldset': { borderColor: COLORS.brand } }, '& .MuiInputLabel-root': { color: COLORS.fadedText }, '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand }, '& .MuiInputBase-input': { color: COLORS.text }, '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 } }} />
+                                <TextField fullWidth size="small" label="Add context (optional)" multiline rows={2}
+                                    value={feedBody} onChange={e => setFeedBody(e.target.value)} placeholder="Share what makes this trip special..."
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardSecondary, borderRadius: 2, color: COLORS.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: COLORS.brand }, '&.Mui-focused fieldset': { borderColor: COLORS.brand } }, '& .MuiInputLabel-root': { color: COLORS.fadedText }, '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand }, '& .MuiInputBase-input': { color: COLORS.text }, '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 } }} />
+                                {shareItinPlaces.length > 0 && (
+                                    <Box>
+                                        <Typography sx={{ color: COLORS.fadedText, fontSize: '0.7rem', mb: 0.75, fontWeight: 600 }}>Place tags (auto-generated):</Typography>
+                                        <Stack direction="row" flexWrap="wrap" gap={0.5}>
+                                            {shareItinPlaces.map(p => (
+                                                <Chip key={p} label={p} size="small" sx={{ height: 20, fontSize: '0.65rem', bgcolor: `${COLORS.brand}15`, color: COLORS.brand, border: `1px solid ${COLORS.brand}35`, '& .MuiChip-label': { px: 0.8 } }} />
+                                            ))}
+                                        </Stack>
+                                    </Box>
+                                )}
+                                <Button fullWidth variant="contained" onClick={shareToFeed}
+                                    disabled={feedSharing || !feedTitle.trim()}
+                                    startIcon={feedSharing ? <CircularProgress size={16} sx={{ color: COLORS.background }} /> : <ShareIcon sx={{ fontSize: 18 }} />}
+                                    sx={{ bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold', borderRadius: 3, py: 1.2, textTransform: 'none', '&:hover': { bgcolor: '#2db8b8' }, '&:disabled': { opacity: 0.5 } }}>
+                                    {feedSharing ? 'Posting...' : 'Share to Community Feed'}
+                                </Button>
+                            </Stack>
+                        </Box>
                     )}
                 </DialogContent>
                 <DialogActions sx={{ px: 2, py: 1.5, borderTop: `1px solid ${COLORS.cardBorder}` }}>
