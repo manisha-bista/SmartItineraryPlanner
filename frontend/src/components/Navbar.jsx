@@ -186,7 +186,13 @@ const Navbar = () => {
         navigate('/');
     };
 
-    const isActive = (path) => location.pathname === path;
+    const isActive = (path) => {
+        if (path === '/itineraries') {
+            // Active on both /itineraries and any /itinerary/:id detail page
+            return location.pathname === path || location.pathname.startsWith('/itinerary/');
+        }
+        return location.pathname === path;
+    };
 
     const drawerBg   = COLORS.background;
     const activeBg   = COLORS.brand;

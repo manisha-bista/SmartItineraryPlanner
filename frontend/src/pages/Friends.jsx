@@ -92,7 +92,7 @@ export default function Friends() {
         if (!addUsername.trim()) return;
         setAddBusy(true); setAddErr('');
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim() });
+            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
             toast('Friend request sent!');
             setAddUsername('');
         } catch (e) {
@@ -127,7 +127,7 @@ export default function Friends() {
     const acceptCollab = async (itineraryId) => {
         try {
             await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/accept?user_id=${userId}`);
-            toast('Joined collaboration!'); load();
+            navigate(`/itinerary/${itineraryId}`);
         } catch { toast('Failed to accept.', 'error'); }
     };
 

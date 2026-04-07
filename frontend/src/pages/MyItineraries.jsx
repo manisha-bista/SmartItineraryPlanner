@@ -292,7 +292,12 @@ const MyItineraries = () => {
     };
 
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    const filtered = itineraries.filter(t =>
+    // Merge own itineraries + collaborations into one list, flagging collabs
+    const allTrips = [
+        ...itineraries.map(t => ({ ...t, _isCollab: false })),
+        ...collaborations.map(t => ({ ...t, _isCollab: true })),
+    ];
+    const filtered = allTrips.filter(t =>
         !search ||
         t.title.toLowerCase().includes(search.toLowerCase()) ||
         t.destination.toLowerCase().includes(search.toLowerCase())
@@ -369,7 +374,10 @@ const MyItineraries = () => {
     };
 
     // TripCard defined inside so it closes over COLORS naturally
-    const TripCard = ({ trip, faded }) => (
+    const TripCard = ({ trip, faded }) => {
+        const isCollab = trip._isCollab || false;
+        const EMOJIS = ['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'];
+        return (
         <Card onClick={() => navigate(`/itinerary/${trip.id}`)} sx={{
             bgcolor: COLORS.cardPrimary, borderRadius: 5, overflow: 'hidden',
             cursor: 'pointer', opacity: faded ? 0.7 : 1,
@@ -384,18 +392,43 @@ const MyItineraries = () => {
                         : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'}
                     alt={trip.title}
                 />
-                <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
-                    <Stack direction="row" spacing={0.5}>
-                        <IconButton size="small" onClick={(e) => openShare(trip, e)}
-                            sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.brand, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(51,204,204,0.2)' } }}>
-                            <ShareIcon fontSize="small" />
-                        </IconButton>
-                        <IconButton size="small" onClick={e => { e.stopPropagation(); setDeleteId(trip.id); }}
-                            sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: '#ff6b6b', backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(255,107,107,0.2)' } }}>
-                            <DeleteIcon fontSize="small" />
-                        </IconButton>
-                    </Stack>
-                </Box>
+                {/* Collaboration badge — top-left corner */}
+                {isCollab && (
+                    <Box sx={{
+                        position: 'absolute', top: 10, left: 10,
+                        display: 'flex', alignItems: 'center', gap: 0.5,
+                        bgcolor: 'rgba(20,22,39,0.82)', backdropFilter: 'blur(6px)',
+                        borderRadius: 10, px: 1, py: 0.4,
+                        border: `1px solid ${COLORS.brand}40`,
+                    }}>
+                        <Box sx={{
+                            width: 18, height: 18, borderRadius: '50%',
+                            bgcolor: `${COLORS.brand}22`,
+                            display: 'flex', alignItems: 'center', justifyContent: 'center',
+                            fontSize: '0.6rem',
+                        }}>
+                            {EMOJIS[(trip.owner_avatar_id || trip.avatar_id || 1) - 1] || '🏔️'}
+                        </Box>
+                        <Typography sx={{ color: COLORS.brand, fontSize: '0.62rem', fontWeight: 700, lineHeight: 1 }}>
+                            Collab
+                        </Typography>
+                    </Box>
+                )}
+                {/* Action buttons — top-right corner (own trips only) */}
+                {!isCollab && (
+                    <Box sx={{ position: 'absolute', top: 10, right: 10 }}>
+                        <Stack direction="row" spacing={0.5}>
+                            <IconButton size="small" onClick={(e) => openShare(trip, e)}
+                                sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: COLORS.brand, backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(51,204,204,0.2)' } }}>
+                                <ShareIcon fontSize="small" />
+                            </IconButton>
+                            <IconButton size="small" onClick={e => { e.stopPropagation(); setDeleteId(trip.id); }}
+                                sx={{ bgcolor: 'rgba(20,22,39,0.7)', color: '#ff6b6b', backdropFilter: 'blur(4px)', '&:hover': { bgcolor: 'rgba(255,107,107,0.2)' } }}>
+                                <DeleteIcon fontSize="small" />
+                            </IconButton>
+                        </Stack>
+                    </Box>
+                )}
             </Box>
 
             <CardContent sx={{ p: 2.5, pb: 1 }}>
@@ -427,7 +460,8 @@ const MyItineraries = () => {
             {/* pass COLORS down since WeatherStrip is outside the component tree */}
             <WeatherStrip trip={trip} userId={user.id} COLORS={COLORS} />
         </Card>
-    );
+        );
+    };
 
     return (
         <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
@@ -495,7 +529,7 @@ const MyItineraries = () => {
                         ) : (
                             <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 5 }}>
                                 {current.map(trip => (
-                                    <TripCard key={trip.id} trip={trip} />
+                                    <TripCard key={`${trip._isCollab ? 'collab' : 'own'}-${trip.id}`} trip={trip} />
                                 ))}
                             </Box>
                         )}
@@ -516,7 +550,7 @@ const MyItineraries = () => {
                                 </Typography>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
                                     {past.map(trip => (
-                                        <TripCard key={trip.id} trip={trip} faded />
+                                        <TripCard key={`${trip._isCollab ? 'collab' : 'own'}-${trip.id}`} trip={trip} faded />
                                     ))}
                                 </Box>
                             </>
@@ -580,29 +614,7 @@ const MyItineraries = () => {
                             </Box>
                         )}
 
-                        {/* Collaborations */}
-                        {(collabsLoading || collaborations.length > 0) && (
-                            <Box sx={{ mt: 4 }}>
-                                <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 3 }}>
-                                    <GroupIcon sx={{ color: COLORS.brand, fontSize: 22 }} />
-                                    <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>
-                                        Collaborations
-                                        <Typography component="span" sx={{ ml: 1.5, color: COLORS.brand, fontSize: '0.85rem', fontWeight: 700 }}>
-                                            ({collaborations.length})
-                                        </Typography>
-                                    </Typography>
-                                </Stack>
-                                {collabsLoading ? (
-                                    <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}><CircularProgress sx={{ color: COLORS.brand }} /></Box>
-                                ) : (
-                                    <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
-                                        {collaborations.map(trip => (
-                                            <TripCard key={`collab-${trip.id}`} trip={trip} />
-                                        ))}
-                                    </Box>
-                                )}
-                            </Box>
-                        )}
+
                     </Box>
                 )}
             </Box>

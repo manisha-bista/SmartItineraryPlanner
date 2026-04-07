@@ -163,7 +163,7 @@ const ChatWidget = () => {
         if (!addUsername.trim()) return;
         setAddStatus('sending'); setAddError('');
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim() });
+            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
             setAddStatus('sent'); setAddUsername('');
             setTimeout(() => setAddStatus(''), 3000);
         } catch (err) {

@@ -139,7 +139,13 @@ export default function ItineraryDetail() {
     const [inviteUsername, setInviteUsername] = useState('');
     const [inviting, setInviting]         = useState(false);
     const [inviteErr, setInviteErr]       = useState('');
+    const [collabFriends, setCollabFriends]   = useState([]);
+    const [collabFriendsLoading, setCollabFriendsLoading] = useState(false);
+    const [collabSearch, setCollabSearch]     = useState('');
+    const [inviteSuccess, setInviteSuccess]   = useState('');
     const [forking, setForking]           = useState(false);
+    const [titleEditing, setTitleEditing] = useState(false);
+    const [titleDraft,   setTitleDraft]   = useState('');
     const [isAcceptedCollaborator, setIsAcceptedCollaborator] = useState(false);
 
     const [timePromptOpen, setTimePromptOpen] = useState(false);
@@ -241,24 +247,39 @@ export default function ItineraryDetail() {
     };
 
     const openCollaborators = async () => {
-        setCollabOpen(true); setCollabsLoading(true); setInviteErr('');
+        setCollabOpen(true); setCollabsLoading(true); setInviteErr(''); setCollabSearch('');
+        const userId = localStorage.getItem('userId');
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
-            setCollaborators(res.data || []);
+            const [collabRes, friendsRes] = await Promise.allSettled([
+                axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`),
+                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
+            ]);
+            setCollaborators(collabRes.status === 'fulfilled' ? collabRes.value.data || [] : []);
+            setCollabFriends(friendsRes.status === 'fulfilled' ? friendsRes.value.data?.friends || [] : []);
         } catch { setCollaborators([]); }
         finally { setCollabsLoading(false); }
     };
 
-    const inviteCollaborator = async () => {
-        if (!inviteUsername.trim()) return;
-        setInviting(true); setInviteErr('');
+    const inviteCollaborator = async (usernameOverride) => {
+        const raw = (usernameOverride || inviteUsername).trim().replace(/^@/, '');
+        if (!raw) return;
+        setInviting(true); setInviteErr(''); setInviteSuccess('');
         try {
-            await axios.post(`http://127.0.0.1:8000/itineraries/${id}/collaborators`, { username: inviteUsername.trim() });
-            setInviteUsername('');
-            toast(`Invite sent to ${inviteUsername.trim()}!`);
+            const userId = localStorage.getItem('userId');
+            await axios.post(`http://127.0.0.1:8000/itineraries/${id}/collaborators?user_id=${userId}`, { username: raw });
+            if (!usernameOverride) setInviteUsername('');
+            setCollabSearch('');
+            setInviteSuccess(`Invite sent to @${raw}!`);
+            setTimeout(() => setInviteSuccess(''), 3000);
             const res = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
             setCollaborators(res.data || []);
-        } catch (e) { setInviteErr(e.response?.data?.detail || 'Failed to invite.'); }
+        } catch (e) {
+            const detail = e.response?.data?.detail;
+            const msg = Array.isArray(detail)
+                ? detail.map(d => d.msg || d.message || JSON.stringify(d)).join(', ')
+                : (typeof detail === 'string' ? detail : 'Failed to invite.');
+            setInviteErr(msg);
+        }
         finally { setInviting(false); }
     };
 
@@ -505,7 +526,49 @@ export default function ItineraryDetail() {
                 <Box sx={{ bgcolor: C.card, borderRadius: 4, px: 3, py: 2, mb: 3, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                         <KeyboardArrowDownIcon sx={{ color: C.brand }} />
-                        <Typography variant="h6" fontWeight="bold" sx={{ color: C.heading }}>{itinerary.title}</Typography>
+                        {titleEditing ? (
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <TextField
+                                    size="small"
+                                    value={titleDraft}
+                                    onChange={e => setTitleDraft(e.target.value)}
+                                    onKeyDown={async (e) => {
+                                        if (e.key === 'Enter') {
+                                            const t = titleDraft.trim();
+                                            if (t && t !== itinerary.title) {
+                                                await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, { title: t });
+                                                await reload();
+                                                toast('Title updated!');
+                                            }
+                                            setTitleEditing(false);
+                                        }
+                                        if (e.key === 'Escape') setTitleEditing(false);
+                                    }}
+                                    autoFocus
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.heading, fontWeight: 'bold', fontSize: '1.1rem', '& fieldset': { borderColor: C.brand }, '&:hover fieldset': { borderColor: C.brand } }, '& .MuiInputBase-input': { color: C.heading, fontWeight: 'bold', py: 0.75, px: 1.5 } }}
+                                />
+                                <Button size="small" onClick={async () => {
+                                    const t = titleDraft.trim();
+                                    if (t && t !== itinerary.title) {
+                                        await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, { title: t });
+                                        await reload();
+                                        toast('Title updated!');
+                                    }
+                                    setTitleEditing(false);
+                                }} sx={{ bgcolor: C.brand, color: C.bg, borderRadius: 2, fontWeight: 'bold', px: 2, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>Save</Button>
+                                <Button size="small" onClick={() => setTitleEditing(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem' }}>Cancel</Button>
+                            </Stack>
+                        ) : (
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Typography variant="h6" fontWeight="bold" sx={{ color: C.heading }}>{itinerary.title}</Typography>
+                                {(isOwner || isAcceptedCollaborator) && (
+                                    <IconButton size="small" onClick={() => { setTitleDraft(itinerary.title); setTitleEditing(true); }}
+                                        sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.brand, bgcolor: `${C.brand}14` } }}>
+                                        <EditIcon sx={{ fontSize: 15 }} />
+                                    </IconButton>
+                                )}
+                            </Stack>
+                        )}
                     </Stack>
 
                     <Stack direction="row" alignItems="center" spacing={0.75}>
@@ -546,13 +609,42 @@ export default function ItineraryDetail() {
                         sx={{ color: C.sub, bgcolor: C.surface, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}14`, color: C.brand } }}>
                         Share
                     </Button>
-                    {isOwner && (
-                        <Button size="small" startIcon={<GroupIcon sx={{ fontSize: 16 }} />} onClick={openCollaborators}
-                            sx={{ color: C.sub, bgcolor: C.surface, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}14`, color: C.brand } }}>
-                            Collaborate
-                        </Button>
-                    )}
-                    {!isOwner && itinerary && (
+                    {(isOwner || isAcceptedCollaborator) && (() => {
+                        const accepted = collaborators.filter(c => c.status === 'accepted');
+                        const EMOJIS = ['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'];
+                        return (
+                            <Button size="small" onClick={openCollaborators}
+                                sx={{ color: C.sub, bgcolor: C.surface, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, gap: 0.75, '&:hover': { bgcolor: `${C.brand}14`, color: C.brand } }}>
+                                {/* Avatar stack of accepted collaborators */}
+                                {accepted.length > 0 ? (
+                                    <Stack direction="row" spacing={-0.5} alignItems="center" sx={{ mr: 0.25 }}>
+                                        {accepted.slice(0, 3).map((c, i) => (
+                                            <Box key={c.user_id} sx={{
+                                                width: 20, height: 20, borderRadius: '50%',
+                                                bgcolor: `${C.brand}20`, border: `2px solid ${C.surface}`,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '0.6rem', zIndex: 3 - i,
+                                            }}>
+                                                {EMOJIS[(c.avatar_id || 1) - 1] || '🏔️'}
+                                            </Box>
+                                        ))}
+                                        {accepted.length > 3 && (
+                                            <Box sx={{
+                                                width: 20, height: 20, borderRadius: '50%',
+                                                bgcolor: C.brand, border: `2px solid ${C.surface}`,
+                                                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                fontSize: '0.5rem', fontWeight: 800, color: C.bg, zIndex: 0,
+                                            }}>+{accepted.length - 3}</Box>
+                                        )}
+                                    </Stack>
+                                ) : (
+                                    <GroupIcon sx={{ fontSize: 16 }} />
+                                )}
+                                {accepted.length > 0 ? `${accepted.length} Collaborating` : 'Collaborate'}
+                            </Button>
+                        );
+                    })()}
+                    {!isOwner && itinerary && itinerary.is_public && (
                         <Button size="small" startIcon={forking ? <CircularProgress size={14} sx={{ color: C.brand }} /> : <ContentCopyIcon sx={{ fontSize: 16 }} />}
                             onClick={forkItinerary} disabled={forking}
                             sx={{ color: C.brand, bgcolor: `${C.brand}14`, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem', px: 1.5, '&:hover': { bgcolor: `${C.brand}26` } }}>
@@ -858,12 +950,22 @@ export default function ItineraryDetail() {
                 <DialogTitle sx={{ color: C.heading, fontWeight: 'bold' }}>{editAct ? 'Edit Activity' : 'Add Activity'}</DialogTitle>
                 <DialogContent>
                     <Stack spacing={2.5} sx={{ mt: 1 }}>
+
+                        {/* Title */}
+                        <TextField fullWidth label="Title *"
+                            value={actForm.title}
+                            onChange={e => setActForm(f => ({ ...f, title: e.target.value }))}
+                            placeholder="e.g., Sunrise at Sarangkot"
+                            sx={inputSx} />
+
+                        {/* Location / Place */}
                         <Box>
                             <PlaceSearchAutocomplete
                                 label="Location / Place *"
+                                destinationContext={itinerary?.destination}
                                 value={actForm.location}
-                                onChange={(text) => setActForm(f => ({ ...f, location: text, title: text, place_id: null, latitude: null, longitude: null, formatted_address: null, place_types: null, rating: null }))}
-                                onSelect={(place) => setActForm(f => ({ ...f, location: place.name, title: place.name, place_id: place.google_place_id, latitude: place.latitude, longitude: place.longitude, formatted_address: place.address, place_types: Array.isArray(place.place_types) ? place.place_types.join(',') : place.place_types || null, rating: place.rating || null }))}
+                                onChange={(text) => setActForm(f => ({ ...f, location: text, place_id: null, latitude: null, longitude: null, formatted_address: null, place_types: null, rating: null }))}
+                                onSelect={(place) => setActForm(f => ({ ...f, location: place.name, title: f.title || place.name, place_id: place.google_place_id, latitude: place.latitude, longitude: place.longitude, formatted_address: place.address, place_types: Array.isArray(place.place_types) ? place.place_types.join(',') : place.place_types || null, rating: place.rating || null }))}
                             />
                             {actErr.location && <Typography variant="caption" sx={{ color: C.red, ml: 1.5, mt: 0.5, display: 'block' }}>{actErr.location}</Typography>}
                             {actForm.place_id ? (
@@ -876,11 +978,35 @@ export default function ItineraryDetail() {
                             )}
                         </Box>
 
-                        <Stack direction="row" spacing={2} alignItems="flex-end">
-                            <Box>
-                                <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Time</Typography>
-                                <Stack direction="row" spacing={1} alignItems="center">
-                                    {/* Hour */}
+                        {/* Row 1: Activity Type + Start Time */}
+                        <Stack direction="row" spacing={2} alignItems="flex-start">
+                            {/* Activity Type */}
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Activity Type *</Typography>
+                                <Select fullWidth size="small"
+                                    value={actForm.activity_type || 'destination'}
+                                    onChange={e => setActForm(f => ({ ...f, activity_type: e.target.value }))}
+                                    sx={{ bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded } }}
+                                    MenuProps={selectMenuSx}>
+                                    {[
+                                        { value: 'destination', label: 'General' },
+                                        { value: 'sightseeing', label: 'Sightseeing' },
+                                        { value: 'dining',      label: 'Dining' },
+                                        { value: 'adventure',   label: 'Adventure' },
+                                        { value: 'leisure',     label: 'Leisure' },
+                                        { value: 'shopping',    label: 'Shopping' },
+                                        { value: 'transport',   label: 'Transport' },
+                                        { value: 'cultural',    label: 'Cultural' },
+                                    ].map(t => (
+                                        <MenuItem key={t.value} value={t.value} sx={{ '&:hover': { bgcolor: `${C.brand}20` } }}>{t.label}</MenuItem>
+                                    ))}
+                                </Select>
+                            </Box>
+
+                            {/* Start Time */}
+                            <Box sx={{ flex: 1 }}>
+                                <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Start Time</Typography>
+                                <Stack direction="row" spacing={0.75} alignItems="center">
                                     <Select size="small" displayEmpty
                                         value={(() => { if (!actForm.start_time) return ''; const h = parseInt(actForm.start_time.split(':')[0]); return String(h % 12 || 12).padStart(2, '0'); })()}
                                         onChange={(e) => {
@@ -890,25 +1016,20 @@ export default function ItineraryDetail() {
                                             const h24 = isPM ? (hr === 12 ? 12 : hr + 12) : (hr === 12 ? 0 : hr);
                                             setActForm(f => ({ ...f, start_time: `${String(h24).padStart(2, '0')}:${m}` }));
                                         }}
-                                        sx={{ width: 72, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.95rem', fontWeight: 600 } }}
+                                        sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
                                         MenuProps={selectMenuSx}>
-                                        <MenuItem value="" sx={{ color: C.faded }}>--</MenuItem>
+                                        <MenuItem value="" sx={{ color: C.faded }}>HH</MenuItem>
                                         {Array.from({ length: 12 }, (_, i) => i + 1).map(h => <MenuItem key={h} value={String(h).padStart(2, '0')}>{String(h).padStart(2, '0')}</MenuItem>)}
                                     </Select>
-
-                                    <Typography sx={{ color: C.faded, fontWeight: 700, fontSize: '1.1rem', mb: 0.1 }}>:</Typography>
-
-                                    {/* Minute */}
+                                    <Typography sx={{ color: C.faded, fontWeight: 700, fontSize: '1rem' }}>:</Typography>
                                     <Select size="small" displayEmpty
                                         value={actForm.start_time ? actForm.start_time.split(':')[1] || '00' : ''}
                                         onChange={(e) => { const h = (actForm.start_time || '00:00').split(':')[0]; setActForm(f => ({ ...f, start_time: `${h}:${e.target.value}` })); }}
-                                        sx={{ width: 72, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.95rem', fontWeight: 600 } }}
+                                        sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
                                         MenuProps={selectMenuSx}>
-                                        <MenuItem value="" sx={{ color: C.faded }}>--</MenuItem>
+                                        <MenuItem value="" sx={{ color: C.faded }}>MM</MenuItem>
                                         {['00', '15', '30', '45'].map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
                                     </Select>
-
-                                    {/* AM/PM */}
                                     <Select size="small"
                                         value={actForm.start_time ? (parseInt(actForm.start_time.split(':')[0]) >= 12 ? 'PM' : 'AM') : 'AM'}
                                         onChange={(e) => {
@@ -918,26 +1039,26 @@ export default function ItineraryDetail() {
                                             if (e.target.value === 'AM' && h >= 12) h -= 12;
                                             setActForm(f => ({ ...f, start_time: `${String(h).padStart(2, '0')}:${m}` }));
                                         }}
-                                        sx={{ width: 76, bgcolor: C.bg, color: C.brand, borderRadius: 2, fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.brand }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 700 } }}
+                                        sx={{ flex: 1, bgcolor: C.bg, color: C.brand, borderRadius: 2, fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.brand }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 700 } }}
                                         MenuProps={selectMenuSx}>
                                         <MenuItem value="AM">AM</MenuItem>
                                         <MenuItem value="PM">PM</MenuItem>
                                     </Select>
                                 </Stack>
                             </Box>
-
-                            {/* Budget side by side */}
-                            <Stack direction="row" spacing={1.5} sx={{ flex: 1 }}>
-                                <TextField fullWidth label={`Estimated (${itinerary?.currency || 'NPR'})`} type="number"
-                                    value={actForm.cost} onChange={e => setActForm({ ...actForm, cost: e.target.value })} placeholder="0"
-                                    sx={{ ...inputSx, '& .MuiInputLabel-root': { color: '#ffb74d99' }, '& .MuiInputLabel-root.Mui-focused': { color: '#ffb74d' }, '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], '&.Mui-focused fieldset': { borderColor: '#ffb74d' }, '& input': { color: '#ffb74d', fontWeight: 700 } } }} />
-                                <TextField fullWidth label={`Actual (${itinerary?.currency || 'NPR'})`} type="number"
-                                    value={actForm.actual_cost} onChange={e => setActForm({ ...actForm, actual_cost: e.target.value })} placeholder="0"
-                                    sx={{ ...inputSx, '& .MuiInputLabel-root': { color: `${C.brand}99` }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand }, '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], '&.Mui-focused fieldset': { borderColor: C.brand }, '& input': { color: C.brand, fontWeight: 700 } } }} />
-                            </Stack>
                         </Stack>
 
-                        <TextField fullWidth label="Description (optional)" multiline rows={2} value={actForm.description}
+                        {/* Row 2: Estimated cost + Actual cost */}
+                        <Stack direction="row" spacing={2}>
+                            <TextField fullWidth label={`Estimated Cost (${itinerary?.currency || 'NPR'})`} type="number"
+                                value={actForm.cost} onChange={e => setActForm({ ...actForm, cost: e.target.value })} placeholder="0"
+                                sx={{ ...inputSx, '& .MuiInputLabel-root': { color: '#ffb74d99' }, '& .MuiInputLabel-root.Mui-focused': { color: '#ffb74d' }, '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], '&.Mui-focused fieldset': { borderColor: '#ffb74d' }, '& input': { color: '#ffb74d', fontWeight: 700 } } }} />
+                            <TextField fullWidth label={`Actual Cost (${itinerary?.currency || 'NPR'})`} type="number"
+                                value={actForm.actual_cost} onChange={e => setActForm({ ...actForm, actual_cost: e.target.value })} placeholder="0"
+                                sx={{ ...inputSx, '& .MuiInputLabel-root': { color: `${C.brand}99` }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand }, '& .MuiOutlinedInput-root': { ...inputSx['& .MuiOutlinedInput-root'], '&.Mui-focused fieldset': { borderColor: C.brand }, '& input': { color: C.brand, fontWeight: 700 } } }} />
+                        </Stack>
+
+                        <TextField fullWidth label="Description" multiline rows={2} value={actForm.description}
                             onChange={e => setActForm({ ...actForm, description: e.target.value })} placeholder="e.g., Scenic views, local food stop" sx={inputSx} />
                     </Stack>
                 </DialogContent>
@@ -1045,7 +1166,7 @@ export default function ItineraryDetail() {
             </Dialog>
 
             {/* ── Collaborators Dialog ─────────────────────────────────────── */}
-            <Dialog open={collabOpen} onClose={() => { setCollabOpen(false); setInviteErr(''); }} maxWidth="sm" fullWidth
+            <Dialog open={collabOpen} onClose={() => { setCollabOpen(false); setInviteErr(''); setInviteSuccess(''); }} maxWidth="sm" fullWidth
                 PaperProps={{ sx: { bgcolor: C.bg, border: `1px solid ${C.border}`, borderRadius: 4 } }}>
                 <DialogTitle sx={{ color: C.heading, fontWeight: 'bold', borderBottom: `1px solid ${C.border}`, pb: 1.5 }}>
                     <Stack direction="row" spacing={1} alignItems="center">
@@ -1057,25 +1178,76 @@ export default function ItineraryDetail() {
                     </Typography>
                 </DialogTitle>
                 <DialogContent sx={{ pt: 2 }}>
-                    {/* Invite row */}
-                    <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
-                        <TextField fullWidth size="small" placeholder="Enter username to invite…"
-                            value={inviteUsername} onChange={e => { setInviteUsername(e.target.value); setInviteErr(''); }}
+
+                    {/* ── Invite section — owners only ─────────────────── */}
+                    {isOwner && <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+                        <TextField fullWidth size="small"
+                            placeholder="Search by @username…"
+                            value={inviteUsername}
+                            onChange={e => { setInviteUsername(e.target.value); setInviteErr(''); setCollabSearch(e.target.value.trim().replace(/^@/, '')); }}
                             onKeyDown={e => { if (e.key === 'Enter') inviteCollaborator(); }}
-                            error={!!inviteErr}
-                            helperText={inviteErr}
+                            error={!!inviteErr && !!inviteUsername.trim()}
+                            helperText={inviteUsername.trim() ? inviteErr : ''}
                             sx={{
                                 '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } },
                                 '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 },
                                 '& .MuiFormHelperText-root': { color: C.red },
                             }} />
-                        <Button variant="contained" onClick={inviteCollaborator} disabled={inviting || !inviteUsername.trim()}
+                        <Button variant="contained" onClick={() => inviteCollaborator()} disabled={inviting || !inviteUsername.trim()}
                             startIcon={inviting ? <CircularProgress size={14} sx={{ color: C.bg }} /> : <PersonAddIcon sx={{ fontSize: 16 }} />}
                             sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 2, px: 2, textTransform: 'none', whiteSpace: 'nowrap', '&:hover': { bgcolor: '#2db8b8' }, '&:disabled': { bgcolor: C.surface, color: C.faded } }}>
                             Invite
                         </Button>
-                    </Stack>
+                    </Stack>}
 
+                    {/* ── Inline success / error feedback (owner only) ──────── */}
+                    {isOwner && inviteSuccess && (
+                        <Box sx={{ px: 1.5, py: 1, mb: 1.5, borderRadius: 2, bgcolor: 'rgba(76,175,80,0.12)', border: '1px solid rgba(76,175,80,0.3)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <CheckCircleIcon sx={{ fontSize: 15, color: '#4CAF50' }} />
+                            <Typography sx={{ fontSize: '0.8rem', color: '#4CAF50', fontWeight: 600 }}>{inviteSuccess}</Typography>
+                        </Box>
+                    )}
+
+                    {/* ── Friends quick-invite list (owner only) ─────────────── */}
+                    {isOwner && collabFriends.length > 0 && (() => {
+                        const collabUserIds = new Set(collaborators.map(c => c.user_id));
+                        const filtered = collabFriends.filter(f =>
+                            !collabUserIds.has(f.user_id) &&
+                            (!collabSearch || f.username.toLowerCase().includes(collabSearch.toLowerCase()))
+                        );
+                        if (filtered.length === 0 && !collabSearch) return null;
+                        return (
+                            <Box sx={{ mb: 2 }}>
+                                <Typography variant="caption" sx={{ color: C.faded, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontSize: '0.68rem', mb: 1, display: 'block' }}>
+                                    {collabSearch ? 'Matching Friends' : 'Friends'}
+                                </Typography>
+                                {collabFriendsLoading ? (
+                                    <Box sx={{ py: 1, textAlign: 'center' }}><CircularProgress size={16} sx={{ color: C.brand }} /></Box>
+                                ) : filtered.length === 0 ? (
+                                    <Typography sx={{ color: C.faded, fontSize: '0.78rem', py: 0.5 }}>No matching friends</Typography>
+                                ) : (
+                                    <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 0.75 }}>
+                                        {filtered.map(f => (
+                                            <Stack key={f.user_id} direction="row" alignItems="center" spacing={1}
+                                                sx={{ px: 1.25, py: 0.75, borderRadius: 2, bgcolor: C.surface, '&:hover': { bgcolor: `${C.brand}10` } }}>
+                                                <Box sx={{ width: 24, height: 24, borderRadius: '50%', bgcolor: `${C.brand}20`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.75rem', flexShrink: 0 }}>
+                                                    {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(f.avatar_id || 1) - 1] || '🏔️'}
+                                                </Box>
+                                                <Typography sx={{ color: C.heading, fontSize: '0.78rem', fontWeight: 600, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>@{f.username}</Typography>
+                                                <Button size="small" onClick={() => { setInviteErr(''); inviteCollaborator(f.username); }}
+                                                    disabled={inviting}
+                                                    sx={{ bgcolor: `${C.brand}18`, color: C.brand, borderRadius: 2, px: 1, py: 0.2, fontSize: '0.68rem', fontWeight: 700, textTransform: 'none', minWidth: 0, flexShrink: 0, '&:hover': { bgcolor: `${C.brand}30` } }}>
+                                                    +
+                                                </Button>
+                                            </Stack>
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+                        );
+                    })()}
+
+                    {/* ── Current collaborators ─────────────────────────────── */}
                     {collabsLoading ? (
                         <Box sx={{ py: 3, textAlign: 'center' }}><CircularProgress size={20} sx={{ color: C.brand }} /></Box>
                     ) : collaborators.length === 0 ? (
@@ -1083,32 +1255,77 @@ export default function ItineraryDetail() {
                             No collaborators yet. Invite someone above.
                         </Typography>
                     ) : (
-                        <Stack spacing={0.5}>
-                            {collaborators.map(c => (
-                                <Stack key={c.user_id} direction="row" alignItems="center" sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: C.surface }}>
-                                    <Typography sx={{ fontSize: '0.9rem', mr: 1.2 }}>
-                                        {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(c.avatar_id || 1) - 1] || '🏔️'}
+                        <Box>
+                            {/* Accepted collaborators */}
+                            {collaborators.filter(c => c.status === 'accepted').length > 0 && (
+                                <Box sx={{ mb: 1.5 }}>
+                                    <Typography variant="caption" sx={{ color: C.faded, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontSize: '0.68rem', mb: 1, display: 'block' }}>
+                                        Active Collaborators
                                     </Typography>
-                                    <Box sx={{ flex: 1 }}>
-                                        <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600 }}>{c.username}</Typography>
-                                        <Typography sx={{ color: C.faded, fontSize: '0.7rem' }}>{c.role}</Typography>
-                                    </Box>
-                                    <Chip size="small" label={c.status}
-                                        icon={c.status === 'accepted' ? <CheckCircleIcon sx={{ fontSize: '12px !important' }} /> : <HourglassEmptyIcon sx={{ fontSize: '12px !important' }} />}
-                                        sx={{
-                                            height: 20, fontSize: '0.65rem', fontWeight: 700,
-                                            bgcolor: c.status === 'accepted' ? 'rgba(76,175,80,0.12)' : 'rgba(255,183,77,0.12)',
-                                            color: c.status === 'accepted' ? '#4CAF50' : '#FFB74D',
-                                            border: `1px solid ${c.status === 'accepted' ? 'rgba(76,175,80,0.3)' : 'rgba(255,183,77,0.3)'}`,
-                                            mr: 1,
-                                        }} />
-                                    <IconButton size="small" onClick={() => removeCollaborator(c.user_id)}
-                                        sx={{ color: C.faded, '&:hover': { color: C.red } }}>
-                                        <DeleteIcon sx={{ fontSize: 16 }} />
-                                    </IconButton>
-                                </Stack>
-                            ))}
-                        </Stack>
+                                    <Stack spacing={0.5}>
+                                        {collaborators.filter(c => c.status === 'accepted').map(c => (
+                                            <Stack key={c.user_id} direction="row" alignItems="center"
+                                                sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: 'rgba(76,175,80,0.06)', border: '1px solid rgba(76,175,80,0.15)' }}>
+                                                <Typography sx={{ fontSize: '0.9rem', mr: 1.2 }}>
+                                                    {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(c.avatar_id || 1) - 1] || '🏔️'}
+                                                </Typography>
+                                                <Box sx={{ flex: 1 }}>
+                                                    <Stack direction="row" alignItems="center" spacing={0.75}>
+                                                        <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600 }}>@{c.username}</Typography>
+                                                        <CheckCircleIcon sx={{ fontSize: 13, color: '#4CAF50' }} />
+                                                    </Stack>
+                                                    <Typography sx={{ color: C.faded, fontSize: '0.7rem' }}>
+                                                        {c.role} · since {c.accepted_at ? new Date(c.accepted_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'recently'}
+                                                    </Typography>
+                                                </Box>
+                                                {isOwner && (
+                                                    <IconButton size="small" onClick={() => removeCollaborator(c.user_id)}
+                                                        sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.red, bgcolor: 'rgba(255,107,107,0.1)' } }}>
+                                                        <DeleteIcon sx={{ fontSize: 15 }} />
+                                                    </IconButton>
+                                                )}
+                                            </Stack>
+                                        ))}
+                                    </Stack>
+                                </Box>
+                            )}
+
+                            {/* Pending invites */}
+                            {collaborators.filter(c => c.status === 'pending').length > 0 && (
+                                <Box>
+                                    <Typography variant="caption" sx={{ color: C.faded, fontWeight: 700, letterSpacing: 0.5, textTransform: 'uppercase', fontSize: '0.68rem', mb: 1, display: 'block' }}>
+                                        Pending Invites
+                                    </Typography>
+                                    <Stack spacing={0.5}>
+                                        {collaborators.filter(c => c.status === 'pending').map(c => (
+                                            <Stack key={c.user_id} direction="row" alignItems="center"
+                                                sx={{ px: 1.5, py: 1, borderRadius: 2, bgcolor: 'rgba(255,183,77,0.06)', border: '1px solid rgba(255,183,77,0.15)' }}>
+                                                <Typography sx={{ fontSize: '0.9rem', mr: 1.2 }}>
+                                                    {['🏔️','🌄','🏕️','🧗','🚶','🌿','🦅','🌺','🏯','🛶','🌙','☀️','🦋','🐾','🎒','🗻','🌊','🔥','❄️','🌈'][(c.avatar_id || 1) - 1] || '🏔️'}
+                                                </Typography>
+                                                <Box sx={{ flex: 1 }}>
+                                                    <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 600 }}>@{c.username}</Typography>
+                                                    <Typography sx={{ color: '#FFB74D', fontSize: '0.7rem' }}>Invite pending</Typography>
+                                                </Box>
+                                                <HourglassEmptyIcon sx={{ fontSize: 15, color: '#FFB74D', mr: 1 }} />
+                                                {isOwner && (
+                                                    <IconButton size="small" onClick={() => removeCollaborator(c.user_id)}
+                                                        sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.red, bgcolor: 'rgba(255,107,107,0.1)' } }}>
+                                                        <DeleteIcon sx={{ fontSize: 15 }} />
+                                                    </IconButton>
+                                                )}
+                                            </Stack>
+                                        ))}
+                                    </Stack>
+                                </Box>
+                            )}
+
+                            {collaborators.length === 0 && (
+                                <Typography sx={{ color: C.faded, fontSize: '0.82rem', textAlign: 'center', py: 2 }}>
+                                    No collaborators yet. Invite someone above.
+                                </Typography>
+                            )}
+                        </Box>
                     )}
                 </DialogContent>
                 <DialogActions sx={{ px: 2, py: 1.5, borderTop: `1px solid ${C.border}` }}>

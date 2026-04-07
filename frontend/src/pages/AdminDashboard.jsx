@@ -217,7 +217,7 @@ const AdminDashboard = () => {
         try {
             const [uR, iR, cR, pR] = await Promise.allSettled([
                 axios.get('http://127.0.0.1:8000/users/'),
-                axios.get('http://127.0.0.1:8000/debug/itineraries'),
+                axios.get(`http://127.0.0.1:8000/admin/itineraries?admin_id=${localStorage.getItem('userId')}`),
                 axios.get('http://127.0.0.1:8000/complaints/'),
                 axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`),
             ]);
@@ -231,7 +231,7 @@ const AdminDashboard = () => {
     };
 
     const fetchUsers = async () => { setUsersLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/users/'); setUsers(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load users', 'error'); } finally { setUsersLoading(false); } };
-    const fetchItineraries = async () => { setItinLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/debug/itineraries'); setItineraries(Array.isArray(r.data.itineraries) ? r.data.itineraries : []); } catch { showAlert('Failed to load itineraries', 'error'); } finally { setItinLoading(false); } };
+    const fetchItineraries = async () => { setItinLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/itineraries?admin_id=${localStorage.getItem('userId')}`); setItineraries(Array.isArray(r.data.itineraries) ? r.data.itineraries : []); } catch { showAlert('Failed to load itineraries', 'error'); } finally { setItinLoading(false); } };
     const fetchComplaints = async () => { setCompLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/complaints/'); setComplaints(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load complaints', 'error'); } finally { setCompLoading(false); } };
     const fetchPlaces = async () => { setPlacesLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`); setPlaces(Array.isArray(r.data.places) ? r.data.places : []); } catch { showAlert('Failed to load places', 'error'); } finally { setPlacesLoading(false); } };
     const fetchCommunityPosts = async () => { setPostsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/posts?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load posts', 'error'); } finally { setPostsLoading(false); } };

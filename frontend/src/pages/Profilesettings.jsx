@@ -172,23 +172,13 @@ export default function ProfileSettings() {
                 {/* ── Content ── */}
                 <Box sx={{ px: 4, pb: 5, flexGrow: 1 }}>
 
-                    {/* Hero banner */}
-                    <Box sx={{
-                        height: 100, borderRadius: 4, mb: 0,
-                        background: `linear-gradient(120deg, rgba(51,204,204,0.25) 0%, rgba(51,204,204,0.08) 40%, rgba(255,107,107,0.08) 100%)`,
-                        position: 'relative', overflow: 'hidden',
-                    }}>
-                        <Box sx={{ position: 'absolute', top: -30, right: 60, width: 120, height: 120, borderRadius: '50%', bgcolor: 'rgba(51,204,204,0.08)' }} />
-                        <Box sx={{ position: 'absolute', top: 10, right: 20, width: 60, height: 60, borderRadius: '50%', bgcolor: 'rgba(51,204,204,0.06)' }} />
-                    </Box>
-
                     {/* Profile Card */}
-                    <Box sx={{ bgcolor: C.card, borderRadius: 4, px: 4, pt: 0, pb: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', mb: 3 }}>
+                    <Box sx={{ bgcolor: C.card, borderRadius: 4, px: 4, pt: 4, pb: 4, boxShadow: '0 8px 32px rgba(0,0,0,0.3)', mb: 3 }}>
 
                         {/* Avatar + name row */}
                         <Stack direction="row" alignItems="flex-end" justifyContent="space-between" sx={{ mb: 4 }}>
                             <Stack direction="row" alignItems="flex-end" spacing={2.5}>
-                                <Box sx={{ position: 'relative', mt: -4 }}>
+                                <Box sx={{ position: 'relative', mt: 0 }}>
                                     <Box sx={{ width: 80, height: 80, borderRadius: 4, bgcolor: `${getAvatarColor(form.avatarId)}20`, border: `3px solid ${C.card}`, boxShadow: '0 4px 20px rgba(51,204,204,0.35)', overflow: 'hidden' }}>
                                         <Box component="img" src={getAvatarUrl(form.avatarId)} alt="avatar" sx={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                                     </Box>
@@ -261,8 +251,7 @@ export default function ProfileSettings() {
                             </Box>
                             <Box>
                                 <Typography sx={labelSx}>Username</Typography>
-                                <TextField fullWidth value={`@${user.username || '—'}`} disabled sx={readOnlySx}
-                                    helperText="Auto-generated at signup, cannot be changed." />
+                                <TextField fullWidth value={`@${user.username || '—'}`} disabled sx={readOnlySx}/>
                             </Box>
                         </Box>
 

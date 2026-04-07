@@ -88,6 +88,7 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
     const [itin, setItin]         = useState(null);
     const [dayIndex, setDayIndex] = useState(0);
     const [forking, setForking]   = useState(false);
+    const [forkError, setForkError] = useState('');
 
     useEffect(() => {
         if (!itineraryId) return;
@@ -98,11 +99,17 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
 
     const forkIt = async (e) => {
         e.stopPropagation();
+        setForkError('');
         setForking(true);
         try {
             const res = await axios.post(`http://127.0.0.1:8000/itineraries/${itineraryId}/fork?user_id=${userId}`);
+            // Navigate whether it's a fresh fork or already-forked — both return the itinerary id
             window.location.href = `/itinerary/${res.data.id}`;
-        } catch { setForking(false); }
+        } catch (err) {
+            const msg = err?.response?.data?.detail || 'Failed to fork itinerary.';
+            setForkError(msg);
+            setForking(false);
+        }
     };
 
     if (!itin) return (
@@ -135,12 +142,14 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
                     </Stack>
                 </Box>
                 <Stack direction="row" spacing={0.75} alignItems="center" sx={{ flexShrink: 0, ml: 1.5 }}>
-                    <Button size="small"
-                        startIcon={forking ? <CircularProgress size={13} sx={{ color: COLORS.background || '#141627' }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
-                        onClick={forkIt} disabled={forking}
-                        sx={{ bgcolor: COLORS.brand, color: COLORS.background || '#141627', fontWeight: 700, borderRadius: 2, px: 2, py: 0.5, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>
-                        {forking ? 'Forking…' : 'Fork & Edit'}
-                    </Button>
+                    {!isOwn && (
+                        <Button size="small"
+                            startIcon={forking ? <CircularProgress size={13} sx={{ color: COLORS.background || '#141627' }} /> : <ContentCopyIcon sx={{ fontSize: 14 }} />}
+                            onClick={forkIt} disabled={forking}
+                            sx={{ bgcolor: COLORS.brand, color: COLORS.background || '#141627', fontWeight: 700, borderRadius: 2, px: 2, py: 0.5, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>
+                            {forking ? 'Forking…' : 'Fork & Edit'}
+                        </Button>
+                    )}
                     <Button size="small" startIcon={<OpenInNewIcon sx={{ fontSize: 14 }} />}
                         onClick={(e) => { e.stopPropagation(); window.open(`/itinerary/${itineraryId}`, '_blank'); }}
                         sx={{ color: COLORS.brand, borderRadius: 2, px: 1.5, py: 0.5, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: `${COLORS.brand}18` } }}>
@@ -148,6 +157,13 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
                     </Button>
                 </Stack>
             </Stack>
+
+            {/* ── Fork error ── */}
+            {forkError && (
+                <Box sx={{ px: 3, py: 1, bgcolor: 'rgba(255,107,107,0.08)', borderBottom: `1px solid rgba(255,107,107,0.2)` }}>
+                    <Typography sx={{ fontSize: '0.75rem', color: '#ff6b6b' }}>{forkError}</Typography>
+                </Box>
+            )}
 
             {/* ── Day tabs + pagination ── */}
             {days.length > 0 && cur && (
@@ -469,7 +485,7 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
                                 sx={{ color: COLORS.subheadings, cursor: post.user_id !== userId ? 'pointer' : 'default', '&:hover': post.user_id !== userId ? { color: COLORS.brand } : {} }}>
                                 {post.author_name || 'Unknown'}
                             </Typography>
-                            {post.place && post.place !== 'All' && (
+                            {post.place && post.place !== 'All' && !post.shared_itinerary_id && (
                                 <><Typography variant="caption" sx={{ color: COLORS.fadedText }}>•</Typography>
                                 <Typography variant="caption" sx={{ color: tagColor }}>{post.place}</Typography></>
                             )}
@@ -763,6 +779,7 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
                             <Box sx={{ flex: 1, minWidth: 0 }}>
                                 <PlaceSearchAutocomplete
                                     label="Search place" value="" onChange={() => {}} onSelect={(p) => addPlace(p.name)}
+                                    destinationContext={typeof filterMode === "number" ? myItineraries.find(i => i.id === filterMode)?.destination : undefined}
                                     inputSx={{
                                         '& .MuiOutlinedInput-root': { py: 0, height: 38, bgcolor: COLORS.cardSecondary, borderRadius: 2.5 },
                                         '& .MuiInputBase-input': { py: '7px', fontSize: '0.82rem' },
@@ -1222,6 +1239,7 @@ const CommunityFeed = () => {
                                 <PlaceSearchAutocomplete
                                     label="Search places to filter posts..."
                                     value={searchedPlace}
+                                    destinationContext={typeof filterMode === "number" ? myItineraries.find(i => i.id === filterMode)?.destination : undefined}
                                     onChange={(t) => { setSearchedPlace(t); if (!t) handleFilterChange('all'); }}
                                     onSelect={(place) => { setSearchedPlace(place.name); setFilterMode(place.name); setSidebarPlace('All'); }}
                                     inputSx={{ '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardPrimary, borderRadius: 3 } }}

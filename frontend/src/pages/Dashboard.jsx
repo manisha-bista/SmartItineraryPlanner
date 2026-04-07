@@ -61,12 +61,7 @@ const makeSmallIcon = (L, color, n) => {
     return L.divIcon({ html: svg, className: '', iconSize: [22, 28], iconAnchor: [11, 28], popupAnchor: [0, -30] });
 };
 
-// hardcoded demo cards (replace with real recommendations later)
-const similarItineraries = [
-    { id: 1, title: 'ACT Via Tilicho',    destination: 'Annapurna',  image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=400', estimatedBudget: 55000, currency: '₹', duration: '5 Days Long' },
-    { id: 2, title: 'Durbar Square Trip', destination: 'Kathmandu',  image: 'https://images.unsplash.com/photo-1748760036656-964ac32eefb4?q=80&w=400', estimatedBudget: 12000, currency: '₹', duration: '2 Days Long' },
-    { id: 3, title: 'Everest Base Camp',  destination: 'Solukhumbu', image: 'https://images.unsplash.com/photo-1673505413397-0cd0dc4f5854?q=80&w=400', estimatedBudget: 85000, currency: '₹', duration: '12 Days Long' },
-];
+
 
 const Dashboard = () => {
     const navigate = useNavigate();
@@ -79,6 +74,9 @@ const Dashboard = () => {
     const [dialogOpen, setDialogOpen]       = useState(false);
     const [currentDate, setCurrentDate]     = useState(new Date());
     const [latestDetail, setLatestDetail]   = useState(null);
+    const [recommendations, setRecommendations] = useState([]);
+    const [recsLoading, setRecsLoading]         = useState(false);
+    const [searchQuery, setSearchQuery]         = useState('');
     const [leafletLib, setLeafletLib]       = useState(null);
 
     const miniMapRef     = useRef(null);
@@ -91,14 +89,55 @@ const Dashboard = () => {
         const userId   = localStorage.getItem('userId');
         const userName = localStorage.getItem('userName');
         if (!userId) { navigate('/login'); return; }
+        const storedUsername = localStorage.getItem('username') || '';
         setUser({
             id: parseInt(userId),
             name: userName || 'User',
+            username: storedUsername,
             avatarId: parseInt(localStorage.getItem('avatarId')) || 1,
         });
-        fetchItineraries(parseInt(userId));
+        const uid = parseInt(userId);
+        fetchItineraries(uid);
+        fetchRecommendations(uid);
         loadLeafletLib().then(L => setLeafletLib(L));
+
     }, [navigate]);
+
+    const fetchRecommendations = async (userId) => {
+        setRecsLoading(true);
+        try {
+            // Try personalised recommendations first
+            const res = await axios.get(`http://127.0.0.1:8000/recommendations/for-user/${userId}`, {
+                params: { limit: 3 },
+            });
+            const personalised = res.data?.results || [];
+            if (personalised.length > 0) {
+                setRecommendations(personalised);
+            } else {
+                // New user — fall back to popular public itineraries
+                const pop = await axios.get('http://127.0.0.1:8000/recommendations/explore', {
+                    params: { limit: 3 },
+                });
+                setRecommendations(pop.data?.results || []);
+            }
+        } catch {
+            // On any error, silently try explore as fallback
+            try {
+                const pop = await axios.get('http://127.0.0.1:8000/recommendations/explore', {
+                    params: { limit: 3 },
+                });
+                setRecommendations(pop.data?.results || []);
+            } catch { setRecommendations([]); }
+        } finally {
+            setRecsLoading(false);
+        }
+    };
+
+    const handleSearch = () => {
+        const q = searchQuery.trim();
+        if (!q) return;
+        navigate(`/search?q=${encodeURIComponent(q)}`);
+    };
 
     // fetch detail for most recent itinerary
     useEffect(() => {
@@ -256,9 +295,12 @@ const Dashboard = () => {
                     {/* Search */}
                     <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, maxWidth: 650 }}>
                         <TextField
-                            placeholder="Search for your favourite destination"
+                            placeholder="Search destinations, e.g. Pokhara"
                             variant="outlined"
                             fullWidth
+                            value={searchQuery}
+                            onChange={e => setSearchQuery(e.target.value)}
+                            onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
                             sx={{
                                 '& .MuiOutlinedInput-root': {
                                     bgcolor: COLORS.cardPrimary, borderRadius: 5, color: COLORS.text,
@@ -277,14 +319,14 @@ const Dashboard = () => {
                                 ),
                             }}
                         />
-                        <Button variant="contained" sx={{
+                        <Button variant="contained" onClick={handleSearch} sx={{
                             bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
                             px: 4, py: 1.75, borderRadius: 5, textTransform: 'uppercase',
                             fontSize: '0.875rem', whiteSpace: 'nowrap',
                             '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
                             transition: 'all 0.3s',
                         }}>
-                            Search
+                            'Search'
                         </Button>
                     </Stack>
 
@@ -313,10 +355,10 @@ const Dashboard = () => {
                     <Box sx={{ flex: 1, minWidth: 0 }}>
                         <Box sx={{ mb: 4 }}>
                             <Typography variant="h4" fontWeight="bold" sx={{ color: COLORS.headings, mb: 0.5 }}>
-                                Hello {user.name}!
+                                Hello {user.username || user.name}!
                             </Typography>
                             <Typography variant="body1" sx={{ color: COLORS.fadedText }}>
-                                Welcome back on your explorations.
+                                {itineraries.length > 0 ? 'Welcome back on your explorations.' : 'Start your Nepal adventure today.'}
                             </Typography>
                         </Box>
 
@@ -387,48 +429,119 @@ const Dashboard = () => {
                             )}
                         </Box>
 
-                        {/* Similar Itineraries */}
+                        {/* Recommendations */}
                         <Box>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
-                                <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>Similar Itineraries</Typography>
-                                <Button sx={{ color: COLORS.brand, textTransform: 'none', '&:hover': { bgcolor: 'transparent', color: '#2db8b8' } }}>View More</Button>
+                                <Box>
+                                    <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>
+                                        {itineraries.length === 0 ? 'Explore Popular Trips' : 'Recommended for You'}
+                                    </Typography>
+                                    {itineraries.length === 0 ? (
+                                        <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.7rem' }}>
+                                            Trending itineraries in Nepal — get inspired
+                                        </Typography>
+                                    ) : recommendations.length > 0 && (
+                                        <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.7rem' }}>
+                                            {recommendations[0]?.recommendation_source === 'collaborative'
+                                                ? 'Based on travellers like you'
+                                                : recommendations[0]?.recommendation_source === 'hybrid'
+                                                ? 'Personalised picks'
+                                                : 'Popular itineraries you might like'}
+                                        </Typography>
+                                    )}
+                                </Box>
+                                <Button onClick={() => navigate('/community')}
+                                    sx={{ color: COLORS.brand, textTransform: 'none', '&:hover': { bgcolor: 'transparent', color: '#2db8b8' } }}>
+                                    View More
+                                </Button>
                             </Stack>
 
-                            <Stack direction="row" spacing={2.5} sx={{ overflowX: 'auto', pb: 2 }}>
-                                {similarItineraries.map((itinerary) => (
-                                    <Card key={itinerary.id} sx={{
-                                        bgcolor: COLORS.cardPrimary, borderRadius: 5, overflow: 'hidden',
-                                        cursor: 'pointer', minWidth: 312, maxWidth: 312,
-                                        transition: 'all 0.3s',
-                                        '&:hover': { transform: 'translateY(-8px)', boxShadow: `0 8px 24px ${COLORS.brand}20` },
-                                    }}>
-                                        <Stack direction="row" spacing={2} sx={{ p: 2.5 }}>
-                                            <Box component="img" src={itinerary.image} alt={itinerary.title}
-                                                sx={{ width: 75, height: '100%', minHeight: 100, borderRadius: 3.5, objectFit: 'cover' }} />
-                                            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
-                                                <Box>
-                                                    <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ color: COLORS.headings, mb: 0.5, fontSize: '0.95rem' }}>
-                                                        {itinerary.title}
-                                                    </Typography>
-                                                    <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.8 }}>
-                                                        <LocationOnIcon sx={{ fontSize: 13, color: '#ff6b6b' }} />
-                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.75rem' }}>{itinerary.destination}</Typography>
-                                                    </Stack>
+                            {recsLoading ? (
+                                <Stack direction="row" spacing={2.5}>
+                                    {[1,2,3].map(i => (
+                                        <Box key={i} sx={{ minWidth: 312, height: 120, borderRadius: 5, bgcolor: COLORS.cardPrimary, opacity: 0.5 }} />
+                                    ))}
+                                </Stack>
+                            ) : recommendations.length === 0 ? (
+                                <Box sx={{ py: 4, textAlign: 'center' }}>
+                                    <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem' }}>
+                                        No public itineraries yet — be the first to share one!
+                                    </Typography>
+                                </Box>
+                            ) : (
+                                <Stack direction="row" spacing={2.5} sx={{ overflowX: 'auto', pb: 2 }}>
+                                    {recommendations.map((rec) => (
+                                        <Card key={rec.id} onClick={() => navigate(`/itinerary/${rec.id}`)} sx={{
+                                            bgcolor: COLORS.cardPrimary, borderRadius: 5, overflow: 'hidden',
+                                            cursor: 'pointer', minWidth: 312, maxWidth: 312,
+                                            transition: 'all 0.3s',
+                                            '&:hover': { transform: 'translateY(-8px)', boxShadow: `0 8px 24px ${COLORS.brand}20` },
+                                        }}>
+                                            <Stack direction="row" spacing={2} sx={{ p: 2.5 }}>
+                                                {/* Cover photo or destination initials fallback */}
+                                                {rec.cover_photo ? (
+                                                    <Box component="img"
+                                                        src={`http://127.0.0.1:8000/places/photo?photo_reference=${rec.cover_photo}&max_width=200`}
+                                                        alt={rec.destination}
+                                                        sx={{ width: 75, minHeight: 100, borderRadius: 3.5, flexShrink: 0, objectFit: 'cover' }}
+                                                    />
+                                                ) : (
+                                                    <Box sx={{
+                                                        width: 75, minHeight: 100, borderRadius: 3.5, flexShrink: 0,
+                                                        bgcolor: `${COLORS.brand}20`,
+                                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                                    }}>
+                                                        <Typography sx={{ fontSize: '1.6rem', fontWeight: 800, color: COLORS.brand, lineHeight: 1, textAlign: 'center' }}>
+                                                            {(rec.destination || '?').split(',')[0].trim().slice(0, 2).toUpperCase()}
+                                                        </Typography>
+                                                    </Box>
+                                                )}
+
+                                                <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', minWidth: 0 }}>
+                                                    <Box>
+                                                        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ color: COLORS.headings, mb: 0.5, fontSize: '0.95rem' }}>
+                                                            {rec.title}
+                                                        </Typography>
+                                                        <Stack direction="row" alignItems="center" spacing={0.5} sx={{ mb: 0.8 }}>
+                                                            <LocationOnIcon sx={{ fontSize: 13, color: '#ff6b6b' }} />
+                                                            <Typography variant="caption" noWrap sx={{ color: COLORS.fadedText, fontSize: '0.75rem' }}>
+                                                                {rec.destination}
+                                                            </Typography>
+                                                        </Stack>
+                                                    </Box>
+                                                    <Box>
+                                                        <Typography variant="body2" fontWeight="bold" sx={{ color: COLORS.brand, mb: 0.4, fontSize: '0.85rem' }}>
+                                                            {rec.currency || 'NPR'} {(rec.estimated_budget || 0).toLocaleString()}
+                                                        </Typography>
+                                                        <Stack direction="row" alignItems="center" spacing={1}>
+                                                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                                <CalendarTodayIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
+                                                                <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.75rem' }}>
+                                                                    {rec.days_count} day{rec.days_count !== 1 ? 's' : ''}
+                                                                </Typography>
+                                                            </Stack>
+                                                            {rec.from_friend && (
+                                                                <Chip label="Friend's pick" size="small" sx={{
+                                                                    height: 16, fontSize: '0.6rem',
+                                                                    bgcolor: `${COLORS.brand}18`, color: COLORS.brand,
+                                                                    '& .MuiChip-label': { px: 0.8 },
+                                                                }} />
+                                                            )}
+                                                            {rec.recommendation_source === 'your_trip' && (
+                                                                <Chip label="Your trip" size="small" sx={{
+                                                                    height: 16, fontSize: '0.6rem',
+                                                                    bgcolor: 'rgba(255,183,77,0.15)', color: '#FFB74D',
+                                                                    '& .MuiChip-label': { px: 0.8 },
+                                                                }} />
+                                                            )}
+                                                        </Stack>
+                                                    </Box>
                                                 </Box>
-                                                <Box>
-                                                    <Typography variant="body2" fontWeight="bold" sx={{ color: COLORS.brand, mb: 0.4, fontSize: '0.85rem' }}>
-                                                        {itinerary.currency} {itinerary.estimatedBudget.toLocaleString()}
-                                                    </Typography>
-                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
-                                                        <CalendarTodayIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
-                                                        <Typography variant="caption" sx={{ color: COLORS.fadedText, fontSize: '0.75rem' }}>{itinerary.duration}</Typography>
-                                                    </Stack>
-                                                </Box>
-                                            </Box>
-                                        </Stack>
-                                    </Card>
-                                ))}
-                            </Stack>
+                                            </Stack>
+                                        </Card>
+                                    ))}
+                                </Stack>
+                            )}
                         </Box>
                     </Box>
 

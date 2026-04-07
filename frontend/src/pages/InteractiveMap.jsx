@@ -8,6 +8,7 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 import Navbar, { DRAWER_WIDTH } from '../components/Navbar';
+import SearchIcon from '@mui/icons-material/Search';
 import PlaceSearchAutocomplete from '../components/PlaceSearchAutocomplete';
 import CreateItineraryDialog from '../components/CreateItineraryDialog';
 
@@ -126,6 +127,7 @@ export default function InteractiveMap() {
     const [selected, setSelected]           = useState(null);
     const [detail, setDetail]               = useState(null);
     const [loadingList, setLoadingList]     = useState(true);
+    const [mapSearch, setMapSearch]           = useState('');
     const [loadingDetail, setLoadingDetail] = useState(false);
     const [expanded, setExpanded]           = useState({});
     const [selectedDay, setSelectedDay]     = useState(null);
@@ -422,6 +424,29 @@ export default function InteractiveMap() {
                         <Typography variant="h6" fontWeight="bold" sx={{ color: C.heading }}>Trip Routes</Typography>
                     </Stack>
                     <Typography variant="caption" sx={{ color: C.faded }}>Select an itinerary to visualise on map</Typography>
+                    <TextField
+                        size="small" fullWidth placeholder="Filter trips…"
+                        value={mapSearch}
+                        onChange={e => setMapSearch(e.target.value)}
+                        sx={{
+                            mt: 1.5,
+                            '& .MuiOutlinedInput-root': {
+                                bgcolor: C.surface, borderRadius: 2, color: C.text,
+                                '& fieldset': { borderColor: 'transparent' },
+                                '&:hover fieldset': { borderColor: C.brand },
+                                '&.Mui-focused fieldset': { borderColor: C.brand },
+                            },
+                            '& .MuiInputBase-input': { py: 1, fontSize: '0.82rem' },
+                            '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 },
+                        }}
+                        InputProps={{
+                            startAdornment: (
+                                <InputAdornment position="start">
+                                    <SearchIcon sx={{ fontSize: 16, color: C.faded }} />
+                                </InputAdornment>
+                            ),
+                        }}
+                    />
                 </Box>
 
                 {loadingList ? (
@@ -438,7 +463,12 @@ export default function InteractiveMap() {
                     </Box>
                 ) : (
                     <Stack>
-                        {itineraries.map(itin => {
+                        {itineraries
+                          .filter(itin => !mapSearch || 
+                            itin.title.toLowerCase().includes(mapSearch.toLowerCase()) ||
+                            itin.destination.toLowerCase().includes(mapSearch.toLowerCase())
+                          )
+                          .map(itin => {
                             const isSelected = selected?.id === itin.id;
                             return (
                                 <Box key={itin.id}>
@@ -544,7 +574,7 @@ export default function InteractiveMap() {
                                                                             {rStatus === 'fallback' && <Typography sx={{ color: C.faded, fontSize: '0.58rem' }}>(est.)</Typography>}
                                                                         </>
                                                                     ) : null}
-                                                                    <Typography sx={{ color: C.faded, fontSize: '0.62rem', ml: 'auto !important' }}>{mappedActs.length} stops</Typography>
+                                                                    <Typography sx={{ color: C.faded, fontSize: '0.62rem', ml: 'auto !important' }}>{day.activities?.length || 0} stop{(day.activities?.length || 0) !== 1 ? 's' : ''}</Typography>
                                                                 </Stack>
                                                             </Box>
 
@@ -723,10 +753,53 @@ export default function InteractiveMap() {
                         ? 'Activity reordered. Set a new start time (optional):'
                         : `Moving to ${(() => { const d = detail?.days?.find(d => d.id === pendingDrop?.dstDayId); return d ? `Day ${d.day_number}` : 'new day'; })()}. Set a start time (optional):`}
                 </Typography>
-                <TextField fullWidth type="time" label="Start Time (optional)" value={dropTime}
-                    onChange={e => setDropTime(e.target.value)}
-                    InputLabelProps={{ shrink: true }}
-                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.bg, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand } }} />
+                <Box>
+                    <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Start Time (optional)</Typography>
+                    <Stack direction="row" spacing={0.75} alignItems="center">
+                        {/* Hour */}
+                        <Select size="small" displayEmpty
+                            value={(() => { if (!dropTime) return ''; const h = parseInt(dropTime.split(':')[0]); return String(h % 12 || 12).padStart(2, '0'); })()}
+                            onChange={(e) => {
+                                const hr = parseInt(e.target.value) || 12;
+                                const m = (dropTime || '00:00').split(':')[1] || '00';
+                                const isPM = dropTime ? parseInt(dropTime.split(':')[0]) >= 12 : false;
+                                const h24 = isPM ? (hr === 12 ? 12 : hr + 12) : (hr === 12 ? 0 : hr);
+                                setDropTime(`${String(h24).padStart(2, '0')}:${m}`);
+                            }}
+                            sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
+                            MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, maxHeight: 260, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                            <MenuItem value="" sx={{ color: C.faded }}>HH</MenuItem>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                <MenuItem key={h} value={String(h).padStart(2, '0')}>{String(h).padStart(2, '0')}</MenuItem>
+                            ))}
+                        </Select>
+                        <Typography sx={{ color: C.faded, fontWeight: 700, fontSize: '1rem' }}>:</Typography>
+                        {/* Minute */}
+                        <Select size="small" displayEmpty
+                            value={dropTime ? dropTime.split(':')[1] || '00' : ''}
+                            onChange={(e) => { const h = (dropTime || '00:00').split(':')[0]; setDropTime(`${h}:${e.target.value}`); }}
+                            sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
+                            MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                            <MenuItem value="" sx={{ color: C.faded }}>MM</MenuItem>
+                            {['00', '15', '30', '45'].map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                        </Select>
+                        {/* AM/PM */}
+                        <Select size="small"
+                            value={dropTime ? (parseInt(dropTime.split(':')[0]) >= 12 ? 'PM' : 'AM') : 'AM'}
+                            onChange={(e) => {
+                                const [hStr, m] = (dropTime || '00:00').split(':');
+                                let h = parseInt(hStr) || 0;
+                                if (e.target.value === 'PM' && h < 12) h += 12;
+                                if (e.target.value === 'AM' && h >= 12) h -= 12;
+                                setDropTime(`${String(h).padStart(2, '0')}:${m || '00'}`);
+                            }}
+                            sx={{ flex: 1, bgcolor: C.bg, color: C.brand, borderRadius: 2, fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.brand }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 700 } }}
+                            MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                            <MenuItem value="AM">AM</MenuItem>
+                            <MenuItem value="PM">PM</MenuItem>
+                        </Select>
+                    </Stack>
+                </Box>
             </DialogContent>
             <DialogActions sx={{ px: 3, pb: 2.5 }}>
                 <Button onClick={cancelMapDrop} sx={{ color: C.faded }}>Cancel</Button>
@@ -860,14 +933,24 @@ export default function InteractiveMap() {
 
                     <DialogContent>
                         <Stack spacing={2.5} sx={{ mt: 1 }}>
+                            {/* Title */}
+                            <Box>
+                                <Typography variant="caption" sx={{ color: C.faded, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>Title *</Typography>
+                                <TextField size="small" fullWidth placeholder="e.g., Sunrise at Sarangkot"
+                                    value={editForm.title || ''}
+                                    onChange={e => setEditForm(f => ({ ...f, title: e.target.value }))}
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.bg, borderRadius: 2, color: C.text, '& fieldset': { borderColor: C.border }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputBase-input::placeholder': { color: C.faded, opacity: 1 } }} />
+                            </Box>
+
                             <Box>
                                 <PlaceSearchAutocomplete
                                     label="Location / Place"
+                                    destinationContext={detail?.destination}
                                     value={editForm.location || ''}
-                                    onChange={(text) => setEditForm(f => ({ ...f, location: text, title: text, place_id: null, latitude: null, longitude: null, formatted_address: null, place_types: null, rating: null }))}
+                                    onChange={(text) => setEditForm(f => ({ ...f, location: text, title: f.title || text, place_id: null, latitude: null, longitude: null, formatted_address: null, place_types: null, rating: null }))}
                                     onSelect={(place) => setEditForm(f => ({
                                         ...f,
-                                        location: place.name, title: place.name,
+                                        location: place.name, title: f.title || place.name,
                                         place_id: place.google_place_id,
                                         latitude: place.latitude, longitude: place.longitude,
                                         formatted_address: place.address,
@@ -886,12 +969,21 @@ export default function InteractiveMap() {
                             <Stack direction="row" spacing={2}>
                                 <Box sx={{ flex: 1 }}>
                                     <Typography variant="caption" sx={{ color: C.faded, fontWeight: 600, textTransform: 'uppercase', letterSpacing: 0.5, display: 'block', mb: 0.75 }}>Type</Typography>
-                                    <Select fullWidth size="small" value={editForm.activity_type || 'sightseeing'}
+                                    <Select fullWidth size="small" value={editForm.activity_type || 'destination'}
                                         onChange={e => setEditForm(f => ({ ...f, activity_type: e.target.value }))}
                                         sx={{ bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: 'transparent' }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded } }}
                                         MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text } } }}>
-                                        {['sightseeing','dining','adventure','relaxation','shopping','transport','activity'].map(t => (
-                                            <MenuItem key={t} value={t} sx={{ textTransform: 'capitalize', '&:hover': { bgcolor: `${C.brand}20` } }}>{t}</MenuItem>
+                                        {[
+                                            { value: 'destination', label: 'General' },
+                                            { value: 'sightseeing', label: 'Sightseeing' },
+                                            { value: 'dining',      label: 'Dining' },
+                                            { value: 'adventure',   label: 'Adventure' },
+                                            { value: 'leisure',     label: 'Leisure' },
+                                            { value: 'shopping',    label: 'Shopping' },
+                                            { value: 'transport',   label: 'Transport' },
+                                            { value: 'cultural',    label: 'Cultural' },
+                                        ].map(t => (
+                                            <MenuItem key={t.value} value={t.value} sx={{ '&:hover': { bgcolor: `${C.brand}20` } }}>{t.label}</MenuItem>
                                         ))}
                                     </Select>
                                 </Box>

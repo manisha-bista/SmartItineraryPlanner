@@ -44,78 +44,100 @@ import HotelIcon from '@mui/icons-material/Hotel';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
 import axios from 'axios';
 import PlaceSearchAutocomplete from './PlaceSearchAutocomplete';
+import { useTheme } from '../context/ThemeContext';
 
-const COLORS = {
-    brand: '#33CCCC',
-    background: '#141627',
-    cardPrimary: '#252845',
-    cardSecondary: 'rgba(255, 255, 255, 0.08)',
-    headings: '#B0D2EB',
-    subheadings: '#C0D2EB',
-    text: '#D0D2EB',
-    fadedText: '#7B809A',
-    icons: '#B0D2EB',
-    error: '#ff6b6b',
-    border: 'rgba(255, 255, 255, 0.08)',
-};
+const TRIP_TAGS = [
+    'budget', 'mid-range', 'luxury',
+    'solo', 'couple', 'family', 'friends',
+    'adventure', 'cultural', 'heritage', 'spiritual',
+    'trekking', 'photography', 'food', 'wildlife',
+    'weekend', 'backpacker',
+];
 
-const inputSx = {
-    '& .MuiOutlinedInput-root': {
-        bgcolor: COLORS.cardSecondary,
-        borderRadius: 3,
-        color: COLORS.text,
-        '& fieldset': { borderColor: 'transparent' },
-        '&:hover fieldset': { borderColor: COLORS.brand },
-        '&.Mui-focused fieldset': { borderColor: COLORS.brand },
-    },
-    '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
-    '& .MuiInputLabel-root': { color: COLORS.fadedText },
-    '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand },
-    '& .MuiFormHelperText-root': { color: COLORS.fadedText },
-    '& .MuiInputBase-input': { color: COLORS.text },
-    '& .MuiSelect-icon': { color: COLORS.fadedText },
-    '& .MuiInputBase-input[type=date]::-webkit-calendar-picker-indicator': { filter: 'invert(0.6)' },
-    '& .MuiInputBase-input[type=time]::-webkit-calendar-picker-indicator': { filter: 'invert(0.6)' },
-};
-
-const errorInputSx = (hasError) => ({
-    ...inputSx,
-    '& .MuiOutlinedInput-root': {
-        ...inputSx['& .MuiOutlinedInput-root'],
-        '& fieldset': { borderColor: hasError ? COLORS.error : 'transparent' },
-    },
-    '& .MuiFormHelperText-root': { color: hasError ? COLORS.error : COLORS.fadedText },
-});
-
-const TRAVEL_STYLES = [
-    { value: 'general',   label: 'General' },
-    { value: 'adventure', label: 'Adventure' },
-    { value: 'cultural',  label: 'Cultural' },
-    { value: 'trekking',  label: 'Trekking' },
-    { value: 'relaxed',   label: 'Relaxed' },
-    { value: 'budget',    label: 'Budget' },
-    { value: 'luxury',    label: 'Luxury' },
+const ACTIVITY_TYPES = [
+    { value: 'destination', label: 'General' },
+    { value: 'sightseeing', label: 'Sightseeing' },
+    { value: 'dining',      label: 'Dining' },
+    { value: 'adventure',   label: 'Adventure' },
+    { value: 'leisure',     label: 'Leisure' },
+    { value: 'shopping',    label: 'Shopping' },
+    { value: 'transport',   label: 'Transport' },
+    { value: 'cultural',    label: 'Cultural' },
 ];
 
 const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
+    const { COLORS, isDark } = useTheme();
+
+    const ERROR_COLOR = '#ff6b6b';
+
+    // input styling that respects the current theme
+    const inputSx = {
+        '& .MuiOutlinedInput-root': {
+            bgcolor: COLORS.cardSecondary,
+            borderRadius: 3,
+            color: COLORS.text,
+            '& fieldset': { borderColor: COLORS.cardBorder },
+            '&:hover fieldset': { borderColor: COLORS.brand },
+            '&.Mui-focused fieldset': { borderColor: COLORS.brand },
+        },
+        '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
+        '& .MuiInputLabel-root': { color: COLORS.fadedText },
+        '& .MuiInputLabel-root.Mui-focused': { color: COLORS.brand },
+        '& .MuiFormHelperText-root': { color: COLORS.fadedText },
+        '& .MuiInputBase-input': { color: COLORS.text },
+        '& .MuiSelect-icon': { color: COLORS.text },
+        // calendar/clock icon: invert in dark, not in light
+        '& .MuiInputBase-input[type=date]::-webkit-calendar-picker-indicator': {
+            filter: isDark ? 'invert(0.6)' : 'none',
+            cursor: 'pointer',
+        },
+        '& .MuiInputBase-input[type=time]::-webkit-calendar-picker-indicator': {
+            filter: isDark ? 'invert(0.6)' : 'none',
+            cursor: 'pointer',
+        },
+        // native select dropdown options
+        '& select': { color: COLORS.text, backgroundColor: COLORS.cardPrimary },
+        '& select option': { backgroundColor: COLORS.cardPrimary, color: COLORS.text },
+    };
+
+    const errorInputSx = (hasError) => ({
+        ...inputSx,
+        '& .MuiOutlinedInput-root': {
+            ...inputSx['& .MuiOutlinedInput-root'],
+            '& fieldset': { borderColor: hasError ? ERROR_COLOR : COLORS.cardBorder },
+        },
+        '& .MuiFormHelperText-root': { color: hasError ? ERROR_COLOR : COLORS.fadedText },
+    });
+
+    // inputs inside destination cards — clearly offset from card background
+    const nestedInputSx = {
+        ...inputSx,
+        '& .MuiOutlinedInput-root': {
+            ...inputSx['& .MuiOutlinedInput-root'],
+            bgcolor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+            '& fieldset': { borderColor: COLORS.cardBorder },
+        },
+    };
+
     const [activeStep, setActiveStep] = useState(0);
     const [submitting, setSubmitting] = useState(false);
     const [error, setError] = useState('');
 
     const [tripInfo, setTripInfo] = useState({
         title: '',
+        destination: '',
         start_date: '',
         end_date: '',
         estimated_budget: '',
         currency: 'NPR',
     });
 
+    const [selectedTags, setSelectedTags] = useState([]);
     const [days, setDays] = useState([]);
     const [validationErrors, setValidationErrors] = useState({});
 
     // AI section state
     const [aiPrompt, setAiPrompt] = useState('');
-    const [aiStyle, setAiStyle] = useState('general');
     const [aiGenerating, setAiGenerating] = useState(false);
     const [aiError, setAiError] = useState('');
 
@@ -156,6 +178,12 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         }
     };
 
+    const handleTagToggle = (tag) => {
+        setSelectedTags(prev =>
+            prev.includes(tag) ? prev.filter(t => t !== tag) : [...prev, tag]
+        );
+    };
+
     const handleAddDestination = (dayIndex) => {
         const newDays = [...days];
         newDays[dayIndex].destinations.push({
@@ -163,8 +191,8 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             time: '',
             description: '',
             estimated_budget: '',
-            mapStatus: null,  // null = manual, no prompt needed
-            // place fields populated when user picks from autocomplete
+            activity_type: 'destination',
+            mapStatus: null,
             latitude: null,
             longitude: null,
             google_place_id: null,
@@ -287,6 +315,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             time: type === 'restaurant' ? '12:30' : '18:00',
             description: '',
             estimated_budget: '',
+            activity_type: type === 'restaurant' ? 'dining' : 'destination',
             mapStatus: null,
             latitude: null,
             longitude: null,
@@ -334,6 +363,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         const errors = {};
         if (!tripInfo.title.trim()) errors.title = 'Trip title is required';
         else if (tripInfo.title.trim().length < 3) errors.title = 'Title must be at least 3 characters';
+        if (!tripInfo.destination.trim()) errors.destination = 'Destination is required';
         if (!tripInfo.start_date) errors.start_date = 'Start date is required';
         if (!tripInfo.end_date) errors.end_date = 'End date is required';
         else if (tripInfo.start_date && tripInfo.end_date < tripInfo.start_date)
@@ -349,14 +379,9 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
     const handleBack = () => setActiveStep((prev) => prev - 1);
 
-    // AI generation — uses the freeform prompt as destination description
+    // AI generation — uses destination + optional extra prompt
     const handleAiGenerate = async () => {
         if (!validateStep1()) return;
-
-        if (!aiPrompt.trim()) {
-            setAiError('Please describe your ideal trip before generating.');
-            return;
-        }
 
         setAiGenerating(true);
         setAiError('');
@@ -364,11 +389,31 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         try {
             const numDays = calculateDays(tripInfo.start_date, tripInfo.end_date);
 
+            // derive AI style from selected trip tags
+            const styleMap = {
+                adventure: 'adventure', trekking: 'adventure',
+                cultural: 'cultural', heritage: 'cultural', spiritual: 'cultural',
+                budget: 'budget', backpacker: 'budget',
+                luxury: 'luxury', couple: 'luxury',
+                food: 'relaxed', wildlife: 'relaxed', photography: 'relaxed',
+                solo: 'general', family: 'general', friends: 'general',
+                weekend: 'general', 'mid-range': 'general',
+            };
+            const derivedStyle = selectedTags.map(t => styleMap[t]).find(Boolean) || 'general';
+
+            // build the full destination context from the form fields + optional extra prompt
+            const normalizedDest = tripInfo.destination
+                .split(',').map(s => s.trim()).filter(s => s.length > 0).join(', ');
+            const extraContext = aiPrompt.trim();
+            const fullPrompt = extraContext
+                ? `${normalizedDest}. ${extraContext}`
+                : normalizedDest;
+
             const response = await axios.post('http://127.0.0.1:8000/ai/generate-itinerary', {
-                destination: aiPrompt.trim(),
+                destination: fullPrompt,
                 days: numDays,
                 budget: parseFloat(tripInfo.estimated_budget) || 0,
-                style: aiStyle,
+                style: derivedStyle,
             });
 
             const data = response.data;
@@ -414,17 +459,23 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         setError('');
         try {
             const budget = parseFloat(tripInfo.estimated_budget) || 0;
-            const status = saveAsDraft ? 'draft' : 'planning';
+            const status = 'planning';
+            // normalize destination: strip whitespace around each city, remove blanks, rejoin
+            const normalizedDestination = tripInfo.destination
+                .split(',')
+                .map(s => s.trim())
+                .filter(s => s.length > 0)
+                .join(', ');
             const itineraryPayload = {
                 title: tripInfo.title.trim(),
-                destination: tripInfo.title.trim(),
+                destination: normalizedDestination,
                 description: null,
                 start_date: tripInfo.start_date,
                 end_date: tripInfo.end_date,
                 estimated_budget: budget,
                 currency: tripInfo.currency,
                 status,
-                is_public: false,
+                is_public: saveAsDraft ? false : false,
                 user_id: userId,
                 days: days.map((day) => ({
                     day_number: day.day_number,
@@ -435,6 +486,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 })),
                 accommodations: [],
                 transportation: [],
+                tags: selectedTags,
             };
 
             const itineraryResponse = await axios.post(
@@ -488,12 +540,12 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     const handleClose = () => {
         if (!submitting) {
             setActiveStep(0);
-            setTripInfo({ title: '', start_date: '', end_date: '', estimated_budget: '', currency: 'NPR' });
+            setTripInfo({ title: '', destination: '', start_date: '', end_date: '', estimated_budget: '', currency: 'NPR' });
+            setSelectedTags([]);
             setDays([]);
             setValidationErrors({});
             setError('');
             setAiPrompt('');
-            setAiStyle('general');
             setAiError('');
             onClose();
         }
@@ -508,16 +560,18 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         <Dialog
             open={open}
             onClose={handleClose}
-            maxWidth="md"
+            maxWidth="lg"
             fullWidth
             PaperProps={{
                 sx: {
                     minHeight: '80vh',
+                    width: '92vw',
+                    maxWidth: '1400px',
                     bgcolor: COLORS.background,
                     backgroundImage: 'linear-gradient(135deg, rgba(51,204,204,0.04) 0%, transparent 60%)',
-                    border: `1px solid ${COLORS.border}`,
+                    border: `1px solid ${COLORS.cardBorder}`,
                     borderRadius: 4,
-                    boxShadow: `0 24px 64px rgba(0,0,0,0.6), 0 0 0 1px ${COLORS.border}`,
+                    boxShadow: `0 24px 64px rgba(0,0,0,0.4), 0 0 0 1px ${COLORS.cardBorder}`,
                 },
             }}
         >
@@ -528,7 +582,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     pb: 1,
-                    borderBottom: `1px solid ${COLORS.border}`,
+                    borderBottom: `1px solid ${COLORS.cardBorder}`,
                     bgcolor: 'transparent',
                 }}
             >
@@ -546,7 +600,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                     sx={{
                         color: COLORS.fadedText,
                         borderRadius: 2,
-                        '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' },
+                        '&:hover': { color: ERROR_COLOR, bgcolor: 'rgba(255,107,107,0.1)' },
                     }}
                 >
                     <CloseIcon />
@@ -558,14 +612,17 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 <Stepper
                     activeStep={activeStep}
                     sx={{
-                        '& .MuiStepLabel-label': { color: '#FFFFFF', fontSize: '0.85rem', opacity: 0.75 },
-                        '& .MuiStepLabel-label.Mui-active': { color: COLORS.brand, fontWeight: 'bold', opacity: 1 },
-                        '& .MuiStepLabel-label.Mui-completed': { color: '#FFFFFF', opacity: 1 },
-                        '& .MuiStepIcon-root': { color: 'rgba(255,255,255,0.18)' },
+                        '& .MuiStepLabel-label': { color: COLORS.fadedText, fontSize: '0.85rem' },
+                        '& .MuiStepLabel-label.Mui-active': { color: COLORS.brand, fontWeight: 'bold' },
+                        '& .MuiStepLabel-label.Mui-completed': { color: COLORS.text },
+                        '& .MuiStepIcon-root': { color: COLORS.cardBorder },
                         '& .MuiStepIcon-root.Mui-active': { color: COLORS.brand },
                         '& .MuiStepIcon-root.Mui-completed': { color: COLORS.brand },
-                        '& .MuiStepIcon-text': { fill: '#FFFFFF', fontWeight: 'bold' },
-                        '& .MuiStepConnector-line': { borderColor: COLORS.border },
+                        '& .MuiStepIcon-text': {
+                            fill: isDark ? '#FFFFFF' : COLORS.background,
+                            fontWeight: 'bold',
+                        },
+                        '& .MuiStepConnector-line': { borderColor: COLORS.cardBorder },
                     }}
                 >
                     {steps.map((label) => (
@@ -581,7 +638,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 dividers
                 sx={{
                     minHeight: '500px',
-                    borderColor: COLORS.border,
+                    borderColor: COLORS.cardBorder,
                     bgcolor: 'transparent',
                     '&::-webkit-scrollbar': { width: 6 },
                     '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
@@ -594,10 +651,10 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                         sx={{
                             mb: 2,
                             bgcolor: 'rgba(255,107,107,0.1)',
-                            color: COLORS.error,
+                            color: ERROR_COLOR,
                             border: `1px solid rgba(255,107,107,0.3)`,
                             borderRadius: 2,
-                            '& .MuiAlert-icon': { color: COLORS.error },
+                            '& .MuiAlert-icon': { color: ERROR_COLOR },
                         }}
                         onClose={() => setError('')}
                     >
@@ -607,22 +664,41 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
                 {/* STEP 1: Trip Details */}
                 {activeStep === 0 && (
-                    <Stack spacing={3} sx={{ mt: 2 }}>
+                    <Stack spacing={2.5} sx={{ mt: 2 }}>
 
-                        <TextField
-                            fullWidth
-                            label="Trip Title *"
-                            name="title"
-                            value={tripInfo.title}
-                            onChange={handleTripInfoChange}
-                            error={Boolean(validationErrors.title)}
-                            helperText={validationErrors.title || 'e.g., "Trip To Annapurna"'}
-                            placeholder="Enter trip name"
-                            sx={errorInputSx(Boolean(validationErrors.title))}
-                        />
-
+                        {/* Row 1: Title + Destination — same line, wide dialog gives them room */}
                         <Grid container spacing={2}>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={12} sm={7}>
+                                <TextField
+                                    fullWidth
+                                    label="Trip Title *"
+                                    name="title"
+                                    value={tripInfo.title}
+                                    onChange={handleTripInfoChange}
+                                    error={Boolean(validationErrors.title)}
+                                    helperText={validationErrors.title || 'e.g., "Nepal Heritage Circuit", "Pokhara Adventure with Friends"'}
+                                    placeholder='Give your trip a memorable name'
+                                    sx={errorInputSx(Boolean(validationErrors.title))}
+                                />
+                            </Grid>
+                            <Grid item xs={12} sm={5}>
+                                <TextField
+                                    fullWidth
+                                    label="Destination *"
+                                    name="destination"
+                                    value={tripInfo.destination}
+                                    onChange={handleTripInfoChange}
+                                    error={Boolean(validationErrors.destination)}
+                                    helperText={validationErrors.destination || 'e.g., Kathmandu, Bhaktapur — comma-separate multiple cities'}
+                                    placeholder="e.g., Kathmandu, Bhaktapur"
+                                    sx={errorInputSx(Boolean(validationErrors.destination))}
+                                />
+                            </Grid>
+                        </Grid>
+
+                        {/* Row 3: Start Date + End Date + Budget + Currency */}
+                        <Grid container spacing={2}>
+                            <Grid item xs={6} sm={3}>
                                 <TextField
                                     fullWidth
                                     label="Start Date *"
@@ -636,7 +712,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     sx={errorInputSx(Boolean(validationErrors.start_date))}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={6}>
+                            <Grid item xs={6} sm={3}>
                                 <TextField
                                     fullWidth
                                     label="End Date *"
@@ -650,25 +726,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     sx={errorInputSx(Boolean(validationErrors.end_date))}
                                 />
                             </Grid>
-                        </Grid>
-
-                        {tripInfo.start_date && tripInfo.end_date && (
-                            <Alert
-                                icon={<CheckCircleIcon sx={{ color: COLORS.brand }} />}
-                                sx={{
-                                    bgcolor: 'rgba(51,204,204,0.08)',
-                                    color: COLORS.brand,
-                                    border: `1px solid rgba(51,204,204,0.25)`,
-                                    borderRadius: 2,
-                                    '& .MuiAlert-icon': { alignItems: 'center' },
-                                }}
-                            >
-                                Your trip will be {calculateDays(tripInfo.start_date, tripInfo.end_date)} days long
-                            </Alert>
-                        )}
-
-                        <Grid container spacing={2}>
-                            <Grid item xs={12} sm={8}>
+                            <Grid item xs={8} sm={4}>
                                 <TextField
                                     fullWidth
                                     label="Estimated Budget"
@@ -676,12 +734,11 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     type="number"
                                     value={tripInfo.estimated_budget}
                                     onChange={handleTripInfoChange}
-                                    helperText="Total budget (optional)"
-                                    placeholder="10000"
+                                    placeholder="0"
                                     sx={inputSx}
                                 />
                             </Grid>
-                            <Grid item xs={12} sm={4}>
+                            <Grid item xs={4} sm={2}>
                                 <TextField
                                     fullWidth
                                     label="Currency"
@@ -692,10 +749,18 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     SelectProps={{ native: true }}
                                     sx={{
                                         ...inputSx,
+                                        '& .MuiOutlinedInput-root': {
+                                            ...inputSx['& .MuiOutlinedInput-root'],
+                                            bgcolor: COLORS.cardSecondary,
+                                        },
                                         '& select': {
-                                            bgcolor: 'transparent',
                                             color: COLORS.text,
-                                            '& option': { bgcolor: COLORS.cardPrimary, color: COLORS.text },
+                                            backgroundColor: COLORS.cardPrimary,
+                                            WebkitAppearance: 'auto',
+                                        },
+                                        '& select option': {
+                                            backgroundColor: COLORS.cardPrimary,
+                                            color: COLORS.text,
                                         },
                                     }}
                                 >
@@ -707,68 +772,50 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                             </Grid>
                         </Grid>
 
-                        {/* AI Generation Section */}
-                        <Box>
-                            <Divider sx={{ borderColor: COLORS.border, mb: 3 }} />
+                        {tripInfo.start_date && tripInfo.end_date && (
+                            <Alert
+                                icon={<CheckCircleIcon sx={{ color: COLORS.brand }} />}
+                                sx={{
+                                    py: 0.5,
+                                    bgcolor: 'rgba(51,204,204,0.08)',
+                                    color: COLORS.brand,
+                                    border: `1px solid rgba(51,204,204,0.25)`,
+                                    borderRadius: 2,
+                                    '& .MuiAlert-icon': { alignItems: 'center' },
+                                }}
+                            >
+                                Your trip will be {calculateDays(tripInfo.start_date, tripInfo.end_date)} days long
+                            </Alert>
+                        )}
 
+                        {/* Trip Tags */}
+                        <Box>
                             <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                                <AutoAwesomeIcon sx={{ fontSize: 16, color: COLORS.fadedText }} />
                                 <Typography variant="subtitle2" sx={{ color: COLORS.subheadings, fontWeight: 'bold' }}>
-                                    Generate with AI
+                                    Trip Tags
+                                </Typography>
+                                <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
+                                    (optional)
                                 </Typography>
                             </Stack>
-
-                            <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 2 }}>
-                                Describe your ideal trip — places you want to visit, things to do, landmarks, food experiences, or anything else. AI will build your day-by-day plan from it.
-                            </Typography>
-
-                            {aiError && (
-                                <Alert
-                                    severity="error"
-                                    sx={{
-                                        mb: 2,
-                                        bgcolor: 'rgba(255,107,107,0.1)',
-                                        color: COLORS.error,
-                                        border: `1px solid rgba(255,107,107,0.3)`,
-                                        borderRadius: 2,
-                                        '& .MuiAlert-icon': { color: COLORS.error },
-                                    }}
-                                    onClose={() => setAiError('')}
-                                >
-                                    {aiError}
-                                </Alert>
-                            )}
-
-                            <TextField
-                                fullWidth
-                                multiline
-                                rows={3}
-                                label="Describe your ideal trip"
-                                value={aiPrompt}
-                                onChange={(e) => setAiPrompt(e.target.value)}
-                                placeholder="e.g., I want to visit Boudhanath Stupa and Pashupatinath Temple, try local street food in Thamel, and hike to a viewpoint with Himalayan views. I also enjoy cultural experiences and peaceful spots."
-                                sx={{ ...inputSx, mb: 2 }}
-                            />
-
                             <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 1.5 }}>
-                                Travel style
+                                Select tags that describe your trip — helps with recommendations.
                             </Typography>
-
                             <Stack direction="row" flexWrap="wrap" gap={1}>
-                                {TRAVEL_STYLES.map((style) => (
+                                {TRIP_TAGS.map((tag) => (
                                     <Chip
-                                        key={style.value}
-                                        label={style.label}
-                                        onClick={() => setAiStyle(style.value)}
+                                        key={tag}
+                                        label={tag}
+                                        onClick={() => handleTagToggle(tag)}
                                         size="small"
                                         sx={{
                                             borderRadius: 2,
-                                            fontWeight: aiStyle === style.value ? 'bold' : 'normal',
-                                            bgcolor: aiStyle === style.value
+                                            fontWeight: selectedTags.includes(tag) ? 'bold' : 'normal',
+                                            bgcolor: selectedTags.includes(tag)
                                                 ? 'rgba(51,204,204,0.18)'
                                                 : COLORS.cardSecondary,
-                                            color: aiStyle === style.value ? COLORS.brand : COLORS.fadedText,
-                                            border: aiStyle === style.value
+                                            color: selectedTags.includes(tag) ? COLORS.brand : COLORS.fadedText,
+                                            border: selectedTags.includes(tag)
                                                 ? `1px solid rgba(51,204,204,0.5)`
                                                 : `1px solid transparent`,
                                             cursor: 'pointer',
@@ -780,6 +827,74 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     />
                                 ))}
                             </Stack>
+                        </Box>
+
+                        {/* AI Generation Section */}
+                        <Box>
+                            <Divider sx={{ borderColor: COLORS.cardBorder, mb: 3 }} />
+
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
+                                <AutoAwesomeIcon sx={{ fontSize: 16, color: COLORS.fadedText }} />
+                                <Typography variant="subtitle2" sx={{ color: COLORS.subheadings, fontWeight: 'bold' }}>
+                                    Generate with AI
+                                </Typography>
+                            </Stack>
+
+                            <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 1.5 }}>
+                                AI will use your destination, dates, budget, and tags above. Optionally add more detail below.
+                            </Typography>
+
+                            {/* Context summary — shows what AI already knows */}
+                            <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
+                                {tripInfo.destination && (
+                                    <Chip size="small" label={`📍 ${tripInfo.destination.split(',').map(s=>s.trim()).filter(Boolean).join(', ')}`}
+                                        sx={{ bgcolor: 'rgba(51,204,204,0.1)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)`, borderRadius: 2, fontSize: '0.72rem' }} />
+                                )}
+                                {tripInfo.start_date && tripInfo.end_date && (
+                                    <Chip size="small" label={`📅 ${calculateDays(tripInfo.start_date, tripInfo.end_date)} days`}
+                                        sx={{ bgcolor: 'rgba(51,204,204,0.1)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)`, borderRadius: 2, fontSize: '0.72rem' }} />
+                                )}
+                                {tripInfo.estimated_budget && (
+                                    <Chip size="small" label={`💰 ${tripInfo.currency} ${parseFloat(tripInfo.estimated_budget).toLocaleString()}`}
+                                        sx={{ bgcolor: 'rgba(51,204,204,0.1)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)`, borderRadius: 2, fontSize: '0.72rem' }} />
+                                )}
+                                {selectedTags.slice(0, 3).map(tag => (
+                                    <Chip key={tag} size="small" label={tag}
+                                        sx={{ bgcolor: 'rgba(51,204,204,0.1)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)`, borderRadius: 2, fontSize: '0.72rem' }} />
+                                ))}
+                                {selectedTags.length > 3 && (
+                                    <Chip size="small" label={`+${selectedTags.length - 3} more`}
+                                        sx={{ bgcolor: COLORS.cardSecondary, color: COLORS.fadedText, borderRadius: 2, fontSize: '0.72rem' }} />
+                                )}
+                            </Stack>
+
+                            {aiError && (
+                                <Alert
+                                    severity="error"
+                                    sx={{
+                                        mb: 2,
+                                        bgcolor: 'rgba(255,107,107,0.1)',
+                                        color: ERROR_COLOR,
+                                        border: `1px solid rgba(255,107,107,0.3)`,
+                                        borderRadius: 2,
+                                        '& .MuiAlert-icon': { color: ERROR_COLOR },
+                                    }}
+                                    onClose={() => setAiError('')}
+                                >
+                                    {aiError}
+                                </Alert>
+                            )}
+
+                            <TextField
+                                fullWidth
+                                multiline
+                                rows={3}
+                                label="Additional details (optional)"
+                                value={aiPrompt}
+                                onChange={(e) => setAiPrompt(e.target.value)}
+                                placeholder="e.g., I want to visit Boudhanath Stupa and Pashupatinath Temple, try local street food in Thamel, and hike to a viewpoint with Himalayan views."
+                                sx={{ ...inputSx, mb: 2 }}
+                            />
                         </Box>
                     </Stack>
                 )}
@@ -799,7 +914,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     sx={{
                                         bgcolor: COLORS.cardPrimary,
                                         borderRadius: '12px !important',
-                                        border: `1px solid ${COLORS.border}`,
+                                        border: `1px solid ${COLORS.cardBorder}`,
                                         '&:before': { display: 'none' },
                                         boxShadow: 'none',
                                         '&.Mui-expanded': { boxShadow: `0 4px 20px rgba(51,204,204,0.08)` },
@@ -867,139 +982,92 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                     variant="outlined"
                                                     sx={{
                                                         p: 2,
-                                                        bgcolor: COLORS.cardSecondary,
+                                                        bgcolor: isDark ? COLORS.cardPrimary : COLORS.cardSecondary,
                                                         borderColor: destination.mapStatus === 'mapped'
-                                                            ? 'rgba(51,204,204,0.25)'
+                                                            ? 'rgba(51,204,204,0.35)'
                                                             : destination.mapStatus === 'skipped'
-                                                                ? 'rgba(255,183,77,0.2)'
+                                                                ? 'rgba(255,183,77,0.3)'
                                                                 : destination.mapStatus === 'pending' || destination.mapStatus === 'picking'
-                                                                    ? 'rgba(51,204,204,0.15)'
-                                                                    : COLORS.border,
+                                                                    ? 'rgba(51,204,204,0.2)'
+                                                                    : COLORS.cardBorder,
                                                         borderRadius: 3,
-                                                        boxShadow: 'none',
+                                                        boxShadow: isDark ? 'none' : '0 1px 4px rgba(0,0,0,0.06)',
                                                         transition: 'border-color 0.3s',
                                                     }}
                                                 >
-                                                    {/* PENDING — AI destination, same layout as edit but with Keep/Skip/Delete */}
-                                                    {destination.mapStatus === 'pending' && (
+                                                    {/* PENDING / PICKING — AI destination card */}
+                                                    {(destination.mapStatus === 'pending' || destination.mapStatus === 'picking' || destination.mapStatus === 'mapping') && (
                                                         <Stack spacing={1.5}>
                                                             {/* header */}
                                                             <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                                                <Stack direction="row" spacing={1} alignItems="center">
-                                                                    <AutoAwesomeIcon sx={{ fontSize: 14, color: COLORS.brand }} />
-                                                                    <Typography variant="caption" sx={{ color: COLORS.brand, fontWeight: 'bold' }}>
-                                                                        AI Suggested
-                                                                    </Typography>
-                                                                </Stack>
-                                                                <Stack direction="row" spacing={0.5}>
-                                                                    <Button size="small" onClick={() => handleKeep(dayIndex, destIndex)}
-                                                                        sx={{ fontSize: '0.72rem', color: COLORS.brand, bgcolor: 'rgba(51,204,204,0.1)', borderRadius: 1.5, minWidth: 0, px: 1.2, '&:hover': { bgcolor: 'rgba(51,204,204,0.2)' } }}>
-                                                                        Keep
-                                                                    </Button>
-                                                                    <Button size="small" onClick={() => handleSkipMapping(dayIndex, destIndex)}
-                                                                        sx={{ fontSize: '0.72rem', color: COLORS.fadedText, bgcolor: COLORS.cardSecondary, borderRadius: 1.5, minWidth: 0, px: 1.2, '&:hover': { color: COLORS.text, bgcolor: 'rgba(255,255,255,0.1)' } }}>
+                                                                <Typography variant="subtitle2" sx={{ color: COLORS.text, fontWeight: 600 }}>
+                                                                    {destination.title || destination.location || `Destination ${destIndex + 1}`}
+                                                                </Typography>
+                                                                <Stack direction="row" spacing={0.75}>
+                                                                    {destination.mapStatus === 'pending' && (
+                                                                        <Button size="small" variant="contained" onClick={() => handleKeep(dayIndex, destIndex)}
+                                                                            sx={{ fontSize: '0.75rem', fontWeight: 700, color: COLORS.background, bgcolor: COLORS.brand, borderRadius: 1.5, minWidth: 0, px: 1.5, py: 0.5, textTransform: 'none', boxShadow: 'none', '&:hover': { bgcolor: '#2db8b8', boxShadow: '0 2px 8px rgba(51,204,204,0.4)' } }}>
+                                                                            Keep
+                                                                        </Button>
+                                                                    )}
+                                                                    <Button size="small" variant="outlined" onClick={() => handleSkipMapping(dayIndex, destIndex)}
+                                                                        sx={{ fontSize: '0.75rem', fontWeight: 600, color: COLORS.text, borderColor: COLORS.cardBorder, borderRadius: 1.5, minWidth: 0, px: 1.5, py: 0.5, textTransform: 'none', '&:hover': { borderColor: COLORS.brand, color: COLORS.brand, bgcolor: 'transparent' } }}>
                                                                         Skip
                                                                     </Button>
-                                                                    <Button size="small" onClick={() => handleRemoveDestination(dayIndex, destIndex)}
-                                                                        sx={{ fontSize: '0.72rem', color: COLORS.error, bgcolor: 'rgba(255,107,107,0.08)', borderRadius: 1.5, minWidth: 0, px: 1.2, '&:hover': { bgcolor: 'rgba(255,107,107,0.18)' } }}>
+                                                                    <Button size="small" variant="outlined" onClick={() => handleRemoveDestination(dayIndex, destIndex)}
+                                                                        sx={{ fontSize: '0.75rem', fontWeight: 600, color: ERROR_COLOR, borderColor: 'rgba(255,107,107,0.4)', borderRadius: 1.5, minWidth: 0, px: 1.5, py: 0.5, textTransform: 'none', '&:hover': { bgcolor: 'rgba(255,107,107,0.08)', borderColor: ERROR_COLOR } }}>
                                                                         Delete
                                                                     </Button>
                                                                 </Stack>
                                                             </Stack>
 
-                                                            {/* pre-filled fields — same as edit layout */}
+                                                            {/* Title field — from AI */}
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Title"
+                                                                value={destination.title || ''}
+                                                                onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'title', e.target.value)}
+                                                                size="small"
+                                                                sx={nestedInputSx}
+                                                            />
+
+                                                            {/* Location search — always visible */}
                                                             <PlaceSearchAutocomplete
                                                                 label="Location/Place"
+                                                                destinationContext={tripInfo.destination}
                                                                 value={destination.location}
                                                                 onChange={(text) => handleDestinationChange(dayIndex, destIndex, 'location', text)}
                                                                 onSelect={(place) => handlePlaceSelect(dayIndex, destIndex, place)}
                                                             />
 
-                                                            <Stack direction="row" spacing={2}>
-                                                                <TextField
-                                                                    label="Time"
-                                                                    type="time"
-                                                                    value={destination.time}
-                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'time', e.target.value)}
-                                                                    InputLabelProps={{ shrink: true }}
-                                                                    size="small"
-                                                                    sx={{ ...inputSx, flex: 1 }}
-                                                                />
-                                                                <TextField
-                                                                    label={`Budget (${tripInfo.currency})`}
-                                                                    type="number"
-                                                                    value={destination.estimated_budget}
-                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'estimated_budget', e.target.value)}
-                                                                    placeholder="0"
-                                                                    size="small"
-                                                                    inputProps={{ min: 0 }}
-                                                                    sx={{ ...inputSx, flex: 1 }}
-                                                                />
-                                                            </Stack>
+                                                            {/* Red instruction shown after Keep is pressed (mapping or picking) */}
+                                                            {(destination.mapStatus === 'mapping' || destination.mapStatus === 'picking') && (
+                                                                <Typography variant="caption" sx={{ color: ERROR_COLOR, fontWeight: 600, fontSize: '0.72rem' }}>
+                                                                    {destination.mapStatus === 'mapping'
+                                                                        ? '⏳ Searching Google Maps…'
+                                                                        : (destination.searchResults || []).length === 0
+                                                                            ? '⚠ No match found — select from dropdown or click Skip to continue without mapping.'
+                                                                            : '⚠ Select the correct place below, or click Skip to continue without mapping.'}
+                                                                </Typography>
+                                                            )}
 
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Description (optional)"
-                                                                value={destination.description}
-                                                                onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'description', e.target.value)}
-                                                                size="small"
-                                                                multiline
-                                                                rows={2}
-                                                                sx={inputSx}
-                                                            />
-                                                        </Stack>
-                                                    )}
-
-                                                    {/* MAPPING — spinner while auto-searching Places */}
-                                                    {destination.mapStatus === 'mapping' && (
-                                                        <Stack direction="row" spacing={1.5} alignItems="center" sx={{ py: 0.5 }}>
-                                                            <CircularProgress size={16} sx={{ color: COLORS.brand }} />
-                                                            <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
-                                                                Searching for <strong style={{ color: COLORS.text }}>{destination.location}</strong>…
-                                                            </Typography>
-                                                        </Stack>
-                                                    )}
-
-                                                    {/* PICKING — search results, user chooses or skips */}
-                                                    {destination.mapStatus === 'picking' && (
-                                                        <Stack spacing={1.5}>
-                                                            <Stack direction="row" justifyContent="space-between" alignItems="center">
-                                                                <Stack spacing={0.2}>
-                                                                    <Typography variant="subtitle2" sx={{ color: COLORS.text, fontWeight: 600 }}>
-                                                                        {destination.location}
-                                                                    </Typography>
-                                                                    <Typography variant="caption" sx={{ color: COLORS.fadedText }}>
-                                                                        {(destination.searchResults || []).length === 0
-                                                                            ? 'No matching place found on Google Maps'
-                                                                            : (destination.searchResults || []).length === 1
-                                                                                ? 'Skip if you don\'t see your desired place below'
-                                                                                : 'Pick the right place or skip if none match'}
-                                                                    </Typography>
-                                                                </Stack>
-                                                                <Stack direction="row" spacing={0.5}>
-                                                                    <Button size="small" onClick={() => handleSkipMapping(dayIndex, destIndex)}
-                                                                        sx={{ fontSize: '0.72rem', color: COLORS.fadedText, bgcolor: COLORS.cardSecondary, borderRadius: 1.5, minWidth: 0, px: 1.2, '&:hover': { color: COLORS.text, bgcolor: 'rgba(255,255,255,0.1)' } }}>
-                                                                        Skip
-                                                                    </Button>
-                                                                    <Button size="small" onClick={() => handleRemoveDestination(dayIndex, destIndex)}
-                                                                        sx={{ fontSize: '0.72rem', color: COLORS.error, bgcolor: 'rgba(255,107,107,0.08)', borderRadius: 1.5, minWidth: 0, px: 1.2, '&:hover': { bgcolor: 'rgba(255,107,107,0.18)' } }}>
-                                                                        Delete
-                                                                    </Button>
-                                                                </Stack>
-                                                            </Stack>
-
-                                                            {(destination.searchResults || []).length > 0 && (
+                                                            {/* Search results inline */}
+                                                            {destination.mapStatus === 'picking' && (destination.searchResults || []).length > 0 && (
                                                                 <Stack spacing={1}>
                                                                     {destination.searchResults.map((place, pi) => (
                                                                         <Box key={place.google_place_id || pi}
                                                                             onClick={() => handlePickPlace(dayIndex, destIndex, place)}
                                                                             sx={{
                                                                                 p: 1.5, borderRadius: 2,
-                                                                                bgcolor: 'rgba(51,204,204,0.04)',
-                                                                                border: `1px solid rgba(51,204,204,0.15)`,
+                                                                                bgcolor: isDark ? 'rgba(51,204,204,0.08)' : 'rgba(26,175,175,0.06)',
+                                                                                border: `1.5px solid ${isDark ? 'rgba(51,204,204,0.25)' : 'rgba(26,175,175,0.3)'}`,
                                                                                 cursor: 'pointer',
-                                                                                transition: 'all 0.2s',
-                                                                                '&:hover': { bgcolor: 'rgba(51,204,204,0.1)', border: `1px solid rgba(51,204,204,0.35)` },
+                                                                                transition: 'all 0.15s',
+                                                                                '&:hover': {
+                                                                                    bgcolor: isDark ? 'rgba(51,204,204,0.15)' : 'rgba(26,175,175,0.12)',
+                                                                                    border: `1.5px solid ${COLORS.brand}`,
+                                                                                    transform: 'translateX(2px)',
+                                                                                },
                                                                             }}>
                                                                             <Stack direction="row" spacing={1.5} alignItems="center">
                                                                                 <LocationOnIcon sx={{ fontSize: 16, color: COLORS.brand, flexShrink: 0 }} />
@@ -1023,6 +1091,54 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     ))}
                                                                 </Stack>
                                                             )}
+
+                                                            <Stack direction="row" spacing={2}>
+                                                                <TextField
+                                                                    label="Time"
+                                                                    type="time"
+                                                                    value={destination.time}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'time', e.target.value)}
+                                                                    InputLabelProps={{ shrink: true }}
+                                                                    size="small"
+                                                                    sx={{ ...nestedInputSx, flex: 1 }}
+                                                                />
+                                                                <TextField
+                                                                    label={`Budget (${tripInfo.currency})`}
+                                                                    type="number"
+                                                                    value={destination.estimated_budget}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'estimated_budget', e.target.value)}
+                                                                    placeholder="0"
+                                                                    size="small"
+                                                                    inputProps={{ min: 0 }}
+                                                                    sx={{ ...nestedInputSx, flex: 1 }}
+                                                                />
+                                                            </Stack>
+
+                                                            <Stack direction="row" spacing={2} alignItems="flex-start">
+                                                                <TextField
+                                                                    select
+                                                                    label="Type"
+                                                                    value={destination.activity_type || 'destination'}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'activity_type', e.target.value)}
+                                                                    size="small"
+                                                                    sx={{ ...nestedInputSx, minWidth: 130 }}
+                                                                    SelectProps={{ native: true }}
+                                                                >
+                                                                    {ACTIVITY_TYPES.map(t => (
+                                                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                                                    ))}
+                                                                </TextField>
+                                                                <TextField
+                                                                    fullWidth
+                                                                    label="Description (optional)"
+                                                                    value={destination.description}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'description', e.target.value)}
+                                                                    size="small"
+                                                                    multiline
+                                                                    rows={2}
+                                                                    sx={nestedInputSx}
+                                                                />
+                                                            </Stack>
                                                         </Stack>
                                                     )}
 
@@ -1037,10 +1153,10 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     ) : destination.mapStatus === 'skipped' ? (
                                                                         <CheckCircleIcon sx={{ fontSize: 18, color: '#ffb74d' }} />
                                                                     ) : (
-                                                                        <LocationOnIcon fontSize="small" sx={{ color: COLORS.error }} />
+                                                                        <LocationOnIcon fontSize="small" sx={{ color: ERROR_COLOR }} />
                                                                     )}
                                                                     <Typography variant="subtitle2" sx={{ color: destination.mapStatus === 'mapped' ? COLORS.brand : destination.mapStatus === 'skipped' ? '#ffb74d' : COLORS.fadedText }}>
-                                                                        Destination {destIndex + 1}
+                                                                        {destination.title || destination.location || `Destination ${destIndex + 1}`}
                                                                     </Typography>
                                                                     {destination.mapStatus === 'mapped' && (
                                                                         <Chip label="Mapped" size="small" sx={{ height: 18, fontSize: '0.65rem', bgcolor: 'rgba(51,204,204,0.12)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)` }} />
@@ -1095,7 +1211,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                         sx={{
                                                                             color: COLORS.fadedText,
                                                                             borderRadius: 1.5,
-                                                                            '&:hover': { color: COLORS.error, bgcolor: 'rgba(255,107,107,0.1)' },
+                                                                            '&:hover': { color: ERROR_COLOR, bgcolor: 'rgba(255,107,107,0.1)' },
                                                                         }}
                                                                     >
                                                                         <DeleteIcon fontSize="small" />
@@ -1104,8 +1220,19 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                             </Stack>
 
                                                             {/* location — full width */}
+                                                            <TextField
+                                                                fullWidth
+                                                                label="Title (optional)"
+                                                                value={destination.title || ''}
+                                                                onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'title', e.target.value)}
+                                                                placeholder="e.g., Sunrise at Sarangkot"
+                                                                size="small"
+                                                                sx={nestedInputSx}
+                                                            />
+
                                                             <PlaceSearchAutocomplete
                                                                 label="Location/Place"
+                                                                destinationContext={tripInfo.destination}
                                                                 value={destination.location}
                                                                 onChange={(text) => handleDestinationChange(dayIndex, destIndex, 'location', text)}
                                                                 onSelect={(place) => handlePlaceSelect(dayIndex, destIndex, place)}
@@ -1147,7 +1274,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'time', e.target.value)}
                                                                     InputLabelProps={{ shrink: true }}
                                                                     size="small"
-                                                                    sx={{ ...inputSx, flex: 1 }}
+                                                                    sx={{ ...nestedInputSx, flex: 1 }}
                                                                 />
                                                                 <TextField
                                                                     label={`Budget (${tripInfo.currency})`}
@@ -1157,22 +1284,37 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                     placeholder="0"
                                                                     size="small"
                                                                     inputProps={{ min: 0 }}
-                                                                    sx={{ ...inputSx, flex: 1 }}
+                                                                    sx={{ ...nestedInputSx, flex: 1 }}
                                                                 />
                                                             </Stack>
 
-                                                            {/* description — full width */}
-                                                            <TextField
-                                                                fullWidth
-                                                                label="Description (optional)"
-                                                                value={destination.description}
-                                                                onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'description', e.target.value)}
-                                                                placeholder="e.g., Will enjoy local Bhajan in our way"
-                                                                size="small"
-                                                                multiline
-                                                                rows={2}
-                                                                sx={inputSx}
-                                                            />
+                                                            {/* type + description */}
+                                                            <Stack direction="row" spacing={2} alignItems="flex-start">
+                                                                <TextField
+                                                                    select
+                                                                    label="Type"
+                                                                    value={destination.activity_type || 'destination'}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'activity_type', e.target.value)}
+                                                                    size="small"
+                                                                    sx={{ ...nestedInputSx, minWidth: 130 }}
+                                                                    SelectProps={{ native: true }}
+                                                                >
+                                                                    {ACTIVITY_TYPES.map(t => (
+                                                                        <option key={t.value} value={t.value}>{t.label}</option>
+                                                                    ))}
+                                                                </TextField>
+                                                                <TextField
+                                                                    fullWidth
+                                                                    label="Description (optional)"
+                                                                    value={destination.description}
+                                                                    onChange={(e) => handleDestinationChange(dayIndex, destIndex, 'description', e.target.value)}
+                                                                    placeholder="e.g., Will enjoy local Bhajan in our way"
+                                                                    size="small"
+                                                                    multiline
+                                                                    rows={2}
+                                                                    sx={nestedInputSx}
+                                                                />
+                                                            </Stack>
 
                                                             {/* move to day */}
                                                             {days.length > 1 && (
@@ -1185,7 +1327,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                             sx={{
                                                                                 height: 20, fontSize: '0.62rem', cursor: 'pointer',
                                                                                 bgcolor: 'rgba(255,255,255,0.05)', color: COLORS.fadedText,
-                                                                                border: `1px solid ${COLORS.border}`,
+                                                                                border: `1px solid ${COLORS.cardBorder}`,
                                                                                 '&:hover': { bgcolor: 'rgba(51,204,204,0.1)', color: COLORS.brand, borderColor: 'rgba(51,204,204,0.3)' },
                                                                             }}
                                                                         />
@@ -1254,7 +1396,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                             <Card
                                 sx={{
                                     bgcolor: COLORS.cardPrimary,
-                                    border: `1px solid ${COLORS.border}`,
+                                    border: `1px solid ${COLORS.cardBorder}`,
                                     borderRadius: 3,
                                     boxShadow: 'none',
                                 }}
@@ -1265,12 +1407,24 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     </Typography>
                                     <Stack spacing={1}>
                                         <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
+                                            📍 {tripInfo.destination.split(',').map(s=>s.trim()).filter(Boolean).join(', ')}
+                                        </Typography>
+                                        <Typography variant="body2" sx={{ color: COLORS.fadedText }}>
                                             {formatDate(tripInfo.start_date)} – {formatDate(tripInfo.end_date)} ({days.length} days)
                                         </Typography>
                                         {tripInfo.estimated_budget && (
                                             <Typography variant="body2" fontWeight="medium" sx={{ color: COLORS.brand }}>
                                                 Estimated Budget: {tripInfo.currency} {parseFloat(tripInfo.estimated_budget).toLocaleString()}
                                             </Typography>
+                                        )}
+                                        {selectedTags.length > 0 && (
+                                            <Stack direction="row" flexWrap="wrap" gap={0.5} sx={{ pt: 0.5 }}>
+                                                {selectedTags.map(tag => (
+                                                    <Chip key={tag} label={tag} size="small"
+                                                        sx={{ height: 20, fontSize: '0.65rem', bgcolor: 'rgba(51,204,204,0.12)', color: COLORS.brand, border: `1px solid rgba(51,204,204,0.3)` }}
+                                                    />
+                                                ))}
+                                            </Stack>
                                         )}
                                     </Stack>
                                 </CardContent>
@@ -1281,7 +1435,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                     key={day.day_number}
                                     sx={{
                                         bgcolor: COLORS.cardPrimary,
-                                        border: `1px solid ${COLORS.border}`,
+                                        border: `1px solid ${COLORS.cardBorder}`,
                                         borderRadius: 3,
                                         boxShadow: 'none',
                                     }}
@@ -1305,6 +1459,11 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                                                 {dest.time && (
                                                                     <Typography component="span" variant="caption" sx={{ color: COLORS.fadedText, ml: 1 }}>
                                                                         @ {dest.time}
+                                                                    </Typography>
+                                                                )}
+                                                                {dest.activity_type && dest.activity_type !== 'destination' && (
+                                                                    <Typography component="span" variant="caption" sx={{ color: COLORS.fadedText, ml: 1 }}>
+                                                                        · {ACTIVITY_TYPES.find(t => t.value === dest.activity_type)?.label || dest.activity_type}
                                                                     </Typography>
                                                                 )}
                                                                 {dest.google_place_id && (
@@ -1336,7 +1495,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 sx={{
                     px: 3,
                     py: 2,
-                    borderTop: `1px solid ${COLORS.border}`,
+                    borderTop: `1px solid ${COLORS.cardBorder}`,
                     bgcolor: 'transparent',
                     gap: 1,
                 }}

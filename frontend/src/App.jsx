@@ -4,6 +4,7 @@ import { ThemeProvider } from './context/ThemeContext';  // adjust path to where
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Register from './pages/Signup';
+import SearchResults from './pages/SearchResults';
 import Dashboard from './pages/Dashboard';
 import ItineraryDetail from './pages/ItineraryDetail.jsx';
 import CommunityFeed from './pages/CommunityFeed';
@@ -39,6 +40,7 @@ function App() {
           <Route path="/itineraries"   element={<ProtectedRoute requiredRole="user"><MyItineraries /></ProtectedRoute>} />
           <Route path="/profile"       element={<ProtectedRoute requiredRole="user"><ProfileSettings /></ProtectedRoute>} />
           <Route path="/map"           element={<ProtectedRoute requiredRole="user"><InteractiveMap /></ProtectedRoute>} />
+          <Route path="/search"         element={<ProtectedRoute requiredRole="user"><SearchResults /></ProtectedRoute>} />
 
           <Route path="/admin" element={<ProtectedRoute requiredRole="admin"><AdminDashboard /></ProtectedRoute>} />
         </Routes>
