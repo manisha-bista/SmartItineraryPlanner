@@ -326,7 +326,7 @@ const Dashboard = () => {
                             '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
                             transition: 'all 0.3s',
                         }}>
-                            'Search'
+                            Search
                         </Button>
                     </Stack>
 

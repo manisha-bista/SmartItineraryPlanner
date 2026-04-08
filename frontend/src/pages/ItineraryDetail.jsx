@@ -146,6 +146,8 @@ export default function ItineraryDetail() {
     const [forking, setForking]           = useState(false);
     const [titleEditing, setTitleEditing] = useState(false);
     const [titleDraft,   setTitleDraft]   = useState('');
+    const [dateEditing, setDateEditing] = useState(false);
+    const [dateDraft,   setDateDraft]   = useState('');
     const [isAcceptedCollaborator, setIsAcceptedCollaborator] = useState(false);
 
     const [timePromptOpen, setTimePromptOpen] = useState(false);
@@ -234,15 +236,20 @@ export default function ItineraryDetail() {
         setCommunitySharing(true);
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, {
+            const payload = {
                 title: feedTitle.trim(),
                 body: feedBody.trim() || null,
+                image_url: null,
                 tag: 'Experience',
-                place: feedPlaces.join(', ') || itinerary.destination || 'Nepal',
+                place: (feedPlaces.join(', ') || itinerary.destination || 'Nepal').substring(0, 200),
                 shared_itinerary_id: itinerary.id,
-            });
+            };
+            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, payload);
             setShareOpen(false); toast('Shared to community feed!');
-        } catch { toast('Failed to share to community.', 'error'); }
+        } catch (err) { 
+            const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
+            toast(`Failed to share: ${errorMsg}`, 'error'); 
+        }
         finally { setCommunitySharing(false); }
     };
 
@@ -573,9 +580,57 @@ export default function ItineraryDetail() {
 
                     <Stack direction="row" alignItems="center" spacing={0.75}>
                         <CalendarTodayIcon sx={{ fontSize: '0.95rem', color: C.faded }} />
-                        <Typography variant="body2" sx={{ color: C.sub, fontWeight: 500 }}>
-                            {fmtDate(itinerary.start_date)} – {fmtDate(itinerary.end_date)}
-                        </Typography>
+                        {dateEditing ? (
+                            <Stack direction="row" alignItems="center" spacing={1}>
+                                <TextField
+                                    size="small"
+                                    type="date"
+                                    value={dateDraft}
+                                    onChange={e => setDateDraft(e.target.value)}
+                                    InputLabelProps={{ shrink: true }}
+                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, fontSize: '0.82rem', '& fieldset': { borderColor: C.brand }, '&:hover fieldset': { borderColor: C.brand } }, '& .MuiInputBase-input': { color: C.text, py: 0.5, px: 1 } }}
+                                />
+                                <Button size="small" onClick={async () => {
+                                    if (!dateDraft) { setDateEditing(false); return; }
+                                    try {
+                                        // Remap all day dates based on new start date
+                                        const newStart = new Date(dateDraft);
+                                        const days = itinerary.days || [];
+                                        // Update start_date (and end_date derived from days count)
+                                        const newEnd = new Date(newStart);
+                                        newEnd.setDate(newEnd.getDate() + days.length - 1);
+                                        await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, {
+                                            start_date: dateDraft,
+                                            end_date: newEnd.toISOString().split('T')[0],
+                                        });
+                                        // Update each day's date offset
+                                        await Promise.all(days.map((day, i) => {
+                                            const d = new Date(newStart);
+                                            d.setDate(d.getDate() + i);
+                                            return axios.put(`http://127.0.0.1:8000/itinerary-days/${day.id}`, {
+                                                date: d.toISOString().split('T')[0],
+                                            });
+                                        }));
+                                        await reload();
+                                        toast('Start date updated — all days remapped!');
+                                    } catch (e) { toast(e.response?.data?.detail || 'Failed to update date.', 'error'); }
+                                    setDateEditing(false);
+                                }} sx={{ bgcolor: C.brand, color: C.bg, borderRadius: 2, fontWeight: 'bold', px: 2, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>Save</Button>
+                                <Button size="small" onClick={() => setDateEditing(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem' }}>Cancel</Button>
+                            </Stack>
+                        ) : (
+                            <Stack direction="row" alignItems="center" spacing={0.5}>
+                                <Typography variant="body2" sx={{ color: C.sub, fontWeight: 500 }}>
+                                    {fmtDate(itinerary.start_date)} – {fmtDate(itinerary.end_date)}
+                                </Typography>
+                                {(isOwner || isAcceptedCollaborator) && (
+                                    <IconButton size="small" onClick={() => { setDateDraft(itinerary.start_date?.split('T')[0] || ''); setDateEditing(true); }}
+                                        sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.brand, bgcolor: `${C.brand}14` } }}>
+                                        <EditIcon sx={{ fontSize: 14 }} />
+                                    </IconButton>
+                                )}
+                            </Stack>
+                        )}
                     </Stack>
 
                     <Stack direction="row" alignItems="center" spacing={0.75}>
@@ -1345,10 +1400,53 @@ export default function ItineraryDetail() {
                             ? 'Activity reordered. Set a new start time (optional):'
                             : `Moving to ${(() => { const d = itinerary.days?.find(d => d.id === pendingDrop?.dstDayId); return d ? `Day ${d.day_number}` : 'new day'; })()}. Set a start time (optional):`}
                     </Typography>
-                    <TextField fullWidth type="time" label="Start Time (optional)" value={dropTime}
-                        onChange={e => setDropTime(e.target.value)}
-                        InputLabelProps={{ shrink: true }}
-                        sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.bg, borderRadius: 2, color: C.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: C.brand }, '&.Mui-focused fieldset': { borderColor: C.brand } }, '& .MuiInputLabel-root': { color: C.faded }, '& .MuiInputLabel-root.Mui-focused': { color: C.brand } }} />
+                    <Box>
+                        <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Start Time (optional)</Typography>
+                        <Stack direction="row" spacing={0.75} alignItems="center">
+                            {/* Hour */}
+                            <Select size="small" displayEmpty
+                                value={(() => { if (!dropTime) return ''; const h = parseInt(dropTime.split(':')[0]); return String(h % 12 || 12).padStart(2, '0'); })()}
+                                onChange={(e) => {
+                                    const hr = parseInt(e.target.value) || 12;
+                                    const m = (dropTime || '00:00').split(':')[1] || '00';
+                                    const isPM = dropTime ? parseInt(dropTime.split(':')[0]) >= 12 : false;
+                                    const h24 = isPM ? (hr === 12 ? 12 : hr + 12) : (hr === 12 ? 0 : hr);
+                                    setDropTime(`${String(h24).padStart(2, '0')}:${m}`);
+                                }}
+                                sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
+                                MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, maxHeight: 260, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                                <MenuItem value="" sx={{ color: C.faded }}>HH</MenuItem>
+                                {Array.from({ length: 12 }, (_, i) => i + 1).map(h => (
+                                    <MenuItem key={h} value={String(h).padStart(2, '0')}>{String(h).padStart(2, '0')}</MenuItem>
+                                ))}
+                            </Select>
+                            <Typography sx={{ color: C.faded, fontWeight: 700, fontSize: '1rem' }}>:</Typography>
+                            {/* Minute */}
+                            <Select size="small" displayEmpty
+                                value={dropTime ? dropTime.split(':')[1] || '00' : ''}
+                                onChange={(e) => { const h = (dropTime || '00:00').split(':')[0]; setDropTime(`${h}:${e.target.value}`); }}
+                                sx={{ flex: 1, bgcolor: C.bg, color: C.text, borderRadius: 2, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.faded }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 600 } }}
+                                MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                                <MenuItem value="" sx={{ color: C.faded }}>MM</MenuItem>
+                                {['00', '15', '30', '45'].map(m => <MenuItem key={m} value={m}>{m}</MenuItem>)}
+                            </Select>
+                            {/* AM/PM */}
+                            <Select size="small"
+                                value={dropTime ? (parseInt(dropTime.split(':')[0]) >= 12 ? 'PM' : 'AM') : 'AM'}
+                                onChange={(e) => {
+                                    const [hStr, m] = (dropTime || '00:00').split(':');
+                                    let h = parseInt(hStr) || 0;
+                                    if (e.target.value === 'PM' && h < 12) h += 12;
+                                    if (e.target.value === 'AM' && h >= 12) h -= 12;
+                                    setDropTime(`${String(h).padStart(2, '0')}:${m || '00'}`);
+                                }}
+                                sx={{ flex: 1, bgcolor: C.bg, color: C.brand, borderRadius: 2, fontWeight: 700, '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border }, '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand }, '& .MuiSelect-icon': { color: C.brand }, '& .MuiSelect-select': { py: 1.1, fontSize: '0.9rem', fontWeight: 700 } }}
+                                MenuProps={{ PaperProps: { sx: { bgcolor: C.card, color: C.text, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}1A` } } } }}>
+                                <MenuItem value="AM">AM</MenuItem>
+                                <MenuItem value="PM">PM</MenuItem>
+                            </Select>
+                        </Stack>
+                    </Box>
                 </DialogContent>
                 <DialogActions sx={{ px: 3, pb: 2.5 }}>
                     <Button onClick={cancelDrop} sx={{ color: C.faded }}>Cancel</Button>
@@ -1358,7 +1456,6 @@ export default function ItineraryDetail() {
                     </Button>
                 </DialogActions>
             </Dialog>
-
             {/* ── Snackbar ─────────────────────────────────────────────────── */}
             <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack(p => ({ ...p, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
                 <Alert severity={snack.sev} onClose={() => setSnack(p => ({ ...p, open: false }))} sx={{ bgcolor: C.card, color: C.text, borderRadius: 3 }}>

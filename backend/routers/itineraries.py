@@ -496,6 +496,62 @@ def remove_collaborator(
     return {"status": "removed"}
 
 
+@router.get("/itineraries/user/{user_id}/pending-collabs")
+def get_pending_collabs(user_id: int, db: Session = Depends(get_db)):
+    """Return all itineraries where the user has a pending collaboration invite."""
+    pending = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.user_id == user_id,
+        models.ItineraryCollaborator.status == "pending",
+    ).all()
+    result = []
+    for c in pending:
+        itin = db.query(models.Itinerary).filter(models.Itinerary.id == c.itinerary_id).first()
+        if not itin:
+            continue
+        inviter = db.query(models.User).filter(models.User.id == c.invited_by).first()
+        result.append({
+            "collab_id": c.id,
+            "itinerary_id": itin.id,
+            "itinerary_title": itin.title,
+            "itinerary_destination": itin.destination,
+            "invited_by": c.invited_by,
+            "invited_by_username": inviter.username if inviter else None,
+            "invited_by_avatar_id": inviter.avatar_id if inviter else 1,
+            "created_at": c.created_at.isoformat() if c.created_at else None,
+        })
+    return result
+
+@router.get("/itineraries/user/{user_id}/collaborations")
+def get_user_collaborations(user_id: int, db: Session = Depends(get_db)):
+    """Return all itineraries where the user is an accepted collaborator (not the owner)."""
+    accepted = db.query(models.ItineraryCollaborator).filter(
+        models.ItineraryCollaborator.user_id == user_id,
+        models.ItineraryCollaborator.status == "accepted",
+    ).all()
+    result = []
+    for c in accepted:
+        itin = db.query(models.Itinerary).filter(models.Itinerary.id == c.itinerary_id).first()
+        if not itin:
+            continue
+        owner = db.query(models.User).filter(models.User.id == itin.user_id).first()
+        cover_photo = _pick_cover_photo(db, itin)
+        result.append({
+            "id":               itin.id,
+            "title":            itin.title,
+            "destination":      itin.destination,
+            "start_date":       itin.start_date.isoformat() if itin.start_date else None,
+            "end_date":         itin.end_date.isoformat()   if itin.end_date   else None,
+            "status":           itin.status,
+            "estimated_budget": itin.estimated_budget,
+            "currency":         itin.currency,
+            "cover_photo":      cover_photo,
+            "is_public":        itin.is_public,
+            "owner_username":   owner.username   if owner else None,
+            "owner_avatar_id":  owner.avatar_id  if owner else 1,
+            "weather_fetched_at": None,
+        })
+    return result
+
 # ── Days ───────────────────────────────────────────────────────────────────────
 @router.post("/itinerary-days", response_model=schemas.ItineraryDayOut, status_code=status.HTTP_201_CREATED)
 def create_day(day: schemas.ItineraryDayCreate, db: Session = Depends(get_db)):

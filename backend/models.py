@@ -174,8 +174,8 @@ class Activity(Base):
     user_ratings_total = Column(Integer, nullable=True)
     
     # Photos from Google Places
-    photo_reference = Column(String(500), nullable=True)
-    
+    photo_reference = Column(Text, nullable=True)
+
     # Timing
     start_time = Column(Time, nullable=True)
     end_time = Column(Time, nullable=True)
@@ -235,8 +235,8 @@ class Accommodation(Base):
     longitude = Column(Float, nullable=True)
     place_id = Column(String(200), nullable=True, index=True)
     rating = Column(Float, nullable=True)
-    photo_reference = Column(String(500), nullable=True)
-    
+    photo_reference = Column(Text, nullable=True)
+
     # Check-in/out
     check_in_date = Column(Date, nullable=False, index=True)
     check_out_date = Column(Date, nullable=False)

@@ -14,39 +14,6 @@ from routers.auth import get_password_hash, verify_password
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["Users"])
 
-# Avatar list is defined here — single source of truth, served dynamically via /avatars
-AVATAR_LIST = [
-    {"id": 1,  "emoji": "🏔️", "color": "#33CCCC"},
-    {"id": 2,  "emoji": "🌄", "color": "#FF7043"},
-    {"id": 3,  "emoji": "🏕️", "color": "#66BB6A"},
-    {"id": 4,  "emoji": "🧗", "color": "#AB47BC"},
-    {"id": 5,  "emoji": "🚶", "color": "#42A5F5"},
-    {"id": 6,  "emoji": "🌿", "color": "#26A69A"},
-    {"id": 7,  "emoji": "🦅", "color": "#8D6E63"},
-    {"id": 8,  "emoji": "🌺", "color": "#EC407A"},
-    {"id": 9,  "emoji": "🏯", "color": "#FFB74D"},
-    {"id": 10, "emoji": "🛶", "color": "#5C6BC0"},
-    {"id": 11, "emoji": "🌙", "color": "#78909C"},
-    {"id": 12, "emoji": "☀️", "color": "#FDD835"},
-    {"id": 13, "emoji": "🦋", "color": "#29B6F6"},
-    {"id": 14, "emoji": "🐾", "color": "#A1887F"},
-    {"id": 15, "emoji": "🎒", "color": "#EF5350"},
-    {"id": 16, "emoji": "🗻", "color": "#7E57C2"},
-    {"id": 17, "emoji": "🌊", "color": "#0097A7"},
-    {"id": 18, "emoji": "🔥", "color": "#FF5722"},
-    {"id": 19, "emoji": "❄️", "color": "#90CAF9"},
-    {"id": 20, "emoji": "🌈", "color": "#9CCC65"},
-]
-
-
-# ── Avatars (no prefix — served at /avatars) ───────────────────────────────────
-avatar_router = APIRouter(tags=["Users"])
-
-@avatar_router.get("/avatars")
-def get_avatars():
-    return {"avatars": AVATAR_LIST}
-
-
 # ── User CRUD ──────────────────────────────────────────────────────────────────
 @router.get("/", response_model=List[schemas.UserOut])
 def list_users(db: Session = Depends(get_db)):
@@ -274,6 +241,24 @@ def check_friendship(
     return {"status": f.status, "friendship_id": f.id, "is_requester": f.requester_id == user_id}
 
 
+@friends_router.get("/{user_id}/pending")
+def get_pending_requests(user_id: int, db: Session = Depends(get_db)):
+    incoming = db.query(models.Friendship).filter(
+        models.Friendship.receiver_id == user_id,
+        models.Friendship.status == "pending",
+    ).all()
+    requests = []
+    for f in incoming:
+        requester = db.query(models.User).filter(models.User.id == f.requester_id).first()
+        if requester:
+            requests.append({
+                "friendship_id": f.id, "user_id": requester.id,
+                "username": requester.username, "avatar_id": requester.avatar_id,
+                "created_at": f.created_at.isoformat() if f.created_at else None,
+            })
+    return {"requests": requests, "count": len(requests)}
+
+
 @friends_router.get("/{user_id}")
 def get_friends(user_id: int, db: Session = Depends(get_db)):
     friendships = db.query(models.Friendship).filter(
@@ -292,24 +277,6 @@ def get_friends(user_id: int, db: Session = Depends(get_db)):
                 "since": f.accepted_at.isoformat() if f.accepted_at else None,
             })
     return {"friends": friends, "count": len(friends)}
-
-
-@friends_router.get("/{user_id}/pending")
-def get_pending_requests(user_id: int, db: Session = Depends(get_db)):
-    incoming = db.query(models.Friendship).filter(
-        models.Friendship.receiver_id == user_id,
-        models.Friendship.status == "pending",
-    ).all()
-    requests = []
-    for f in incoming:
-        requester = db.query(models.User).filter(models.User.id == f.requester_id).first()
-        if requester:
-            requests.append({
-                "friendship_id": f.id, "user_id": requester.id,
-                "username": requester.username, "avatar_id": requester.avatar_id,
-                "created_at": f.created_at.isoformat() if f.created_at else None,
-            })
-    return {"requests": requests, "count": len(requests)}
 
 
 @friends_router.delete("/{friendship_id}")

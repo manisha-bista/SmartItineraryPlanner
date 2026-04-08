@@ -67,30 +67,92 @@ def _place_to_dict(p: models.Place) -> dict:
     }
 
 
-# Canonical city list — used for city extraction from addresses and result sorting
+# Canonical city/region list — used for city extraction from addresses and result sorting
 _ALL_CITIES = [
-    # Major cities first (longer match wins via ordering)
-    "Kathmandu", "Pokhara", "Bhaktapur", "Lalitpur", "Chitwan",
-    "Lumbini", "Mustang", "Nagarkot", "Namche", "Lukla",
-    "Gorkha", "Janakpur", "Tansen", "Bardiya", "Manang",
-    "Jomsom", "Bandipur", "Dhulikhel", "Kirtipur",
-    # Kathmandu sub-areas — map to parent city
-    "Boudha", "Thamel", "Patan",
+    "Kathmandu", "Pokhara", "Lalitpur", "Bhaktapur", "Bharatpur",
+    "Lumbini", "Namche", "Lukla", "Jomsom", "Manang",
+    "Lo Manthang", "Nagarkot", "Dhulikhel", "Bandipur", "Tansen",
+    "Gorkha", "Janakpur", "Kirtipur", "Dharan", "Biratnagar",
+    "Butwal", "Hetauda", "Itahari", "Nepalgunj", "Birendranagar",
+    "Dhangadhi", "Siddharthanagar", "Panauti", "Ilam", "Dhankuta",
+    "Phaplu", "Salleri", "Okhaldhunga", "Khandbari", "Tumlingtar",
+    "Charikot", "Jiri", "Besisahar", "Chame", "Kagbeni",
+    "Syabrubesi", "Dhunche", "Ghandruk", "Ghorepani", "Tatopani",
+    "Beni", "Baglung", "Jumla", "Simikot", "Dunai",
+    "Taplejung", "Damauli", "Sauraha", "Thakurdwara", "Kakani",
+    "Daman",
+    # Mountain regions
+    "Annapurna",
 ]
-# Sub-areas that should map to a parent city
+
+# Sub-areas / neighbourhoods → canonical parent city
 _SUBAREA_MAP = {
-    "Boudha":    "Kathmandu",
-    "Thamel":    "Kathmandu",
-    "Patan":     "Lalitpur",
-    "Lalitpur":  "Lalitpur",
+    # Kathmandu
+    "Thamel": "Kathmandu", "Boudha": "Kathmandu", "Bouddha": "Kathmandu",
+    "Swayambhu": "Kathmandu", "Swayambhunath": "Kathmandu", "Asan": "Kathmandu",
+    "Pashupatinath": "Kathmandu", "Durbar Marg": "Kathmandu", "Naxal": "Kathmandu",
+    "Basantapur": "Kathmandu", "Baneshwor": "Kathmandu", "Koteshwor": "Kathmandu",
+    "Maharajgunj": "Kathmandu", "Baluwatar": "Kathmandu", "Chabahil": "Kathmandu",
+    "Gaushala": "Kathmandu", "Sinamangal": "Kathmandu", "Kalimati": "Kathmandu",
+    "Teku": "Kathmandu", "Tripureshwor": "Kathmandu", "Lazimpat": "Kathmandu",
+    "Thapathali": "Kathmandu", "Putalisadak": "Kathmandu", "Kamaladi": "Kathmandu",
+    "Gyaneshwor": "Kathmandu", "Maitidevi": "Kathmandu", "Dillibazar": "Kathmandu",
+    "Anamnagar": "Kathmandu", "Kuleshwor": "Kathmandu", "Bafal": "Kathmandu",
+    "Sitapaila": "Kathmandu", "Samakhusi": "Kathmandu", "Gongabu": "Kathmandu",
+    "Tokha": "Kathmandu", "Budhanilkantha": "Kathmandu", "Kapan": "Kathmandu",
+    "Gokarna": "Kathmandu", "Sundarijal": "Kathmandu", "Dakshinkali": "Kathmandu",
+    "Chobhar": "Kathmandu", "Chandragiri": "Kathmandu", "New Road": "Kathmandu",
+    "Indrachowk": "Kathmandu", "Jamal": "Kathmandu", "Makhan": "Kathmandu",
+    "Tahachal": "Kathmandu",
+    # Lalitpur
+    "Patan": "Lalitpur", "Jawalakhel": "Lalitpur", "Jhamsikhel": "Lalitpur",
+    "Godawari": "Lalitpur",
+    # Bhaktapur
+    "Thimi": "Bhaktapur", "Suryabinayak": "Bhaktapur", "Sallaghari": "Bhaktapur",
+    "Kamalbinayak": "Bhaktapur", "Dattatreya": "Bhaktapur", "Taumadhi": "Bhaktapur",
+    "Pottery Square": "Bhaktapur", "Byasi": "Bhaktapur", "Chyamasingh": "Bhaktapur",
+    "Bageshwori": "Bhaktapur", "Changunarayan": "Bhaktapur", "Bode": "Bhaktapur",
+    "Nagdesh": "Bhaktapur", "Katunje": "Bhaktapur", "Balkot": "Bhaktapur",
+    "Sirutar": "Bhaktapur", "Dadhikot": "Bhaktapur",
+    # Pokhara
+    "Lakeside": "Pokhara", "Sarangkot": "Pokhara", "Phewa": "Pokhara",
+    "Begnas": "Pokhara", "Mahendrapul": "Pokhara", "Chipledhunga": "Pokhara",
+    "Prithvichowk": "Pokhara", "Srijanachowk": "Pokhara", "Parsyang": "Pokhara",
+    "Bagar": "Pokhara", "Amarsingh Chowk": "Pokhara", "Ram Bazaar": "Pokhara",
+    "Matepani": "Pokhara", "Kahun Danda": "Pokhara", "Pumdikot": "Pokhara",
+    "Shanti Stupa": "Pokhara", "Hemja": "Pokhara", "Lamachaur": "Pokhara",
+    "Batulechaur": "Pokhara", "Pardi": "Pokhara", "Birauta": "Pokhara",
+    "Chhorepatan": "Pokhara", "Rupakot": "Pokhara", "Majhikuna": "Pokhara",
+    "Khapaudi": "Pokhara", "Pame": "Pokhara",
+    # Other cities
+    "Narayangarh": "Bharatpur", "Devghat": "Bharatpur",
+    "Maya Devi": "Lumbini", "Monastic Zone": "Lumbini",
+    "Khumjung": "Namche", "Tengboche": "Namche",
+    "Gorkha Durbar": "Gorkha",
+    "Janaki Mandir": "Janakpur",
+    "Bhedetar": "Dharan", "Pindeshwor": "Dharan",
+    "Kanyam": "Ilam", "Fikkal": "Ilam",
+    "Tundikhel": "Bandipur",
+    "Shreenagar": "Tansen", "Rani Mahal": "Tansen",
+    "Muktinath": "Kagbeni",
+    # Annapurna region sub-areas
+    "Annapurna Base Camp": "Annapurna", "ABC": "Annapurna",
+    "Annapurna Circuit": "Annapurna", "Poon Hill": "Annapurna",
+    "Tadapani": "Annapurna", "Chomrong": "Annapurna",
+    "Sinuwa": "Annapurna", "Bamboo": "Annapurna",
+    "Dovan": "Annapurna", "Machapuchare Base Camp": "Annapurna",
+    "MBC": "Annapurna",
 }
 
 def _extract_city(address: str) -> Optional[str]:
-    lower = address.lower()
+    # Check sub-areas first (more specific)
+    for subarea, parent in _SUBAREA_MAP.items():
+        if subarea.lower() in address.lower():
+            return parent
+    # Fall back to direct city name match
     for city in _ALL_CITIES:
-        if city.lower() in lower:
-            # Map sub-areas to canonical city
-            return _SUBAREA_MAP.get(city, city)
+        if city.lower() in address.lower():
+            return city
     return None
 
 

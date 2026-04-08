@@ -111,7 +111,7 @@ export default function FriendsPopup({ open, onClose, onOpenChat }) {
         if (!addUsername.trim()) return;
         setAddBusy(true); setAddErr(''); setAddSuccess('');
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
+            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '').replace(/[^a-z0-9]/gi, '') });
             setAddSuccess(`Request sent to @${addUsername.trim()}!`);
             setAddUsername('');
         } catch (e) {

@@ -12,7 +12,7 @@ from database import engine
 import models
 
 from routers import auth, users, itineraries, community, communication, services, admin
-from routers.users import avatar_router, friends_router
+from routers.users import friends_router
 from routers.community import updates_router, complaints_router  # /community-updates and /complaints
 from routers.recommendations import router as recommendations_router
 
@@ -48,7 +48,6 @@ app.add_middleware(
 # ── Routers ────────────────────────────────────────────────────────────────────
 app.include_router(auth.router)
 app.include_router(users.router)
-app.include_router(avatar_router)    # GET /avatars
 app.include_router(friends_router)   # /friends/...
 app.include_router(itineraries.router)
 app.include_router(community.router) # /community/posts, /community/saved, etc.

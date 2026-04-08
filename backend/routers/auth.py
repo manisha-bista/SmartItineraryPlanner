@@ -64,7 +64,7 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
             email=email,
             hashed_password=get_password_hash(user.password),
             username=generate_username(db),
-            avatar_id=random.randint(1, 20),
+            avatar_id=random.randint(1, 30),
         )
         db.add(new_user)
         db.commit()
@@ -127,7 +127,7 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
             if not user.username:
                 user.username = generate_username(db)
             if not user.avatar_id:
-                user.avatar_id = random.randint(1, 20)
+                user.avatar_id = random.randint(1, 30)
             user.last_login = datetime.utcnow()
         else:
             # New user via Google — assign username and avatar just like email signup
@@ -137,7 +137,7 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
                 hashed_password=get_password_hash(secrets.token_hex(32)),
                 profile_picture_url=guser.get("picture") or None,
                 username=generate_username(db),
-                avatar_id=random.randint(1, 20),
+                avatar_id=random.randint(1, 30),
                 role="user",
             )
             db.add(user)

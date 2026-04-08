@@ -30,7 +30,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from database import get_db
-from recommendations.rule_based    import (
+from recommendations.rule_based import (
     get_similar_itineraries,
     get_recommendations_for_new_user,
 )
