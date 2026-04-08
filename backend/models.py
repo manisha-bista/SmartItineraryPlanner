@@ -1,5 +1,5 @@
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Text, Boolean, Time, Index
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, String, Float, ForeignKey, DateTime, Date, Text, Boolean, Time, Index, UniqueConstraint
+from sqlalchemy.orm import relationship, backref
 from database import Base
 from datetime import datetime
 
@@ -15,7 +15,7 @@ class User(Base):
     role = Column(String(20), default="user", nullable=False)  # user, admin
     
     # Profile fields
-    avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-20)
+    avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-30)
     profile_picture_url = Column(String(500), nullable=True)
     bio = Column(Text, nullable=True)
     location = Column(String(200), nullable=True)
@@ -63,6 +63,9 @@ class Itinerary(Base):
     # Engagement metrics
     view_count = Column(Integer, default=0)
     like_count = Column(Integer, default=0)
+
+    # Fork tracking
+    forked_from = Column(Integer, ForeignKey("itineraries.id", ondelete="SET NULL"), nullable=True)
     
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
@@ -79,12 +82,35 @@ class Itinerary(Base):
     notes = relationship("TripNote", back_populates="itinerary", cascade="all, delete-orphan")
     comments = relationship("ItineraryComment", back_populates="itinerary", cascade="all, delete-orphan")
     tags = relationship("ItineraryTag", back_populates="itinerary", cascade="all, delete-orphan")
+    collaborators = relationship("ItineraryCollaborator", back_populates="itinerary", cascade="all, delete-orphan", foreign_keys="[ItineraryCollaborator.itinerary_id]")
 
     # Composite indexes for common queries
     __table_args__ = (
         Index('idx_user_status', 'user_id', 'status'),
         Index('idx_public_status', 'is_public', 'status'),
         Index('idx_destination_dates', 'destination', 'start_date'),
+    )
+
+
+# ITINERARY COLLABORATOR MODEL - for shared collaborative editing
+class ItineraryCollaborator(Base):
+    __tablename__ = "itinerary_collaborators"
+
+    id = Column(Integer, primary_key=True, index=True)
+    itinerary_id = Column(Integer, ForeignKey("itineraries.id", ondelete="CASCADE"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    invited_by = Column(Integer, ForeignKey("users.id"), nullable=False)
+    role = Column(String(20), default="editor", nullable=False)   # editor, viewer
+    status = Column(String(20), default="pending", nullable=False) # pending, accepted, rejected
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    accepted_at = Column(DateTime, nullable=True)
+
+    # Relationships
+    itinerary = relationship("Itinerary", back_populates="collaborators", foreign_keys=[itinerary_id])
+
+    __table_args__ = (
+        Index('idx_collab_itinerary_user', 'itinerary_id', 'user_id', unique=True),
     )
 
 
@@ -148,8 +174,8 @@ class Activity(Base):
     user_ratings_total = Column(Integer, nullable=True)
     
     # Photos from Google Places
-    photo_reference = Column(String(500), nullable=True)
-    
+    photo_reference = Column(Text, nullable=True)
+
     # Timing
     start_time = Column(Time, nullable=True)
     end_time = Column(Time, nullable=True)
@@ -169,6 +195,17 @@ class Activity(Base):
     # Order within the day
     display_order = Column(Integer, default=0)
     
+    # Weather (per-activity, fetched by time slot)
+    weather_temp = Column(Float, nullable=True)
+    weather_condition = Column(String(100), nullable=True)
+    weather_description = Column(String(200), nullable=True)
+    weather_icon = Column(String(50), nullable=True)
+    weather_humidity = Column(Integer, nullable=True)
+    weather_wind_speed = Column(Float, nullable=True)
+
+    # Actual spend (tracked separately from estimated cost)
+    actual_cost = Column(Float, default=0.0)
+
     # Notes
     notes = Column(Text, nullable=True)
     
@@ -198,8 +235,8 @@ class Accommodation(Base):
     longitude = Column(Float, nullable=True)
     place_id = Column(String(200), nullable=True, index=True)
     rating = Column(Float, nullable=True)
-    photo_reference = Column(String(500), nullable=True)
-    
+    photo_reference = Column(Text, nullable=True)
+
     # Check-in/out
     check_in_date = Column(Date, nullable=False, index=True)
     check_out_date = Column(Date, nullable=False)
@@ -424,11 +461,15 @@ class CommunityPost(Base):
     
     # Foreign Keys
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    
+
+    # Optional linked itinerary
+    shared_itinerary_id = Column(Integer, ForeignKey("itineraries.id", ondelete="SET NULL"), nullable=True)
+
     # Relationships
     author = relationship("User", back_populates="community_posts")
     votes = relationship("PostVote", back_populates="post", cascade="all, delete-orphan")
     comments = relationship("PostComment", back_populates="post", cascade="all, delete-orphan")
+    shared_itinerary = relationship("Itinerary", foreign_keys=[shared_itinerary_id])
 
 
 # tracks which user voted on which post (so one vote per user per post)
@@ -521,13 +562,34 @@ class PostComment(Base):
     # Foreign Keys
     post_id = Column(Integer, ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    parent_comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Relationships
     post = relationship("CommunityPost", back_populates="comments")
     user = relationship("User")
+    reactions = relationship("PostCommentReaction", back_populates="comment", cascade="all, delete-orphan")
+    replies = relationship("PostComment", backref=backref("parent", remote_side="PostComment.id"), foreign_keys=[parent_comment_id], cascade="all, delete-orphan")
 
     __table_args__ = (
         Index('idx_post_comment_created', 'post_id', 'created_at'),
+    )
+
+
+# POST COMMENT REACTION MODEL
+class PostCommentReaction(Base):
+    __tablename__ = "post_comment_reactions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    emoji = Column(String(10), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    comment = relationship("PostComment", back_populates="reactions")
+    user = relationship("User")
+
+    __table_args__ = (
+        UniqueConstraint("comment_id", "user_id", name="uq_comment_user_reaction"),
     )
 
 
@@ -590,4 +652,41 @@ class Message(Base):
 
     __table_args__ = (
         Index('idx_message_conversation', 'sender_id', 'receiver_id', 'created_at'),
+    )
+
+
+# SAVED POST MODEL
+class SavedPost(Base):
+    __tablename__ = "saved_posts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = Column(Integer, ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "post_id", name="uq_saved_user_post"),
+    )
+
+
+# POST REPORT MODEL
+# Users can report posts or comments for admin review
+class PostReport(Base):
+    __tablename__ = "post_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    reporter_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    post_id = Column(Integer, ForeignKey("community_posts.id", ondelete="CASCADE"), nullable=True, index=True)
+    comment_id = Column(Integer, ForeignKey("post_comments.id", ondelete="CASCADE"), nullable=True, index=True)
+    reason = Column(String(200), nullable=False)
+    status = Column(String(20), default="pending", nullable=False, index=True)  # pending, reviewed, dismissed
+
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    reporter = relationship("User", foreign_keys=[reporter_id])
+    post = relationship("CommunityPost", foreign_keys=[post_id])
+    comment = relationship("PostComment", foreign_keys=[comment_id])
+
+    __table_args__ = (
+        Index('idx_report_status_created', 'status', 'created_at'),
     )
