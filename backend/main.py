@@ -5,10 +5,12 @@ No business logic lives here.
 """
 import logging
 import os
-from fastapi import FastAPI
-from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 
+load_dotenv()
+
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from database import engine
 import models
 
@@ -18,8 +20,6 @@ from routers.users import friends_router
 from routers.community import updates_router, complaints_router  # /community-updates and /complaints
 from routers.recommendations import router as recommendations_router
 from seed import ensure_default_admin, ensure_schema_extras
-
-load_dotenv()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
