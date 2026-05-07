@@ -25,7 +25,7 @@ import logging
 import math
 from typing import Optional
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, selectinload
 
 import models
 
@@ -133,7 +133,11 @@ def _get_public_candidates(
     exclude_ids: set[int] | None = None,
 ) -> list[models.Itinerary]:
     """Fetch all public completed/planning itineraries."""
-    q = db.query(models.Itinerary).filter(
+    q = db.query(models.Itinerary).options(
+        joinedload(models.Itinerary.owner),
+        selectinload(models.Itinerary.days).selectinload(models.ItineraryDay.activities),
+        selectinload(models.Itinerary.tags),
+    ).filter(
         models.Itinerary.is_public == True,
         models.Itinerary.status.in_(["completed", "planning", "confirmed"]),
     )
