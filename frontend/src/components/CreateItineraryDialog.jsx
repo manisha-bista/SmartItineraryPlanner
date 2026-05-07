@@ -42,7 +42,9 @@ import EditIcon from '@mui/icons-material/Edit';
 import RestaurantIcon from '@mui/icons-material/Restaurant';
 import HotelIcon from '@mui/icons-material/Hotel';
 import SwapVertIcon from '@mui/icons-material/SwapVert';
+import WorkspacePremiumIcon from '@mui/icons-material/WorkspacePremium';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import PlaceSearchAutocomplete from './PlaceSearchAutocomplete';
 import { useTheme } from '../context/ThemeContext';
 
@@ -67,6 +69,37 @@ const ACTIVITY_TYPES = [
 
 const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
     const { COLORS, isDark } = useTheme();
+    const navigate = useNavigate();
+
+    // Role / tier flags. AI generation is available to everyone — free users get
+    // a small per-week quota, premium users get a larger monthly quota, admins
+    // are unlimited. Enforcement happens server-side; this dialog just shows
+    // the remaining quota and disables the button once it's exhausted.
+    const userRole  = localStorage.getItem('userRole') || 'user';
+    const isAdmin   = userRole === 'admin';
+    const isPremium = isAdmin || (localStorage.getItem('subscriptionTier') || 'free') === 'premium';
+
+    // AI quota status pulled from /subscriptions/status when the dialog opens.
+    // Shape: { used, limit, period, resetsOn }  (limit = -1 means unlimited)
+    const [aiQuota, setAiQuota] = useState(null);
+
+    useEffect(() => {
+        if (!open) return;
+        const uid = localStorage.getItem('userId');
+        if (!uid) return;
+        axios.get(`http://127.0.0.1:8000/subscriptions/status/${uid}`)
+            .then(r => setAiQuota({
+                used:     r.data.ai_generations_used ?? 0,
+                limit:    r.data.ai_limit ?? 0,
+                period:   r.data.ai_period || 'week',
+                resetsOn: r.data.ai_resets_on || null,
+            }))
+            .catch(() => setAiQuota(null));
+    }, [open]);
+
+    const aiUnlimited = isAdmin || (aiQuota && aiQuota.limit === -1);
+    const aiExhausted = !aiUnlimited && aiQuota != null && aiQuota.used >= aiQuota.limit;
+    const aiRemaining = aiUnlimited ? null : Math.max(0, (aiQuota?.limit ?? 0) - (aiQuota?.used ?? 0));
 
     const ERROR_COLOR = '#ff6b6b';
 
@@ -409,12 +442,16 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 ? `${normalizedDest}. ${extraContext}`
                 : normalizedDest;
 
-            const response = await axios.post('http://127.0.0.1:8000/ai/generate-itinerary', {
-                destination: fullPrompt,
-                days: numDays,
-                budget: parseFloat(tripInfo.estimated_budget) || 0,
-                style: derivedStyle,
-            });
+            const callerId = localStorage.getItem('userId');
+            const response = await axios.post(
+                `http://127.0.0.1:8000/ai/generate-itinerary?user_id=${callerId}`,
+                {
+                    destination: fullPrompt,
+                    days: numDays,
+                    budget: parseFloat(tripInfo.estimated_budget) || 0,
+                    style: derivedStyle,
+                }
+            );
 
             const data = response.data;
 
@@ -446,6 +483,19 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
             setDays(updatedDays);
             setActiveStep(1);
+
+            // Refresh the quota chip so "X/Y this week" decrements live.
+            if (!aiUnlimited) {
+                const uid = localStorage.getItem('userId');
+                axios.get(`http://127.0.0.1:8000/subscriptions/status/${uid}`)
+                    .then(r => setAiQuota({
+                        used:     r.data.ai_generations_used ?? 0,
+                        limit:    r.data.ai_limit ?? 0,
+                        period:   r.data.ai_period || 'week',
+                        resetsOn: r.data.ai_resets_on || null,
+                    }))
+                    .catch(() => {});
+            }
         } catch (err) {
             if (err.response?.data?.detail) setAiError(err.response.data.detail);
             else setAiError('AI generation failed. You can still proceed manually by clicking Next.');
@@ -833,18 +883,44 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                         <Box>
                             <Divider sx={{ borderColor: COLORS.cardBorder, mb: 3 }} />
 
-                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 0.5 }}>
-                                <AutoAwesomeIcon sx={{ fontSize: 16, color: COLORS.fadedText }} />
+                            <Stack direction="row" alignItems="center" spacing={1} sx={{ mb: 1.5 }}>
+                                <AutoAwesomeIcon sx={{ fontSize: 16, color: aiExhausted ? COLORS.fadedText : COLORS.brand }} />
                                 <Typography variant="subtitle2" sx={{ color: COLORS.subheadings, fontWeight: 'bold' }}>
                                     Generate with AI
                                 </Typography>
+
+                                {/* Quota chip — admins see "Unlimited", everyone else sees remaining count. */}
+                                {aiUnlimited ? (
+                                    <Chip
+                                        label="Unlimited"
+                                        size="small"
+                                        sx={{
+                                            height: 20, fontSize: '0.65rem', fontWeight: 700,
+                                            bgcolor: `${COLORS.brand}18`, color: COLORS.brand,
+                                            border: `1px solid ${COLORS.brand}44`,
+                                            '& .MuiChip-label': { px: 0.8 },
+                                        }}
+                                    />
+                                ) : aiQuota && (
+                                    <Chip
+                                        label={`${aiRemaining}/${aiQuota.limit} this ${aiQuota.period}`}
+                                        size="small"
+                                        sx={{
+                                            height: 20, fontSize: '0.65rem', fontWeight: 700,
+                                            bgcolor: aiExhausted ? 'rgba(255,107,107,0.12)' : `${COLORS.brand}18`,
+                                            color: aiExhausted ? ERROR_COLOR : COLORS.brand,
+                                            border: `1px solid ${aiExhausted ? 'rgba(255,107,107,0.4)' : `${COLORS.brand}44`}`,
+                                            '& .MuiChip-label': { px: 0.8 },
+                                        }}
+                                    />
+                                )}
                             </Stack>
 
                             <Typography variant="caption" sx={{ color: COLORS.fadedText, display: 'block', mb: 1.5 }}>
                                 AI will use your destination, dates, budget, and tags above. Optionally add more detail below.
                             </Typography>
 
-                            {/* Context summary — shows what AI already knows */}
+                            {/* Context summary chips */}
                             <Stack direction="row" flexWrap="wrap" gap={1} sx={{ mb: 2 }}>
                                 {tripInfo.destination && (
                                     <Chip size="small" label={`📍 ${tripInfo.destination.split(',').map(s=>s.trim()).filter(Boolean).join(', ')}`}
@@ -893,8 +969,31 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                 value={aiPrompt}
                                 onChange={(e) => setAiPrompt(e.target.value)}
                                 placeholder="e.g., I want to visit Boudhanath Stupa and Pashupatinath Temple, try local street food in Thamel, and hike to a viewpoint with Himalayan views."
+                                disabled={aiExhausted}
                                 sx={{ ...inputSx, mb: 2 }}
                             />
+
+                            {/* Soft upgrade hint — only for non-premium, non-admin users. */}
+                            {!isPremium && aiQuota && (
+                                <Typography
+                                    variant="caption"
+                                    sx={{
+                                        display: 'block', color: COLORS.fadedText, fontSize: '0.72rem',
+                                        mt: -0.5, mb: 1,
+                                    }}
+                                >
+                                    {aiExhausted
+                                        ? `You've used all ${aiQuota.limit} AI generations this ${aiQuota.period}. `
+                                        : `Free plan includes ${aiQuota.limit} AI generations / ${aiQuota.period}. `}
+                                    <Box
+                                        component="span"
+                                        onClick={() => { onClose(); navigate('/subscription'); }}
+                                        sx={{ color: COLORS.brand, cursor: 'pointer', fontWeight: 600, '&:hover': { textDecoration: 'underline' } }}
+                                    >
+                                        Upgrade for more →
+                                    </Box>
+                                </Typography>
+                            )}
                         </Box>
                     </Stack>
                 )}
@@ -1525,21 +1624,25 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                                 Save Draft
                             </Button>
                         )}
-                        <Button
-                            onClick={handleAiGenerate}
-                            disabled={aiGenerating || submitting}
-                            startIcon={aiGenerating ? <CircularProgress size={16} sx={{ color: COLORS.brand }} /> : <AutoAwesomeIcon />}
-                            variant="outlined"
-                            sx={{
-                                borderColor: `rgba(51,204,204,0.5)`,
-                                color: COLORS.brand,
-                                borderRadius: 2,
-                                '&:hover': { borderColor: COLORS.brand, bgcolor: 'rgba(51,204,204,0.08)' },
-                                '&:disabled': { opacity: 0.5 },
-                            }}
-                        >
-                            {aiGenerating ? 'Generating...' : 'Generate'}
-                        </Button>
+                        <Tooltip title={aiExhausted ? `AI quota used up — resets ${aiQuota?.resetsOn ? new Date(aiQuota.resetsOn).toLocaleDateString() : 'soon'}` : ''}>
+                            <span>
+                                <Button
+                                    onClick={handleAiGenerate}
+                                    disabled={aiGenerating || submitting || aiExhausted}
+                                    startIcon={aiGenerating ? <CircularProgress size={16} sx={{ color: COLORS.brand }} /> : <AutoAwesomeIcon />}
+                                    variant="outlined"
+                                    sx={{
+                                        borderColor: `rgba(51,204,204,0.5)`,
+                                        color: COLORS.brand,
+                                        borderRadius: 2,
+                                        '&:hover': { borderColor: COLORS.brand, bgcolor: 'rgba(51,204,204,0.08)' },
+                                        '&:disabled': { opacity: 0.5 },
+                                    }}
+                                >
+                                    {aiGenerating ? 'Generating...' : 'Generate'}
+                                </Button>
+                            </span>
+                        </Tooltip>
                         <Button
                             onClick={handleNext}
                             disabled={submitting}

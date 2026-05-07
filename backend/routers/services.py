@@ -16,6 +16,7 @@ import models
 from database import get_db
 from services.gemini_ai import generate_itinerary
 from services.weather_maps import fetch_weather_for_itinerary
+from routers.subscriptions import consume_ai_credit
 
 logger = logging.getLogger(__name__)
 
@@ -336,7 +337,18 @@ async def fetch_weather(
 # ═══════════════════════════════════════════════════════════════════════════════
 
 @router.post("/ai/generate-itinerary")
-async def ai_generate_itinerary(request: dict):
+async def ai_generate_itinerary(
+    request: dict,
+    user_id: int = Query(..., description="ID of the user requesting generation"),
+    db: Session = Depends(get_db),
+):
+    user = db.query(models.User).filter(models.User.id == user_id).first()
+    if not user:
+        raise HTTPException(404, "User not found")
+
+    # Enforce per-period quota (raises 429 if over). Admins bypass.
+    consume_ai_credit(user, db)
+
     destination = request.get("destination", "")
     days        = request.get("days", 3)
     budget      = float(request.get("budget", 0))

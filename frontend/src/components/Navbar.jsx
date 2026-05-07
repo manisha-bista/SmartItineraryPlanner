@@ -95,6 +95,13 @@ const Navbar = () => {
     const userRole = localStorage.getItem('userRole') || 'user';
     const avatarId = parseInt(localStorage.getItem('avatarId')) || 1;
     const userName = localStorage.getItem('userName') || 'User';
+    const subTier  = localStorage.getItem('subscriptionTier') || 'free';
+    const isAdmin  = userRole === 'admin';
+
+    // Items the admin shouldn't see — admins don't subscribe.
+    const visibleNavItems = isAdmin
+        ? NAV_ITEMS.filter(i => i.path !== '/subscription')
+        : NAV_ITEMS;
 
     // notifications
     const [notifications, setNotifications]   = useState([]);
@@ -103,8 +110,9 @@ const Navbar = () => {
     const notifOpen = Boolean(notifAnchor);
 
     // pending friend requests count for Friends badge
-    const [pendingFriends, setPendingFriends] = useState(0);
-    const [friendsOpen, setFriendsOpen]       = useState(false);
+    const [pendingFriends, setPendingFriends]   = useState(0);
+    const [friendsOpen, setFriendsOpen]         = useState(false);
+    const [friendsInitialTab, setFriendsInitialTab] = useState('friends');
 
     useEffect(() => {
         if (!userId) return;
@@ -151,8 +159,13 @@ const Navbar = () => {
 
         switch (notif.type) {
             case 'friend_request':
-            case 'friend_accepted':
             case 'collab_invite':
+                // Land directly on the Requests tab so the user sees the invite
+                setFriendsInitialTab('requests');
+                setFriendsOpen(true);
+                break;
+            case 'friend_accepted':
+                setFriendsInitialTab('friends');
                 setFriendsOpen(true);
                 break;
 
@@ -236,13 +249,13 @@ const Navbar = () => {
 
             {/* Nav Items */}
             <List sx={{ px: 2, mt: 1, flexGrow: 1 }}>
-                {NAV_ITEMS.map((item) => {
+                {visibleNavItems.map((item) => {
                     const active = isActive(item.path);
                     const isFriends = item.path === '/friends';
                     return (
                         <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                             <ListItemButton
-                                onClick={() => isFriends ? setFriendsOpen(true) : navigate(item.path)}
+                                onClick={() => { if (isFriends) { setFriendsInitialTab('friends'); setFriendsOpen(true); } else { navigate(item.path); } }}
                                 selected={!isFriends && active}
                                 sx={{
                                     borderRadius: 2,
@@ -280,7 +293,7 @@ const Navbar = () => {
                 })}
 
                 {/* Admin link — only visible to admins */}
-                {userRole === 'admin' && (
+                {isAdmin && (
                     <ListItem disablePadding sx={{ mb: 0.5 }}>
                         <ListItemButton
                             onClick={() => navigate('/admin')}
@@ -402,7 +415,7 @@ const Navbar = () => {
             </Box>
 
             {/* Friends Popup Drawer */}
-            <FriendsPopup open={friendsOpen} onClose={() => setFriendsOpen(false)} />
+            <FriendsPopup open={friendsOpen} onClose={() => setFriendsOpen(false)} initialTab={friendsInitialTab} />
 
             {/* Notifications Popover */}
             <Popover

@@ -50,6 +50,12 @@ export const ThemeProvider = ({ children }) => {
         return saved ? saved === 'dark' : true;
     });
 
+    // Keep body class in sync so global CSS (e.g. autofill) can target theme
+    React.useEffect(() => {
+        document.body.classList.toggle('theme-dark',  isDark);
+        document.body.classList.toggle('theme-light', !isDark);
+    }, [isDark]);
+
     const toggleTheme = () => {
         setIsDark(prev => {
             const next = !prev;

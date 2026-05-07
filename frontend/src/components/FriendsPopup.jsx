@@ -64,7 +64,7 @@ const Tab = ({ active, onClick, children, badge, C }) => (
     </Button>
 );
 
-export default function FriendsPopup({ open, onClose, onOpenChat }) {
+export default function FriendsPopup({ open, onClose, onOpenChat, initialTab = 'friends' }) {
     const { COLORS, isDark } = useTheme();
     const userId = parseInt(localStorage.getItem('userId'));
 
@@ -75,7 +75,12 @@ export default function FriendsPopup({ open, onClose, onOpenChat }) {
         faded: COLORS.fadedText, red: '#ff6b6b', green: '#66d9a0', yellow: '#ffb74d',
     };
 
-    const [tab, setTab]                   = useState('friends'); // 'friends' | 'add' | 'requests'
+    const [tab, setTab] = useState(initialTab); // 'friends' | 'add' | 'requests'
+
+    // Reset to the requested tab each time the drawer opens
+    useEffect(() => {
+        if (open) setTab(initialTab);
+    }, [open, initialTab]);
     const [friends, setFriends]           = useState([]);
     const [pending, setPending]           = useState([]);
     const [collabInvites, setCollabInvites] = useState([]);
