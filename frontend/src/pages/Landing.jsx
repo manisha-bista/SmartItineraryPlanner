@@ -130,7 +130,7 @@ const Landing = () => {
                     <Box sx={{ flex: 1, display: { xs: 'none', md: 'flex' }, justifyContent: 'center', alignItems: 'center', position: 'relative' }}>
                         <Box sx={{ position: 'absolute', top: '5%', right: '10%', width: 220, height: 280, bgcolor: COLORS.brand, borderRadius: 5, opacity: 0.15, transform: 'rotate(8deg)' }} />
                         <Box sx={{ position: 'absolute', bottom: '5%', right: '22%', width: 160, height: 200, bgcolor: COLORS.brand, borderRadius: 5, opacity: 0.12, transform: 'rotate(-5deg)' }} />
-                        <Box component="img" src="../src/travellers.png" alt="Travellers" sx={{ width: '90%', maxWidth: 500, objectFit: 'contain', position: 'relative', zIndex: 2, filter: isDark ? 'drop-shadow(0 20px 40px rgba(51,204,204,0.2))' : 'drop-shadow(0 20px 40px rgba(26,175,175,0.15))' }} />
+                        <Box component="img" src="../travellers.png" alt="Travellers" sx={{ width: '90%', maxWidth: 500, objectFit: 'contain', position: 'relative', zIndex: 2, filter: isDark ? 'drop-shadow(0 20px 40px rgba(51,204,204,0.2))' : 'drop-shadow(0 20px 40px rgba(26,175,175,0.15))' }} />
                         <Typography sx={{ position: 'absolute', top: '15%', right: '5%', color: COLORS.fadedText, fontSize: '2rem', fontWeight: 'bold', opacity: 0.5 }}>!?</Typography>
                         <Box sx={{ position: 'absolute', top: '10%', left: '8%', display: 'flex', flexDirection: 'column', gap: 0.5, opacity: 0.4 }}>
                             {[...Array(3)].map((_, i) => (
