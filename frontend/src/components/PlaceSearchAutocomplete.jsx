@@ -197,7 +197,7 @@ export default function PlaceSearchAutocomplete({
                     if (cityMatch) params.city = cityMatch;
                 }
             }
-            const res = await axios.get('http://127.0.0.1:8000/places/search', { params });
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}places/search`, { params });
             setResults(res.data.results || []);
             setOpen(true);
         } catch (err) {

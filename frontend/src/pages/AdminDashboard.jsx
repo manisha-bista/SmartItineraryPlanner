@@ -219,10 +219,10 @@ const AdminDashboard = () => {
         setStatsLoading(true);
         try {
             const [uR, iR, cR, pR] = await Promise.allSettled([
-                axios.get('http://127.0.0.1:8000/users/'),
-                axios.get(`http://127.0.0.1:8000/admin/itineraries?admin_id=${localStorage.getItem('userId')}`),
-                axios.get('http://127.0.0.1:8000/complaints/'),
-                axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/itineraries?admin_id=${localStorage.getItem('userId')}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}complaints/`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/places?admin_id=${localStorage.getItem('userId')}`),
             ]);
             setStats({
                 totalUsers:       uR.status === 'fulfilled' && Array.isArray(uR.value.data) ? uR.value.data.length : 0,
@@ -233,18 +233,18 @@ const AdminDashboard = () => {
         } finally { setStatsLoading(false); }
     };
 
-    const fetchUsers = async () => { setUsersLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/users/'); setUsers(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load users', 'error'); } finally { setUsersLoading(false); } };
-    const fetchItineraries = async () => { setItinLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/itineraries?admin_id=${localStorage.getItem('userId')}`); setItineraries(Array.isArray(r.data.itineraries) ? r.data.itineraries : []); } catch { showAlert('Failed to load itineraries', 'error'); } finally { setItinLoading(false); } };
-    const fetchComplaints = async () => { setCompLoading(true); try { const r = await axios.get('http://127.0.0.1:8000/complaints/'); setComplaints(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load complaints', 'error'); } finally { setCompLoading(false); } };
-    const fetchPlaces = async () => { setPlacesLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`); setPlaces(Array.isArray(r.data.places) ? r.data.places : []); } catch { showAlert('Failed to load places', 'error'); } finally { setPlacesLoading(false); } };
-    const fetchCommunityPosts = async () => { setPostsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/posts?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load posts', 'error'); } finally { setPostsLoading(false); } };
-    const fetchReports = async () => { setReportsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/reports?admin_id=${localStorage.getItem('userId')}`); setReports(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load reports', 'error'); } finally { setReportsLoading(false); } };
-    const fetchPendingSubs = async () => { setSubsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/subscriptions/admin/pending?admin_id=${localStorage.getItem('userId')}`); setPendingSubs(Array.isArray(r.data) ? r.data : []); } catch { } finally { setSubsLoading(false); } };
+    const fetchUsers = async () => { setUsersLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/`); setUsers(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load users', 'error'); } finally { setUsersLoading(false); } };
+    const fetchItineraries = async () => { setItinLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/itineraries?admin_id=${localStorage.getItem('userId')}`); setItineraries(Array.isArray(r.data.itineraries) ? r.data.itineraries : []); } catch { showAlert('Failed to load itineraries', 'error'); } finally { setItinLoading(false); } };
+    const fetchComplaints = async () => { setCompLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}complaints/`); setComplaints(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load complaints', 'error'); } finally { setCompLoading(false); } };
+    const fetchPlaces = async () => { setPlacesLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/places?admin_id=${localStorage.getItem('userId')}`); setPlaces(Array.isArray(r.data.places) ? r.data.places : []); } catch { showAlert('Failed to load places', 'error'); } finally { setPlacesLoading(false); } };
+    const fetchCommunityPosts = async () => { setPostsLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/posts?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load posts', 'error'); } finally { setPostsLoading(false); } };
+    const fetchReports = async () => { setReportsLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/reports?admin_id=${localStorage.getItem('userId')}`); setReports(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load reports', 'error'); } finally { setReportsLoading(false); } };
+    const fetchPendingSubs = async () => { setSubsLoading(true); try { const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/admin/pending?admin_id=${localStorage.getItem('userId')}`); setPendingSubs(Array.isArray(r.data) ? r.data : []); } catch { } finally { setSubsLoading(false); } };
 
     const viewUserProfile = async (userId) => {
         setUserProfile({ open: true, loading: true, data: null });
         try {
-            const r = await axios.get(`http://127.0.0.1:8000/admin/users/${userId}/profile?admin_id=${localStorage.getItem('userId')}`);
+            const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}admin/users/${userId}/profile?admin_id=${localStorage.getItem('userId')}`);
             setUserProfile({ open: true, loading: false, data: r.data });
         } catch { showAlert('Failed to load user profile', 'error'); setUserProfile({ open: false, loading: false, data: null }); }
     };
@@ -252,27 +252,27 @@ const AdminDashboard = () => {
     const viewItinerary = async (id) => {
         setItinDetail({ open: true, loading: true, data: null });
         try {
-            const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
+            const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`);
             setItinDetail({ open: true, loading: false, data: r.data });
         } catch { showAlert('Failed to load itinerary details', 'error'); setItinDetail({ open: false, loading: false, data: null }); }
     };
 
-    const deleteUser       = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/users/${id}`); setUsers(p => p.filter(u => u.id !== id)); setStats(s => ({ ...s, totalUsers: s.totalUsers - 1 })); showAlert('User deleted'); } catch { showAlert('Failed to delete user', 'error'); } };
-    const deleteItinerary  = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/itineraries/${id}`); setItineraries(p => p.filter(i => i.id !== id)); setStats(s => ({ ...s, totalItineraries: s.totalItineraries - 1 })); showAlert('Itinerary deleted'); } catch { showAlert('Failed to delete itinerary', 'error'); } };
-    const resolveComplaint = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/complaints/${id}`, { status: 'resolved' }); setComplaints(p => p.map(c => c.id === id ? { ...c, status: 'resolved' } : c)); showAlert('Complaint resolved'); } catch { showAlert('Failed to resolve', 'error'); } };
-    const deleteComplaint  = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/complaints/${id}`); setComplaints(p => p.filter(c => c.id !== id)); setStats(s => ({ ...s, totalComplaints: s.totalComplaints - 1 })); showAlert('Complaint deleted'); } catch { showAlert('Failed to delete', 'error'); } };
-    const deletePost       = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/posts/${id}?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(p => p.filter(x => x.id !== id)); showAlert('Post deleted'); } catch { showAlert('Failed to delete post', 'error'); } };
-    const promoteUser      = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=admin&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'admin' } : u)); showAlert('User promoted to admin'); } catch { showAlert('Failed to promote user', 'error'); } };
-    const demoteUser       = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=user&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'user' } : u)); showAlert('User demoted to regular user'); } catch { showAlert('Failed to demote user', 'error'); } };
-    const deletePlace      = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/places/${id}?admin_id=${localStorage.getItem('userId')}`); setPlaces(p => p.filter(x => x.id !== id)); showAlert('Place deleted'); } catch { showAlert('Failed to delete place', 'error'); } };
-    const resolveReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=reviewed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Report marked as reviewed'); } catch { showAlert('Failed to update report', 'error'); } };
-    const dismissReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=dismissed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); showAlert('Report dismissed'); } catch { showAlert('Failed to dismiss report', 'error'); } };
-    const deleteReport     = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.filter(r => r.id !== id)); showAlert('Report deleted'); } catch { showAlert('Failed to delete report', 'error'); } };
-    const deleteReportContent = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}/content?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Reported content removed'); } catch { showAlert('Failed to remove content', 'error'); } };
+    const deleteUser       = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}users/${id}`); setUsers(p => p.filter(u => u.id !== id)); setStats(s => ({ ...s, totalUsers: s.totalUsers - 1 })); showAlert('User deleted'); } catch { showAlert('Failed to delete user', 'error'); } };
+    const deleteItinerary  = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`); setItineraries(p => p.filter(i => i.id !== id)); setStats(s => ({ ...s, totalItineraries: s.totalItineraries - 1 })); showAlert('Itinerary deleted'); } catch { showAlert('Failed to delete itinerary', 'error'); } };
+    const resolveComplaint = async (id) => { try { await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}complaints/${id}`, { status: 'resolved' }); setComplaints(p => p.map(c => c.id === id ? { ...c, status: 'resolved' } : c)); showAlert('Complaint resolved'); } catch { showAlert('Failed to resolve', 'error'); } };
+    const deleteComplaint  = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}complaints/${id}`); setComplaints(p => p.filter(c => c.id !== id)); setStats(s => ({ ...s, totalComplaints: s.totalComplaints - 1 })); showAlert('Complaint deleted'); } catch { showAlert('Failed to delete', 'error'); } };
+    const deletePost       = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}admin/posts/${id}?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(p => p.filter(x => x.id !== id)); showAlert('Post deleted'); } catch { showAlert('Failed to delete post', 'error'); } };
+    const promoteUser      = async (id) => { try { await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}users/${id}/role?role=admin&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'admin' } : u)); showAlert('User promoted to admin'); } catch { showAlert('Failed to promote user', 'error'); } };
+    const demoteUser       = async (id) => { try { await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}users/${id}/role?role=user&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'user' } : u)); showAlert('User demoted to regular user'); } catch { showAlert('Failed to demote user', 'error'); } };
+    const deletePlace      = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}admin/places/${id}?admin_id=${localStorage.getItem('userId')}`); setPlaces(p => p.filter(x => x.id !== id)); showAlert('Place deleted'); } catch { showAlert('Failed to delete place', 'error'); } };
+    const resolveReport    = async (id) => { try { await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=reviewed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Report marked as reviewed'); } catch { showAlert('Failed to update report', 'error'); } };
+    const dismissReport    = async (id) => { try { await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=dismissed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); showAlert('Report dismissed'); } catch { showAlert('Failed to dismiss report', 'error'); } };
+    const deleteReport     = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}admin/reports/${id}?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.filter(r => r.id !== id)); showAlert('Report deleted'); } catch { showAlert('Failed to delete report', 'error'); } };
+    const deleteReportContent = async (id) => { try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}admin/reports/${id}/content?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Reported content removed'); } catch { showAlert('Failed to remove content', 'error'); } };
 
     const activateSub = async (userId, plan) => {
         try {
-            await axios.post(`http://127.0.0.1:8000/subscriptions/admin/activate/${userId}`, { admin_id: admin.id, plan });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/admin/activate/${userId}`, { admin_id: admin.id, plan });
             showAlert('Premium activated successfully');
             fetchPendingSubs();
             fetchUsers();
@@ -280,7 +280,7 @@ const AdminDashboard = () => {
     };
     const revokeSub = async (userId) => {
         try {
-            await axios.post(`http://127.0.0.1:8000/subscriptions/admin/revoke/${userId}`, { admin_id: admin.id });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/admin/revoke/${userId}`, { admin_id: admin.id });
             showAlert('Subscription revoked');
             fetchPendingSubs();
             fetchUsers();
@@ -292,7 +292,7 @@ const AdminDashboard = () => {
         if (!newEmail.trim() || !newEmail.includes('@')) { setSettingsError('Enter a valid email address'); return; }
         setSettingsSaving(true);
         try {
-            const r = await axios.patch(`http://127.0.0.1:8000/users/${admin.id}/credentials`, { email: newEmail.trim().toLowerCase() });
+            const r = await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}users/${admin.id}/credentials`, { email: newEmail.trim().toLowerCase() });
             localStorage.setItem('userEmail', r.data.email);
             setAdmin(prev => ({ ...prev, email: r.data.email }));
             showAlert('Email updated'); setSettingsOpen(false);
@@ -308,7 +308,7 @@ const AdminDashboard = () => {
         if (newPassword !== confirmPassword) { setSettingsError('Passwords do not match'); return; }
         setSettingsSaving(true);
         try {
-            await axios.patch(`http://127.0.0.1:8000/users/${admin.id}/credentials`, { current_password: currentPassword, new_password: newPassword });
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}users/${admin.id}/credentials`, { current_password: currentPassword, new_password: newPassword });
             showAlert('Password updated'); setSettingsOpen(false);
             setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
         } catch (err) { setSettingsError(err.response?.data?.detail || 'Failed to update password'); }

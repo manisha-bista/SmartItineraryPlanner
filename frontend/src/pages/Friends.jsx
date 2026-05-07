@@ -85,9 +85,9 @@ export default function Friends() {
     const load = useCallback(async () => {
         try {
             const [friendsRes, pendingRes, collabRes] = await Promise.all([
-                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
-                axios.get(`http://127.0.0.1:8000/friends/${userId}/pending`),
-                axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}/pending-collabs`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}/pending`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}/pending-collabs`),
             ]);
             setFriends(friendsRes.data?.friends || []);
             setPending(pendingRes.data?.requests || []);
@@ -102,7 +102,7 @@ export default function Friends() {
         if (!addUsername.trim()) return;
         setAddBusy(true); setAddErr('');
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
             toast('Friend request sent!');
             setAddUsername('');
         } catch (e) {
@@ -115,35 +115,35 @@ export default function Friends() {
 
     const acceptRequest = async (friendshipId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/friends/${friendshipId}/accept?user_id=${userId}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}friends/${friendshipId}/accept?user_id=${userId}`);
             toast('Friend added!'); load();
         } catch { toast('Failed to accept.', 'error'); }
     };
 
     const rejectRequest = async (friendshipId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/friends/${friendshipId}/reject?user_id=${userId}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}friends/${friendshipId}/reject?user_id=${userId}`);
             toast('Request declined.'); load();
         } catch { toast('Failed to decline.', 'error'); }
     };
 
     const removeFriend = async (friendshipId) => {
         try {
-            await axios.delete(`http://127.0.0.1:8000/friends/${friendshipId}?user_id=${userId}`);
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}friends/${friendshipId}?user_id=${userId}`);
             toast('Friend removed.'); setRemoveTarget(null); load();
         } catch { toast('Failed to remove.', 'error'); }
     };
 
     const acceptCollab = async (itineraryId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/accept?user_id=${userId}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}/collaborators/accept?user_id=${userId}`);
             navigate(`/itinerary/${itineraryId}`);
         } catch { toast('Failed to accept.', 'error'); }
     };
 
     const rejectCollab = async (itineraryId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/reject?user_id=${userId}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}/collaborators/reject?user_id=${userId}`);
             toast('Invitation declined.'); load();
         } catch { toast('Failed to decline.', 'error'); }
     };

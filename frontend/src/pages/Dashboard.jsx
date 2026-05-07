@@ -107,7 +107,7 @@ const Dashboard = () => {
         setRecsLoading(true);
         try {
             // Try personalised recommendations first
-            const res = await axios.get(`http://127.0.0.1:8000/recommendations/for-user/${userId}`, {
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}recommendations/for-user/${userId}`, {
                 params: { limit: 3 },
             });
             const personalised = res.data?.results || [];
@@ -115,7 +115,7 @@ const Dashboard = () => {
                 setRecommendations(personalised);
             } else {
                 // New user — fall back to popular public itineraries
-                const pop = await axios.get('http://127.0.0.1:8000/recommendations/explore', {
+                const pop = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}recommendations/explore`, {
                     params: { limit: 3 },
                 });
                 setRecommendations(pop.data?.results || []);
@@ -123,7 +123,7 @@ const Dashboard = () => {
         } catch {
             // On any error, silently try explore as fallback
             try {
-                const pop = await axios.get('http://127.0.0.1:8000/recommendations/explore', {
+                const pop = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}recommendations/explore`, {
                     params: { limit: 3 },
                 });
                 setRecommendations(pop.data?.results || []);
@@ -142,7 +142,7 @@ const Dashboard = () => {
     // fetch detail for most recent itinerary
     useEffect(() => {
         if (!itineraries.length) return;
-        axios.get('http://127.0.0.1:8000/itineraries/' + itineraries[0].id)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/` + itineraries[0].id)
             .then(r => setLatestDetail(r.data))
             .catch(() => {});
     }, [itineraries]);
@@ -219,7 +219,7 @@ const Dashboard = () => {
     const fetchItineraries = async (uid) => {
         try {
             setLoading(true);
-            const r = await axios.get(`http://127.0.0.1:8000/itineraries/user/${uid}`);
+            const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${uid}`);
             setItineraries(r.data);
             setError('');
         } catch (err) {
@@ -400,7 +400,7 @@ const Dashboard = () => {
                                             <CardMedia
                                                 component="img" height="160"
                                                 image={trip.cover_photo
-                                                    ? `http://127.0.0.1:8000/places/photo?photo_reference=${trip.cover_photo}&max_width=600`
+                                                    ? `${import.meta.env.VITE_BACKEND_API_URL}places/photo?photo_reference=${trip.cover_photo}&max_width=600`
                                                     : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'}
                                                 alt={trip.title} sx={{ objectFit: 'cover' }}
                                             />
@@ -481,7 +481,7 @@ const Dashboard = () => {
                                                 {/* Cover photo or destination initials fallback */}
                                                 {rec.cover_photo ? (
                                                     <Box component="img"
-                                                        src={`http://127.0.0.1:8000/places/photo?photo_reference=${rec.cover_photo}&max_width=200`}
+                                                        src={`${import.meta.env.VITE_BACKEND_API_URL}places/photo?photo_reference=${rec.cover_photo}&max_width=200`}
                                                         alt={rec.destination}
                                                         sx={{ width: 75, minHeight: 100, borderRadius: 3.5, flexShrink: 0, objectFit: 'cover' }}
                                                     />

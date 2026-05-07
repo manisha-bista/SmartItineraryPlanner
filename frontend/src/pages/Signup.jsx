@@ -66,7 +66,7 @@ const Signup = () => {
         setLoading(true);
         try {
             const payload = { name: `${formData.firstName.trim()} ${formData.lastName.trim()}`, email: formData.email.trim().toLowerCase(), password: formData.password };
-            const response = await axios.post('http://127.0.0.1:8000/register', payload, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
+            const response = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}register`, payload, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
             if (response.data.id) {
                 localStorage.setItem('userId',    response.data.id);
                 localStorage.setItem('userName',  response.data.name);
@@ -94,7 +94,7 @@ const Signup = () => {
             setGoogleLoading(true); setError('');
             try {
                 const response = await axios.post(
-                    'http://127.0.0.1:8000/auth/google',
+                    `${import.meta.env.VITE_BACKEND_API_URL}auth/google`,
                     { token: tokenResponse.access_token },
                     { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
                 );

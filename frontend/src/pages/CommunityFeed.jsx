@@ -92,7 +92,7 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
 
     useEffect(() => {
         if (!itineraryId) return;
-        axios.get(`http://127.0.0.1:8000/itineraries/${itineraryId}`)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}`)
             .then(r => { setItin(r.data); setDayIndex(0); })
             .catch(() => {});
     }, [itineraryId]);
@@ -102,7 +102,7 @@ const ItineraryEmbed = ({ itineraryId, userId, COLORS }) => {
         setForkError('');
         setForking(true);
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/itineraries/${itineraryId}/fork?user_id=${userId}`);
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}/fork?user_id=${userId}`);
             // Navigate whether it's a fresh fork or already-forked — both return the itinerary id
             window.location.href = `/itinerary/${res.data.id}`;
         } catch (err) {
@@ -268,7 +268,7 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
     const loadComments = async () => {
         setCommentsLoading(true);
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/community/posts/${post.id}/comments`, { params: { user_id: userId } });
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments`, { params: { user_id: userId } });
             setComments(res.data || []);
         } catch { /* silent */ }
         finally { setCommentsLoading(false); }
@@ -280,7 +280,7 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
         if (!newComment.trim()) return;
         setPosting(true);
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments?user_id=${userId}`, { content: newComment.trim() });
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments?user_id=${userId}`, { content: newComment.trim() });
             setNewComment('');
             setComments(prev => [...prev, res.data]);
             setLocalCommentCount(c => c + 1);
@@ -292,7 +292,7 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
         if (!replyText.trim()) return;
         setReplyPosting(true);
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments?user_id=${userId}`, { content: replyText.trim(), parent_comment_id: parentId });
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments?user_id=${userId}`, { content: replyText.trim(), parent_comment_id: parentId });
             setReplyText(''); setReplyTo(null);
             setComments(prev => [...prev, res.data]);
             setLocalCommentCount(c => c + 1);
@@ -313,9 +313,9 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
         setReportSubmitting(true);
         try {
             if (reportDialog.target === 'comment') {
-                await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${reportDialog.commentId}/report?user_id=${userId}`, { reason: reportReason.trim() });
+                await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments/${reportDialog.commentId}/report?user_id=${userId}`, { reason: reportReason.trim() });
             } else {
-                await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/report?user_id=${userId}`, { reason: reportReason.trim() });
+                await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/report?user_id=${userId}`, { reason: reportReason.trim() });
             }
             setReportSuccess(true);
             setTimeout(() => { setReportDialog({ open: false, target: null, commentId: null }); setReportReason(''); setReportSuccess(false); }, 1500);
@@ -325,7 +325,7 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
 
     const deletePost = async () => {
         try {
-            await axios.delete(`http://127.0.0.1:8000/community/posts/${post.id}?user_id=${userId}`);
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}?user_id=${userId}`);
             onDelete?.(post.id);
         } catch { /* silent */ }
     };
@@ -333,14 +333,14 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
     const submitReaction = async (commentId, emoji, anchorEl) => {
         setEmojiAnchor(null);
         try {
-            const res = await axios.post(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${commentId}/react?user_id=${userId}&emoji=${encodeURIComponent(emoji)}`);
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments/${commentId}/react?user_id=${userId}&emoji=${encodeURIComponent(emoji)}`);
             setComments(prev => prev.map(c => c.id === commentId ? { ...c, reactions: res.data.reactions } : c));
         } catch { /* silent */ }
     };
 
     const deleteComment = async (commentId) => {
         try {
-            await axios.delete(`http://127.0.0.1:8000/community/posts/${post.id}/comments/${commentId}?user_id=${userId}`);
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${post.id}/comments/${commentId}?user_id=${userId}`);
             // Compute removed count from current snapshot BEFORE updating state
             const removed = comments.filter(c => c.id === commentId || c.parent_comment_id === commentId);
             setLocalCommentCount(c => Math.max(0, c - removed.length));
@@ -683,7 +683,7 @@ const CreatePostDialog = ({ open, onClose, userName, onCreated, myItineraries, d
                 place: places.join(', '), image_url: imageUrl.trim() || null,
             };
             if (attachedItinId) payload.shared_itinerary_id = attachedItinId;
-            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, payload);
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts?user_id=${userId}`, payload);
             handleClose(); if (onCreated) onCreated();
         } catch { setError('Failed to create post. Please try again.'); }
         finally { setSubmitting(false); }
@@ -930,11 +930,11 @@ const CommunityFeed = () => {
 
     const fetchMyItineraries = async (userId) => {
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}`);
             const itins = Array.isArray(res.data) ? res.data : [];
             const detailed = [];
             for (const itin of itins) {
-                try { const d = await axios.get(`http://127.0.0.1:8000/itineraries/${itin.id}`); detailed.push(d.data); }
+                try { const d = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itin.id}`); detailed.push(d.data); }
                 catch { detailed.push(itin); }
             }
             setMyItineraries(detailed);
@@ -955,13 +955,13 @@ const CommunityFeed = () => {
             } else if (sidebarPlace !== 'All') { places.push(sidebarPlace); }
 
             if (places.length === 0) {
-                const res = await axios.get('http://127.0.0.1:8000/community-updates', { params: { active_only: true, limit: 5 } });
+                const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community-updates`, { params: { active_only: true, limit: 5 } });
                 setRecentAlerts(res.data || []);
             } else {
                 const allAlerts = []; const seen = new Set();
                 for (const loc of [...new Set(places)].slice(0, 5)) {
                     try {
-                        const res = await axios.get('http://127.0.0.1:8000/community-updates', { params: { location: loc, active_only: true, limit: 3 } });
+                        const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community-updates`, { params: { location: loc, active_only: true, limit: 3 } });
                         (res.data || []).forEach(a => { if (!seen.has(a.id)) { seen.add(a.id); allAlerts.push(a); } });
                     } catch { /* skip */ }
                 }
@@ -1018,7 +1018,7 @@ const CommunityFeed = () => {
             const placeFilter = getPlaceFilter();
             if (placeFilter) params.place = placeFilter;
             if (activeTag) params.tag = activeTag;
-            const res = await axios.get('http://127.0.0.1:8000/community/posts', { params });
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community/posts`, { params });
             let results = res.data || [];
             if (typeof filterMode === 'number' && sidebarPlace === 'All') {
                 const names = getItinPlaceNames();
@@ -1056,7 +1056,7 @@ const CommunityFeed = () => {
             else { if (direction === 'up') up += 1; else down += 1; }
             return { ...p, upvotes: up, downvotes: down, user_vote: newVote };
         }));
-        try { await axios.post(`http://127.0.0.1:8000/community/posts/${postId}/vote?user_id=${userId}`, { direction }); }
+        try { await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${postId}/vote?user_id=${userId}`, { direction }); }
         catch { fetchPosts(); }
     };
 
@@ -1072,7 +1072,7 @@ const CommunityFeed = () => {
             return prev;
         });
         try {
-            await axios.post(`http://127.0.0.1:8000/community/posts/${postId}/save?user_id=${userId}`);
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts/${postId}/save?user_id=${userId}`);
         } catch { /* revert on failure */
             setPosts(prev => prev.map(p => p.id === postId ? { ...p, saved: !p.saved } : p));
             setSavedPosts(prev => {
@@ -1086,7 +1086,7 @@ const CommunityFeed = () => {
         const userId = localStorage.getItem('userId');
         setSavedLoading(true);
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/community/saved?user_id=${userId}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community/saved?user_id=${userId}`);
             setSavedPosts(res.data || []);
         } catch { /* silent */ }
         finally { setSavedLoading(false); }
@@ -1100,9 +1100,9 @@ const CommunityFeed = () => {
         setProfileOpen(true); setProfileUser(null); setProfilePosts([]); setFriendStatus({ status: 'none', friendship_id: null });
         try {
             const [profileRes, postsRes, statusRes] = await Promise.all([
-                axios.get(`http://127.0.0.1:8000/users/${targetUserId}/public`),
-                axios.get('http://127.0.0.1:8000/community/posts', { params: { user_id: user.id, sort: 'new' } }),
-                axios.get(`http://127.0.0.1:8000/friends/status/${targetUserId}`, { params: { user_id: user.id } }),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/${targetUserId}/public`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community/posts`, { params: { user_id: user.id, sort: 'new' } }),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/status/${targetUserId}`, { params: { user_id: user.id } }),
             ]);
             setProfileUser(profileRes.data);
             setProfilePosts((postsRes.data || []).filter(p => p.user_id === targetUserId).slice(0, 10));
@@ -1113,7 +1113,7 @@ const CommunityFeed = () => {
     const sendFriendRequest = async () => {
         if (!profileUser) return; setFriendLoading(true);
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${user.id}`, { receiver_username: profileUser.username });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}friends/request?user_id=${user.id}`, { receiver_username: profileUser.username });
             setFriendStatus({ status: 'pending', is_requester: true });
         } catch (e) {
             const detail = e.response?.data?.detail || '';
@@ -1124,15 +1124,15 @@ const CommunityFeed = () => {
 
     const acceptFriendFromProfile = async (fromUserId) => {
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/friends/status/${fromUserId}`, { params: { user_id: user.id } });
-            if (res.data?.friendship_id) await axios.patch(`http://127.0.0.1:8000/friends/${res.data.friendship_id}/accept?user_id=${user.id}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/status/${fromUserId}`, { params: { user_id: user.id } });
+            if (res.data?.friendship_id) await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}friends/${res.data.friendship_id}/accept?user_id=${user.id}`);
         } catch { /* silent */ }
     };
 
     const rejectFriendFromProfile = async (fromUserId) => {
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/friends/status/${fromUserId}`, { params: { user_id: user.id } });
-            if (res.data?.friendship_id) await axios.patch(`http://127.0.0.1:8000/friends/${res.data.friendship_id}/reject?user_id=${user.id}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/status/${fromUserId}`, { params: { user_id: user.id } });
+            if (res.data?.friendship_id) await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}friends/${res.data.friendship_id}/reject?user_id=${user.id}`);
         } catch { /* silent */ }
     };
 

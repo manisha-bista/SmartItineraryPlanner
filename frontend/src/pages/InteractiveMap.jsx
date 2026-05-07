@@ -180,10 +180,10 @@ export default function InteractiveMap() {
         try {
             const payload = { start_time: dropTime || null, display_order: newOrder };
             if (srcDayId !== dstDayId) payload.day_id = dstDayId;
-            await axios.put(`http://127.0.0.1:8000/activities/${actId}`, payload);
+            await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}activities/${actId}`, payload);
             toast('Activity moved!');
             if (selected) {
-                const r = await axios.get(`http://127.0.0.1:8000/itineraries/${selected.id}`);
+                const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${selected.id}`);
                 setDetail(r.data);
             }
         } catch {
@@ -234,7 +234,7 @@ export default function InteractiveMap() {
         if (!editAct) return;
         setEditBusy(true);
         try {
-            await axios.put(`http://127.0.0.1:8000/activities/${editAct.id}`, {
+            await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}activities/${editAct.id}`, {
                 title:         editForm.title?.trim() || editForm.location.trim(),
                 location:      editForm.location.trim(),
                 activity_type: editForm.activity_type,
@@ -256,7 +256,7 @@ export default function InteractiveMap() {
             setEditMode(false);
             // reload detail to redraw map
             if (selected) {
-                const r = await axios.get(`http://127.0.0.1:8000/itineraries/${selected.id}`);
+                const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${selected.id}`);
                 setDetail(r.data);
             }
         } catch (e) {
@@ -267,7 +267,7 @@ export default function InteractiveMap() {
     useEffect(() => {
         const userId = localStorage.getItem('userId');
         if (!userId) { navigate('/login'); return; }
-        axios.get('http://127.0.0.1:8000/itineraries/user/' + userId)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/` + userId)
             .then(r => {
                 const list = r.data || [];
                 setItineraries(list);
@@ -308,7 +308,7 @@ export default function InteractiveMap() {
     useEffect(() => {
         if (!selected) { setDetail(null); return; }
         setLoadingDetail(true); setSelectedDay(null); setRoutingStatus({}); setDayDistances({});
-        axios.get('http://127.0.0.1:8000/itineraries/' + selected.id)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/` + selected.id)
             .then(r => setDetail(r.data))
             .catch(() => setDetail(null))
             .finally(() => setLoadingDetail(false));
@@ -821,7 +821,7 @@ export default function InteractiveMap() {
                     {editAct?.photo_reference ? (
                         <Box sx={{ width: '100%', height: 200, overflow: 'hidden', position: 'relative' }}>
                             <Box component="img"
-                                src={`http://127.0.0.1:8000/places/photo?photo_reference=${editAct.photo_reference}&max_width=600`}
+                                src={`${import.meta.env.VITE_BACKEND_API_URL}places/photo?photo_reference=${editAct.photo_reference}&max_width=600`}
                                 alt={editAct.title || editAct.location}
                                 sx={{ width: '100%', height: '100%', objectFit: 'cover' }}
                                 onError={e => { e.target.style.display = 'none'; }}
@@ -1036,7 +1036,7 @@ export default function InteractiveMap() {
         <CreateItineraryDialog open={createOpen} onClose={() => setCreateOpen(false)} onCreated={() => {
             setCreateOpen(false);
             const userId = localStorage.getItem('userId');
-            axios.get('http://127.0.0.1:8000/itineraries/user/' + userId)
+            axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/` + userId)
                 .then(r => { const list = r.data || []; setItineraries(list); if (list.length > 0) setSelected(list[0]); })
                 .catch(() => {});
         }} />

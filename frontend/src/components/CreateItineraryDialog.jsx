@@ -87,7 +87,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         if (!open) return;
         const uid = localStorage.getItem('userId');
         if (!uid) return;
-        axios.get(`http://127.0.0.1:8000/subscriptions/status/${uid}`)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/status/${uid}`)
             .then(r => setAiQuota({
                 used:     r.data.ai_generations_used ?? 0,
                 limit:    r.data.ai_limit ?? 0,
@@ -274,7 +274,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
         setDays([...newDays]);
 
         try {
-            const res = await axios.get('http://127.0.0.1:8000/places/search', {
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}places/search`, {
                 params: { query: dest.location },
             });
             const results = res.data.results || [];
@@ -444,7 +444,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
 
             const callerId = localStorage.getItem('userId');
             const response = await axios.post(
-                `http://127.0.0.1:8000/ai/generate-itinerary?user_id=${callerId}`,
+                `${import.meta.env.VITE_BACKEND_API_URL}ai/generate-itinerary?user_id=${callerId}`,
                 {
                     destination: fullPrompt,
                     days: numDays,
@@ -487,7 +487,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             // Refresh the quota chip so "X/Y this week" decrements live.
             if (!aiUnlimited) {
                 const uid = localStorage.getItem('userId');
-                axios.get(`http://127.0.0.1:8000/subscriptions/status/${uid}`)
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/status/${uid}`)
                     .then(r => setAiQuota({
                         used:     r.data.ai_generations_used ?? 0,
                         limit:    r.data.ai_limit ?? 0,
@@ -540,7 +540,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
             };
 
             const itineraryResponse = await axios.post(
-                'http://127.0.0.1:8000/itineraries/complete',
+                `${import.meta.env.VITE_BACKEND_API_URL}itineraries/complete`,
                 itineraryPayload
             );
 
@@ -549,7 +549,7 @@ const CreateItineraryDialog = ({ open, onClose, userId, onSuccess }) => {
                 const createdDay = itineraryResponse.data.days[dayIndex];
                 for (const destination of day.destinations) {
                     if (destination.location.trim()) {
-                        await axios.post('http://127.0.0.1:8000/activities', {
+                        await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}activities`, {
                             title: destination.title || destination.location.trim(),
                             description: destination.description?.trim() || null,
                             location: destination.location.trim(),

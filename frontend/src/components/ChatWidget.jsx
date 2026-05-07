@@ -77,8 +77,8 @@ const ChatWidget = () => {
     const fetchConversations = useCallback(async () => {
         try {
             const [convosRes, friendsRes] = await Promise.all([
-                axios.get(`http://127.0.0.1:8000/messages/${userId}/conversations`),
-                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}messages/${userId}/conversations`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}`),
             ]);
             const convos = convosRes.data?.conversations || [];
             const friends = friendsRes.data?.friends || [];
@@ -114,7 +114,7 @@ const ChatWidget = () => {
     const fetchMessages = useCallback(async () => {
         if (!activeChat) return;
         try {
-            const res = await axios.get(`http://127.0.0.1:8000/messages/${userId}/${activeChat.friend_id}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}messages/${userId}/${activeChat.friend_id}`);
             setMessages(res.data?.messages || []);
         } catch { /* silent */ }
     }, [userId, activeChat]);
@@ -149,7 +149,7 @@ const ChatWidget = () => {
         if (!newMsg.trim() || !activeChat || sending) return;
         setSending(true);
         try {
-            await axios.post(`http://127.0.0.1:8000/messages?user_id=${userId}`, {
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}messages?user_id=${userId}`, {
                 receiver_id: activeChat.friend_id,
                 content: newMsg.trim(),
             });
@@ -163,7 +163,7 @@ const ChatWidget = () => {
         if (!addUsername.trim()) return;
         setAddStatus('sending'); setAddError('');
         try {
-            await axios.post(`http://127.0.0.1:8000/friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}friends/request?user_id=${userId}`, { receiver_username: addUsername.trim().replace(/^@/, '') });
             setAddStatus('sent'); setAddUsername('');
             setTimeout(() => setAddStatus(''), 3000);
         } catch (err) {

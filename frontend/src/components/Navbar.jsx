@@ -117,7 +117,7 @@ const Navbar = () => {
     useEffect(() => {
         if (!userId) return;
         const fetchPending = () => {
-            axios.get(`http://127.0.0.1:8000/friends/${userId}/pending`)
+            axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}/pending`)
                 .then(r => setPendingFriends((r.data || []).length))
                 .catch(() => {});
         };
@@ -128,7 +128,7 @@ const Navbar = () => {
 
     const fetchNotifications = () => {
         if (!userId) return;
-        axios.get(`http://127.0.0.1:8000/notifications/${userId}`)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}notifications/${userId}`)
             .then(r => {
                 setNotifications(r.data);
                 setUnreadCount(r.data.filter(n => !n.is_read).length);
@@ -147,13 +147,13 @@ const Navbar = () => {
 
     const handleMarkAllRead = () => {
         if (!userId) return;
-        axios.patch(`http://127.0.0.1:8000/notifications/${userId}/read-all`)
+        axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}notifications/${userId}/read-all`)
             .then(() => fetchNotifications())
             .catch(() => {});
     };
 
     const handleNotifAction = async (notif) => {
-        axios.patch(`http://127.0.0.1:8000/notifications/${notif.id}/read`).catch(() => {});
+        axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}notifications/${notif.id}/read`).catch(() => {});
         handleNotifClose();
         fetchNotifications();
 
@@ -181,7 +181,7 @@ const Navbar = () => {
             case 'message':
                 if (notif.from_user_id) {
                     try {
-                        const res = await axios.get(`http://127.0.0.1:8000/users/${notif.from_user_id}/public`);
+                        const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/${notif.from_user_id}/public`);
                         window.dispatchEvent(new CustomEvent('open-chat', {
                             detail: { friendId: notif.from_user_id, username: res.data.username, avatarId: res.data.avatar_id }
                         }));

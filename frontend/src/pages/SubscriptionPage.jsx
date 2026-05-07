@@ -136,10 +136,10 @@ export default function SubscriptionPage() {
         });
 
         // Fetch name + role from users endpoint, then get CANONICAL tier from status endpoint
-        axios.get(`http://127.0.0.1:8000/users/${uid}`)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/${uid}`)
             .then(({ data: u }) => {
                 // Use status endpoint as the authoritative source — it runs auto-expiry
-                return axios.get(`http://127.0.0.1:8000/subscriptions/status/${uid}`)
+                return axios.get(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/status/${uid}`)
                     .then(({ data: s }) => {
                         const canonicalTier = s.subscription_tier || 'free';
                         const isCanceled    = Boolean(s.is_canceled);
@@ -181,7 +181,7 @@ export default function SubscriptionPage() {
         setLoading(true);
         try {
             const uid = localStorage.getItem('userId');
-            const { data } = await axios.post('http://127.0.0.1:8000/subscriptions/khalti/initiate', {
+            const { data } = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/khalti/initiate`, {
                 user_id: parseInt(uid), plan: selected,
             });
             if (data.payment_url) {
@@ -204,7 +204,7 @@ export default function SubscriptionPage() {
         setLoading(true);
         try {
             const uid = localStorage.getItem('userId');
-            const { data } = await axios.post('http://127.0.0.1:8000/subscriptions/cancel', {
+            const { data } = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/cancel`, {
                 user_id: parseInt(uid),
             });
 

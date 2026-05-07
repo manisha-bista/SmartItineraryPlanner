@@ -105,7 +105,7 @@ const ForgotPasswordDialog = ({ open, onClose, COLORS }) => {
         if (!forgotEmail.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(forgotEmail)) { setForgotError('Please enter a valid email address'); return; }
         setForgotLoading(true);
         try {
-            const res = await axios.post('http://127.0.0.1:8000/auth/forgot-password', { email: forgotEmail.trim().toLowerCase() });
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}auth/forgot-password`, { email: forgotEmail.trim().toLowerCase() });
             setUserId(res.data.user_id); setOtp(''); setOtpError(''); setResendTimer(60); setStep('otp');
         } catch (err) { setForgotError(err.response?.data?.detail || 'No account found with this email address.'); }
         finally { setForgotLoading(false); }
@@ -115,7 +115,7 @@ const ForgotPasswordDialog = ({ open, onClose, COLORS }) => {
         e?.preventDefault(); setOtpError('');
         if (otp.length !== 6) { setOtpError('Please enter the full 6-digit OTP'); return; }
         setOtpLoading(true);
-        try { await axios.post('http://127.0.0.1:8000/auth/verify-otp', { user_id: userId, otp_code: otp }); setStep('reset'); }
+        try { await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}auth/verify-otp`, { user_id: userId, otp_code: otp }); setStep('reset'); }
         catch (err) { setOtpError(err.response?.data?.detail || 'Invalid OTP. Please try again.'); setOtp(''); }
         finally { setOtpLoading(false); }
     };
@@ -126,7 +126,7 @@ const ForgotPasswordDialog = ({ open, onClose, COLORS }) => {
         if (newPassword.length < 6) { setResetError('Password must be at least 6 characters'); return; }
         if (newPassword !== confirmPassword) { setResetError('Passwords do not match'); return; }
         setResetLoading(true);
-        try { await axios.post('http://127.0.0.1:8000/auth/reset-password', { user_id: userId, new_password: newPassword, confirm_password: confirmPassword }); setStep('success'); }
+        try { await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}auth/reset-password`, { user_id: userId, new_password: newPassword, confirm_password: confirmPassword }); setStep('success'); }
         catch (err) { setResetError(err.response?.data?.detail || 'Failed to reset password. Please try again.'); }
         finally { setResetLoading(false); }
     };
@@ -311,7 +311,7 @@ const Login = () => {
         if (!validateForm()) return;
         setLoading(true);
         try {
-            const response = await axios.post('http://127.0.0.1:8000/login', { email: formData.email.trim().toLowerCase(), password: formData.password }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
+            const response = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}login`, { email: formData.email.trim().toLowerCase(), password: formData.password }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
             if (response.data.id) {
                 localStorage.setItem('userId',            response.data.id);
                 localStorage.setItem('userName',          response.data.name);
@@ -336,7 +336,7 @@ const Login = () => {
         onSuccess: async (tokenResponse) => {
             setGoogleLoading(true); setError('');
             try {
-                const response = await axios.post('http://127.0.0.1:8000/auth/google', { token: tokenResponse.access_token }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
+                const response = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}auth/google`, { token: tokenResponse.access_token }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
                 const user = response.data;
                 localStorage.setItem('userId',            user.id);
                 localStorage.setItem('userName',          user.name);

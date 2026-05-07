@@ -163,12 +163,12 @@ export default function ItineraryDetail() {
         try {
             setLoading(true);
             const uid = parseInt(localStorage.getItem('userId'));
-            const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
+            const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`);
             setItinerary(r.data);
             checkAndUpdateStatus(r.data);
             if (r.data.user_id !== uid) {
                 try {
-                    const collabs = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
+                    const collabs = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/collaborators`);
                     const me = (collabs.data || []).find(c => c.user_id === uid && c.status === 'accepted');
                     setIsAcceptedCollaborator(!!me);
                 } catch { /* silent */ }
@@ -179,7 +179,7 @@ export default function ItineraryDetail() {
     // Silent refresh used after mutations — no full-page spinner
     const reload = async () => {
         try {
-            const r = await axios.get(`http://127.0.0.1:8000/itineraries/${id}`);
+            const r = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`);
             setItinerary(r.data);
             checkAndUpdateStatus(r.data);
         } catch { /* non-critical */ }
@@ -193,7 +193,7 @@ export default function ItineraryDetail() {
         const newStatus = allDaysFilled ? 'confirmed' : 'planning';
         if (itin.status !== newStatus) {
             try {
-                await axios.put(`http://127.0.0.1:8000/itineraries/${itin.id}`, { status: newStatus });
+                await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itin.id}`, { status: newStatus });
                 setItinerary(prev => prev ? { ...prev, status: newStatus } : prev);
             } catch { /* non-critical */ }
         }
@@ -204,7 +204,7 @@ export default function ItineraryDetail() {
         setWeatherLoading(true);
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/itineraries/${itinerary.id}/fetch-weather?user_id=${userId}`);
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itinerary.id}/fetch-weather?user_id=${userId}`);
             await reload(); toast('Weather updated!');
         } catch (e) { toast(e.response?.data?.detail || 'Failed to fetch weather.', 'error'); }
         finally { setWeatherLoading(false); }
@@ -225,7 +225,7 @@ export default function ItineraryDetail() {
         setShareOpen(true); setShareTab('chat'); setFriendsLoading(true);
         try {
             const userId = localStorage.getItem('userId');
-            const res = await axios.get(`http://127.0.0.1:8000/friends/${userId}`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}`);
             setFriends(res.data?.friends || []);
         } catch { setFriends([]); }
         finally { setFriendsLoading(false); }
@@ -244,7 +244,7 @@ export default function ItineraryDetail() {
                 place: (feedPlaces.join(', ') || itinerary.destination || 'Nepal').substring(0, 200),
                 shared_itinerary_id: itinerary.id,
             };
-            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, payload);
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts?user_id=${userId}`, payload);
             setShareOpen(false); toast('Shared to community feed!');
         } catch (err) { 
             const errorMsg = err.response?.data?.detail || err.message || 'Unknown error';
@@ -258,8 +258,8 @@ export default function ItineraryDetail() {
         const userId = localStorage.getItem('userId');
         try {
             const [collabRes, friendsRes] = await Promise.allSettled([
-                axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`),
-                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/collaborators`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}`),
             ]);
             setCollaborators(collabRes.status === 'fulfilled' ? collabRes.value.data || [] : []);
             setCollabFriends(friendsRes.status === 'fulfilled' ? friendsRes.value.data?.friends || [] : []);
@@ -273,12 +273,12 @@ export default function ItineraryDetail() {
         setInviting(true); setInviteErr(''); setInviteSuccess('');
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/itineraries/${id}/collaborators?user_id=${userId}`, { username: raw });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/collaborators?user_id=${userId}`, { username: raw });
             if (!usernameOverride) setInviteUsername('');
             setCollabSearch('');
             setInviteSuccess(`Invite sent to @${raw}!`);
             setTimeout(() => setInviteSuccess(''), 3000);
-            const res = await axios.get(`http://127.0.0.1:8000/itineraries/${id}/collaborators`);
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/collaborators`);
             setCollaborators(res.data || []);
         } catch (e) {
             const detail = e.response?.data?.detail;
@@ -293,7 +293,7 @@ export default function ItineraryDetail() {
     const removeCollaborator = async (collabUserId) => {
         try {
             const uid = localStorage.getItem('userId');
-            await axios.delete(`http://127.0.0.1:8000/itineraries/${id}/collaborators/${collabUserId}?user_id=${uid}`);
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/collaborators/${collabUserId}?user_id=${uid}`);
             setCollaborators(prev => prev.filter(c => c.user_id !== collabUserId));
             toast('Collaborator removed.');
         } catch { toast('Failed to remove.', 'error'); }
@@ -303,7 +303,7 @@ export default function ItineraryDetail() {
         setForking(true);
         try {
             const userId = localStorage.getItem('userId');
-            const res = await axios.post(`http://127.0.0.1:8000/itineraries/${id}/fork?user_id=${userId}`);
+            const res = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}/fork?user_id=${userId}`);
             toast('Itinerary forked! Opening your copy...');
             setTimeout(() => { window.location.href = `/itinerary/${res.data.id}`; }, 1200);
         } catch (e) { toast(e.response?.data?.detail || 'Failed to fork.', 'error'); setForking(false); }
@@ -314,7 +314,7 @@ export default function ItineraryDetail() {
         setSharing(friendId);
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/messages?user_id=${userId}`, {
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}messages?user_id=${userId}`, {
                 receiver_id: friendId,
                 content: `Check out my itinerary: "${itinerary.title}"`,
                 shared_itinerary_id: itinerary.id,
@@ -337,7 +337,7 @@ export default function ItineraryDetail() {
                 const allAlerts = []; const seen = new Set();
                 for (const loc of locations) {
                     try {
-                        const res = await axios.get('http://127.0.0.1:8000/community-updates', { params: { location: loc, active_only: true } });
+                        const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}community-updates`, { params: { location: loc, active_only: true } });
                         (res.data || []).forEach(a => { if (!seen.has(a.id)) { seen.add(a.id); allAlerts.push(a); } });
                     } catch { /* skip */ }
                 }
@@ -374,15 +374,15 @@ export default function ItineraryDetail() {
         setDayBusy(true);
         try {
             const payload = { day_number: dayForm.day_number, date: dayForm.date, title: dayForm.title.trim(), description: dayForm.description.trim(), estimated_cost: parseFloat(dayForm.estimated_cost) || 0, actual_cost: editDay?.actual_cost || 0, itinerary_id: parseInt(id), activities: [] };
-            if (editDay) { await axios.put(`http://127.0.0.1:8000/itinerary-days/${editDay.id}`, payload); toast('Day updated!'); }
-            else         { await axios.post('http://127.0.0.1:8000/itinerary-days', payload); toast('Day added!'); }
+            if (editDay) { await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days/${editDay.id}`, payload); toast('Day updated!'); }
+            else         { await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days`, payload); toast('Day added!'); }
             await reload(); setDayOpen(false);
         } catch (e) { toast(e.response?.data?.detail || 'Failed.', 'error'); }
         finally { setDayBusy(false); }
     };
 
     const deleteDay = async (day) => {
-        try { await axios.delete(`http://127.0.0.1:8000/itinerary-days/${day.id}`); toast('Day deleted.'); await reload(); }
+        try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days/${day.id}`); toast('Day deleted.'); await reload(); }
         catch { toast('Failed to delete day.', 'error'); }
         setDelOpen(false); setDelTarget(null);
     };
@@ -408,15 +408,15 @@ export default function ItineraryDetail() {
         setActBusy(true);
         try {
             const payload = { title: actForm.title?.trim() || actForm.location.trim(), description: actForm.description.trim(), location: actForm.location.trim(), formatted_address: actForm.formatted_address || null, latitude: actForm.latitude || null, longitude: actForm.longitude || null, place_id: actForm.place_id || null, place_types: actForm.place_types || null, rating: actForm.rating || null, start_time: actForm.start_time || null, end_time: actForm.end_time || null, activity_type: actForm.activity_type || 'sightseeing', cost: parseFloat(actForm.cost) || 0, actual_cost: parseFloat(actForm.actual_cost) || 0, is_completed: editAct?.is_completed || false, day_id: actDayId };
-            if (editAct) { await axios.put(`http://127.0.0.1:8000/activities/${editAct.id}`, payload); toast('Activity updated!'); }
-            else         { await axios.post('http://127.0.0.1:8000/activities', payload); toast('Activity added!'); }
+            if (editAct) { await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}activities/${editAct.id}`, payload); toast('Activity updated!'); }
+            else         { await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}activities`, payload); toast('Activity added!'); }
             await reload(); setActOpen(false);
         } catch (e) { toast(e.response?.data?.detail || 'Failed.', 'error'); }
         finally { setActBusy(false); }
     };
 
     const deleteAct = async (act) => {
-        try { await axios.delete(`http://127.0.0.1:8000/activities/${act.id}`); toast('Activity deleted.'); await reload(); }
+        try { await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}activities/${act.id}`); toast('Activity deleted.'); await reload(); }
         catch { toast('Failed to delete.', 'error'); }
         setDelOpen(false); setDelTarget(null);
     };
@@ -462,7 +462,7 @@ export default function ItineraryDetail() {
         try {
             const payload = { start_time: dropTime || null, display_order: newOrder };
             if (srcDayId !== dstDayId) payload.day_id = dstDayId;
-            await axios.put(`http://127.0.0.1:8000/activities/${actId}`, payload);
+            await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}activities/${actId}`, payload);
             toast('Activity moved!');
             await reload();
         } catch {
@@ -482,7 +482,7 @@ export default function ItineraryDetail() {
         if (raw === undefined) return;
         const value = parseFloat(raw) || 0;
         if (value === (act.actual_cost || 0)) return;
-        try { await axios.put(`http://127.0.0.1:8000/activities/${act.id}`, { actual_cost: value }); await reload(); }
+        try { await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}activities/${act.id}`, { actual_cost: value }); await reload(); }
         catch { toast('Failed to save actual cost.', 'error'); }
     };
 
@@ -544,7 +544,7 @@ export default function ItineraryDetail() {
                                         if (e.key === 'Enter') {
                                             const t = titleDraft.trim();
                                             if (t && t !== itinerary.title) {
-                                                await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, { title: t });
+                                                await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`, { title: t });
                                                 await reload();
                                                 toast('Title updated!');
                                             }
@@ -558,7 +558,7 @@ export default function ItineraryDetail() {
                                 <Button size="small" onClick={async () => {
                                     const t = titleDraft.trim();
                                     if (t && t !== itinerary.title) {
-                                        await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, { title: t });
+                                        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`, { title: t });
                                         await reload();
                                         toast('Title updated!');
                                     }
@@ -600,7 +600,7 @@ export default function ItineraryDetail() {
                                         // Update start_date (and end_date derived from days count)
                                         const newEnd = new Date(newStart);
                                         newEnd.setDate(newEnd.getDate() + days.length - 1);
-                                        await axios.put(`http://127.0.0.1:8000/itineraries/${id}`, {
+                                        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`, {
                                             start_date: dateDraft,
                                             end_date: newEnd.toISOString().split('T')[0],
                                         });
@@ -608,7 +608,7 @@ export default function ItineraryDetail() {
                                         await Promise.all(days.map((day, i) => {
                                             const d = new Date(newStart);
                                             d.setDate(d.getDate() + i);
-                                            return axios.put(`http://127.0.0.1:8000/itinerary-days/${day.id}`, {
+                                            return axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days/${day.id}`, {
                                                 date: d.toISOString().split('T')[0],
                                             });
                                         }));

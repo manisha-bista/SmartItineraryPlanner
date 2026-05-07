@@ -112,7 +112,7 @@ export default function PaymentReturn() {
             return;
         }
 
-        axios.post('http://127.0.0.1:8000/subscriptions/khalti/verify', {
+        axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/khalti/verify`, {
             pidx,
             user_id: parseInt(userId),
         })

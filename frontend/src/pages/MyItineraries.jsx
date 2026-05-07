@@ -81,7 +81,7 @@ const WeatherStrip = ({ trip, userId, COLORS }) => {
             if (age < 60 * 60 * 1000) {
                 try {
                     setStatus('loading');
-                    const detail = await axios.get(`http://127.0.0.1:8000/itineraries/${trip.id}`);
+                    const detail = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${trip.id}`);
                     setDays((detail.data?.days || []).slice(0, 3));
                     setStatus('done');
                 } catch { setStatus('idle'); }
@@ -91,8 +91,8 @@ const WeatherStrip = ({ trip, userId, COLORS }) => {
         setStatus('loading');
         setErrMsg('');
         try {
-            await axios.post(`http://127.0.0.1:8000/itineraries/${trip.id}/fetch-weather?user_id=${userId}`);
-            const detail = await axios.get(`http://127.0.0.1:8000/itineraries/${trip.id}`);
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${trip.id}/fetch-weather?user_id=${userId}`);
+            const detail = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${trip.id}`);
             setDays((detail.data?.days || []).slice(0, 3));
             setStatus('done');
         } catch (err) {
@@ -256,7 +256,7 @@ const MyItineraries = () => {
             name: userName || 'User',
             avatarId: parseInt(localStorage.getItem('avatarId')) || 1,
         });
-        axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}`)
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}`)
             .then(r => setItineraries(r.data))
             .catch(() => setError('Could not load itineraries. Is the backend running?'))
             .finally(() => setLoading(false));
@@ -264,8 +264,8 @@ const MyItineraries = () => {
         // fetch collaborations
         setCollabsLoading(true);
         Promise.all([
-            axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}/collaborations`).then(r => r.data).catch(() => []),
-            axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}/pending-collabs`).then(r => r.data).catch(() => []),
+            axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}/collaborations`).then(r => r.data).catch(() => []),
+            axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}/pending-collabs`).then(r => r.data).catch(() => []),
         ]).then(([collabs, pending]) => {
             setCollaborations(collabs);
             setPendingCollabs(pending);
@@ -274,10 +274,10 @@ const MyItineraries = () => {
 
     const acceptCollab = async (itineraryId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/accept?user_id=${user.id}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}/collaborators/accept?user_id=${user.id}`);
             const [collabs, pending] = await Promise.all([
-                axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}/collaborations`).then(r => r.data).catch(() => []),
-                axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}/pending-collabs`).then(r => r.data).catch(() => []),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${user.id}/collaborations`).then(r => r.data).catch(() => []),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${user.id}/pending-collabs`).then(r => r.data).catch(() => []),
             ]);
             setCollaborations(collabs);
             setPendingCollabs(pending);
@@ -286,7 +286,7 @@ const MyItineraries = () => {
 
     const rejectCollab = async (itineraryId) => {
         try {
-            await axios.patch(`http://127.0.0.1:8000/itineraries/${itineraryId}/collaborators/reject?user_id=${user.id}`);
+            await axios.patch(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${itineraryId}/collaborators/reject?user_id=${user.id}`);
             setPendingCollabs(prev => prev.filter(p => p.id !== itineraryId));
         } catch { setError('Failed to decline collaboration.'); }
     };
@@ -308,7 +308,7 @@ const MyItineraries = () => {
     const handleDelete = async () => {
         setDeleting(true);
         try {
-            await axios.delete(`http://127.0.0.1:8000/itineraries/${deleteId}`);
+            await axios.delete(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${deleteId}`);
             setItineraries(prev => prev.filter(t => t.id !== deleteId));
             setDeleteId(null);
         } catch { setError('Delete failed.'); }
@@ -328,8 +328,8 @@ const MyItineraries = () => {
         try {
             const userId = localStorage.getItem('userId');
             const [friendsRes, itinRes] = await Promise.all([
-                axios.get(`http://127.0.0.1:8000/friends/${userId}`),
-                axios.get(`http://127.0.0.1:8000/itineraries/${trip.id}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}friends/${userId}`),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${trip.id}`),
             ]);
             setFriends(friendsRes.data?.friends || []);
             const ps = new Set();
@@ -347,7 +347,7 @@ const MyItineraries = () => {
         setFeedSharing(true);
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/community/posts?user_id=${userId}`, {
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}community/posts?user_id=${userId}`, {
                 title: feedTitle.trim(),
                 body: feedBody.trim() || null,
                 tag: 'Experience',
@@ -363,7 +363,7 @@ const MyItineraries = () => {
         setSharing(friendId);
         try {
             const userId = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/messages?user_id=${userId}`, {
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}messages?user_id=${userId}`, {
                 receiver_id: friendId,
                 content: `Check out my itinerary: "${shareItinTitle}"`,
                 shared_itinerary_id: shareItinId,
@@ -388,7 +388,7 @@ const MyItineraries = () => {
                 <CardMedia
                     component="img" height="160"
                     image={trip.cover_photo
-                        ? `http://127.0.0.1:8000/places/photo?photo_reference=${trip.cover_photo}&max_width=600`
+                        ? `${import.meta.env.VITE_BACKEND_API_URL}places/photo?photo_reference=${trip.cover_photo}&max_width=600`
                         : 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop'}
                     alt={trip.title}
                 />
@@ -642,7 +642,7 @@ const MyItineraries = () => {
                 userId={user.id}
                 onSuccess={() => {
                     setCreateOpen(false);
-                    axios.get(`http://127.0.0.1:8000/itineraries/user/${user.id}`)
+                    axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${user.id}`)
                         .then(r => setItineraries(r.data))
                         .catch(() => {});
                 }}

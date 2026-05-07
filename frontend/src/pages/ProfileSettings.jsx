@@ -205,7 +205,7 @@ export default function ProfileSettings() {
         setUser({ name: uname, email, username, avatarId });
         setForm(p => ({ ...p, fullName: uname, avatarId }));
 
-        axios.get(`http://127.0.0.1:8000/users/${uid}`).then(r => {
+        axios.get(`${import.meta.env.VITE_BACKEND_API_URL}users/${uid}`).then(r => {
             const u = r.data;
             setUser(prev => ({ ...prev, username: u.username || '', avatarId: u.avatar_id || 1 }));
             setForm(prev => ({ ...prev, fullName: u.name, bio: u.bio || '', avatarId: u.avatar_id || 1 }));
@@ -223,7 +223,7 @@ export default function ProfileSettings() {
     const handleSave = async () => {
         try {
             const uid = localStorage.getItem('userId');
-            await axios.put(`http://127.0.0.1:8000/users/${uid}`, { name: form.fullName, bio: form.bio || null, avatar_id: form.avatarId });
+            await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}users/${uid}`, { name: form.fullName, bio: form.bio || null, avatar_id: form.avatarId });
             localStorage.setItem('userName', form.fullName);
             localStorage.setItem('avatarId', form.avatarId);
             setUser(p => ({ ...p, name: form.fullName, avatarId: form.avatarId }));
@@ -237,7 +237,7 @@ export default function ProfileSettings() {
         setSubLoading(true);
         try {
             const uid = localStorage.getItem('userId');
-            const { data } = await axios.post('http://127.0.0.1:8000/subscriptions/khalti/initiate', {
+            const { data } = await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/khalti/initiate`, {
                 user_id: parseInt(uid), plan: selectedPlan,
             });
             if (data.payment_url) {
@@ -255,7 +255,7 @@ export default function ProfileSettings() {
         setSubLoading(true);
         try {
             const uid = localStorage.getItem('userId');
-            await axios.post(`http://127.0.0.1:8000/subscriptions/cancel`, { user_id: parseInt(uid) });
+            await axios.post(`${import.meta.env.VITE_BACKEND_API_URL}subscriptions/cancel`, { user_id: parseInt(uid) });
             toast('Your subscription has been cancelled.', 'info');
             setSubTier('free'); localStorage.setItem('subscriptionTier', 'free');
         } catch (e) { toast(e.response?.data?.detail || 'Could not cancel.', 'error'); }

@@ -47,7 +47,7 @@ const fmtBudget = (n, currency = 'NPR') =>
 const fmtDays = (n) => n ? `${n} day${n !== 1 ? 's' : ''}` : '';
 
 // ── Card components ───────────────────────────────────────────────────────────
-const PHOTO_BASE = 'http://127.0.0.1:8000/places/photo?photo_reference=';
+const PHOTO_BASE = `${import.meta.env.VITE_BACKEND_API_URL}places/photo?photo_reference=`;
 const FALLBACK   = 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?q=80&w=600&auto=format&fit=crop';
 
 const ItineraryGridCard = ({ item, COLORS, onClick }) => {
@@ -228,9 +228,9 @@ const SearchResults = () => {
         const userId = localStorage.getItem('userId');
         try {
             const [pubRes, recRes, userRes] = await Promise.allSettled([
-                axios.get('http://127.0.0.1:8000/itineraries/public', { params: { destination: q, limit: 20 } }),
-                axios.get('http://127.0.0.1:8000/recommendations/explore', { params: { destination: q, limit: 12 } }),
-                userId ? axios.get(`http://127.0.0.1:8000/itineraries/user/${userId}`) : Promise.resolve(null),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/public`, { params: { destination: q, limit: 20 } }),
+                axios.get(`${import.meta.env.VITE_BACKEND_API_URL}recommendations/explore`, { params: { destination: q, limit: 12 } }),
+                userId ? axios.get(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/user/${userId}`) : Promise.resolve(null),
             ]);
 
             const seenIds = new Set();
@@ -286,7 +286,7 @@ const SearchResults = () => {
     // Fetch trending / popular for the destination regardless of filters
     const fetchPopular = useCallback(async (q) => {
         try {
-            const res = await axios.get('http://127.0.0.1:8000/recommendations/explore', {
+            const res = await axios.get(`${import.meta.env.VITE_BACKEND_API_URL}recommendations/explore`, {
                 params: { destination: q || undefined, limit: 4 },
             });
             setPopular(res.data?.results || []);
