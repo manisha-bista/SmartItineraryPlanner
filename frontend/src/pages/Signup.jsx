@@ -8,6 +8,7 @@ import PersonIcon from '@mui/icons-material/Person';
 import EmailIcon from '@mui/icons-material/Email';
 import LockIcon from '@mui/icons-material/Lock';
 import { useNavigate } from 'react-router-dom';
+import { useGoogleLogin } from '@react-oauth/google';
 import axios from 'axios';
 import { useTheme } from '../context/ThemeContext';
 
@@ -20,11 +21,18 @@ const Signup = () => {
         '& .MuiInputBase-input': { py: 1.5 },
         '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
         '& .MuiFormHelperText-root': { color: '#ff6b6b', mx: 0, mt: 0.5 },
+        '& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus': {
+            WebkitBoxShadow: `0 0 0 1000px ${COLORS.inputBg} inset !important`,
+            WebkitTextFillColor: `${COLORS.text} !important`,
+            caretColor: `${COLORS.text} !important`,
+            transition: 'background-color 50000s ease-in-out 0s',
+        },
     };
 
     const [formData, setFormData] = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
     const [error, setError]       = useState('');
     const [loading, setLoading]   = useState(false);
+    const [googleLoading, setGoogleLoading] = useState(false);
     const [showPassword, setShowPassword]               = useState(false);
     const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [validationErrors, setValidationErrors]       = useState({ firstName: '', lastName: '', email: '', password: '', confirmPassword: '' });
@@ -77,6 +85,36 @@ const Signup = () => {
             else setError(err.response?.data?.detail || 'Registration failed. Please try again.');
         } finally { setLoading(false); }
     };
+
+    // Google OAuth — same flow as Login.jsx. The backend's /auth/google
+    // endpoint creates the account if it doesn't exist, so this works for
+    // both first-time signup and returning users.
+    const handleGoogleSignup = useGoogleLogin({
+        onSuccess: async (tokenResponse) => {
+            setGoogleLoading(true); setError('');
+            try {
+                const response = await axios.post(
+                    'http://127.0.0.1:8000/auth/google',
+                    { token: tokenResponse.access_token },
+                    { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
+                );
+                const user = response.data;
+                localStorage.setItem('userId',            user.id);
+                localStorage.setItem('userName',          user.name);
+                localStorage.setItem('userEmail',         user.email);
+                localStorage.setItem('userRole',          user.role || 'user');
+                localStorage.setItem('username',          user.username || '');
+                localStorage.setItem('avatarId',          user.avatar_id || 1);
+                localStorage.setItem('subscriptionTier',  user.subscription_tier || 'free');
+                if (user.profile_picture_url) localStorage.setItem('userPicture', user.profile_picture_url);
+                navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
+            } catch (err) {
+                if (err.code === 'ERR_NETWORK') setError('Cannot connect to server.');
+                else setError(err.response?.data?.detail || 'Google sign-up failed. Please try again.');
+            } finally { setGoogleLoading(false); }
+        },
+        onError: () => setError('Google sign-in was cancelled or failed. Please try again.'),
+    });
 
     return (
         <Box sx={{ display: 'flex', height: '100vh', bgcolor: COLORS.background, overflow: 'hidden' }}>
@@ -142,10 +180,13 @@ const Signup = () => {
                                 {loading ? <Stack direction="row" spacing={1} alignItems="center"><CircularProgress size={16} sx={{ color: COLORS.background }} /><span>Creating Account...</span></Stack> : 'Sign Up'}
                             </Button>
 
-                            <Button fullWidth variant="contained" disabled={loading}
-                                startIcon={<Box component="img" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" sx={{ width: 18, height: 18 }} />}
+                            <Button fullWidth variant="contained" disabled={loading || googleLoading}
+                                onClick={() => handleGoogleSignup()}
+                                startIcon={googleLoading
+                                    ? <CircularProgress size={16} sx={{ color: COLORS.text }} />
+                                    : <Box component="img" src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" alt="Google" sx={{ width: 18, height: 18 }} />}
                                 sx={{ py: 1.4, bgcolor: COLORS.inputBg, color: COLORS.text, textTransform: 'none', fontSize: '0.9rem', borderRadius: 2, boxShadow: 'none', fontWeight: 500, '&:hover': { bgcolor: COLORS.cardSecondary } }}>
-                                Continue With Google
+                                {googleLoading ? 'Signing in...' : 'Continue With Google'}
                             </Button>
                         </Stack>
 

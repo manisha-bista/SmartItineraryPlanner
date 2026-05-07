@@ -12,9 +12,11 @@ from database import engine
 import models
 
 from routers import auth, users, itineraries, community, communication, services, admin
+from routers.subscriptions import router as subscriptions_router
 from routers.users import friends_router
 from routers.community import updates_router, complaints_router  # /community-updates and /complaints
 from routers.recommendations import router as recommendations_router
+from seed import ensure_default_admin, ensure_schema_extras
 
 load_dotenv()
 
@@ -27,6 +29,10 @@ try:
     logger.info("Database tables ready")
 except Exception as e:
     logger.error(f"Error creating database tables: {e}")
+
+# ── Apply additive column migrations & seed required default rows (idempotent)
+ensure_schema_extras()
+ensure_default_admin()
 
 # ── App ────────────────────────────────────────────────────────────────────────
 app = FastAPI(
@@ -57,6 +63,7 @@ app.include_router(communication.router)
 app.include_router(services.router)
 app.include_router(admin.router)
 app.include_router(recommendations_router)
+app.include_router(subscriptions_router)
 
 
 # ── Health / Root ──────────────────────────────────────────────────────────────

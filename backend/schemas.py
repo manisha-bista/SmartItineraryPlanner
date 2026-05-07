@@ -1,6 +1,6 @@
 from pydantic import BaseModel, EmailStr, Field, validator, HttpUrl
 from typing import List, Optional
-from datetime import date as date_, datetime, time
+from datetime import date, datetime, time
 
 # ============================================
 # USER SCHEMAS
@@ -32,6 +32,12 @@ class UserOut(BaseModel):
     location: Optional[str] = None
     profile_picture_url: Optional[str] = None
     created_at: datetime
+
+    # Subscription
+    subscription_tier: str = "free"
+    subscription_plan: Optional[str] = None
+    premium_until: Optional[datetime] = None
+    ai_generations_month: int = 0
 
     class Config:
         from_attributes = True
@@ -126,7 +132,7 @@ class ActivityOut(ActivityBase):
 # ============================================
 class ItineraryDayBase(BaseModel):
     day_number: int = Field(..., gt=0)
-    date: date_
+    date: date
     title: Optional[str] = None
     description: Optional[str] = None
     
@@ -153,7 +159,6 @@ class ItineraryDayCreate(ItineraryDayBase):
     activities: List[ActivityBase] = []
 
 class ItineraryDayUpdate(BaseModel):
-    date: Optional[date_] = None
     title: Optional[str] = None
     description: Optional[str] = None
     estimated_cost: Optional[float] = None
@@ -188,8 +193,8 @@ class AccommodationBase(BaseModel):
     photo_reference: Optional[str] = None
     
     # Check-in/out
-    check_in_date: date_
-    check_out_date: date_
+    check_in_date: date
+    check_out_date: date
     check_in_time: Optional[time] = None
     check_out_time: Optional[time] = None
     
@@ -220,8 +225,8 @@ class AccommodationUpdate(BaseModel):
     name: Optional[str] = None
     type: Optional[str] = None
     address: Optional[str] = None
-    check_in_date: Optional[date_] = None
-    check_out_date: Optional[date_] = None
+    check_in_date: Optional[date] = None
+    check_out_date: Optional[date] = None
     cost_per_night: Optional[float] = None
     total_cost: Optional[float] = None
     is_booked: Optional[bool] = None
@@ -366,8 +371,8 @@ class CommunityUpdateBase(BaseModel):
     longitude: Optional[float] = None
     update_type: str = Field(..., pattern="^(closure|event|alert|tip|hazard)$")
     severity: str = Field(default="info", pattern="^(info|warning|urgent)$")
-    start_date: Optional[date_] = None
-    end_date: Optional[date_] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     is_active: bool = True
 
 class CommunityUpdateCreate(CommunityUpdateBase):
@@ -377,7 +382,7 @@ class CommunityUpdateUpdate(BaseModel):
     title: Optional[str] = None
     content: Optional[str] = None
     is_active: Optional[bool] = None
-    end_date: Optional[date_] = None
+    end_date: Optional[date] = None
 
 class CommunityUpdateOut(CommunityUpdateBase):
     id: int
@@ -401,8 +406,8 @@ class ItineraryBase(BaseModel):
     cover_image_url: Optional[str] = None
     
     # Dates
-    start_date: date_
-    end_date: date_
+    start_date: date
+    end_date: date
     
     # Budget
     estimated_budget: float = Field(default=0.0, ge=0)
@@ -434,8 +439,8 @@ class ItineraryUpdate(BaseModel):
     destination: Optional[str] = None
     description: Optional[str] = None
     cover_image_url: Optional[str] = None
-    start_date: Optional[date_] = None
-    end_date: Optional[date_] = None
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
     estimated_budget: Optional[float] = None
     actual_budget: Optional[float] = None
     currency: Optional[str] = None
@@ -476,8 +481,8 @@ class ItinerarySummary(BaseModel):
     title: str
     destination: str
     cover_image_url: Optional[str] = None
-    start_date: date_
-    end_date: date_
+    start_date: date
+    end_date: date
     status: str
     estimated_budget: float
     currency: str

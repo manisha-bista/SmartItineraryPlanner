@@ -89,6 +89,11 @@ def login_user(credentials: schemas.UserLogin, db: Session = Depends(get_db)):
         raise HTTPException(401, "Invalid email or password")
     try:
         user.last_login = datetime.utcnow()
+        # Auto-expire premium if past date
+        if user.subscription_tier == "premium" and user.premium_until:
+            if datetime.utcnow() > user.premium_until:
+                user.subscription_tier = "free"
+                user.premium_until = None
         db.commit()
         return user
     except Exception as e:
@@ -155,6 +160,10 @@ async def google_auth(payload: dict, db: Session = Depends(get_db)):
             "bio": user.bio,
             "location": user.location,
             "created_at": user.created_at.isoformat(),
+            "subscription_tier": user.subscription_tier or "free",
+            "subscription_plan": user.subscription_plan,
+            "premium_until": user.premium_until.isoformat() if user.premium_until else None,
+            "ai_generations_month": user.ai_generations_month or 0,
         }
     except HTTPException:
         db.rollback()

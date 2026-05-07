@@ -14,12 +14,22 @@ import PlaceDetail from './pages/PlaceDetail';
 import AdminDashboard from './pages/AdminDashboard.jsx';
 import InteractiveMap from './pages/InteractiveMap';
 import ProtectedRoute from './components/ProtectedRoute';
+import SubscriptionPage from './pages/SubscriptionPage';
+import PaymentReturn from './pages/PaymentReturn';
 import ChatWidget from './components/ChatWidget';
 
 const PublicOnlyRoute = ({ children }) => {
     const userId   = localStorage.getItem('userId');
     const userRole = localStorage.getItem('userRole') || 'user';
     if (userId) return <Navigate to={userRole === 'admin' ? '/admin' : '/dashboard'} replace />;
+    return children;
+};
+
+// Routes that should never be reachable for admins — e.g. the subscription
+// page (admins have unlimited access; the paywall is meaningless to them).
+const NonAdminRoute = ({ children }) => {
+    const userRole = localStorage.getItem('userRole') || 'user';
+    if (userRole === 'admin') return <Navigate to="/admin" replace />;
     return children;
 };
 
@@ -39,6 +49,8 @@ function App() {
           <Route path="/community"     element={<ProtectedRoute requiredRole="user"><CommunityFeed /></ProtectedRoute>} />
           <Route path="/itineraries"   element={<ProtectedRoute requiredRole="user"><MyItineraries /></ProtectedRoute>} />
           <Route path="/profile"       element={<ProtectedRoute requiredRole="user"><ProfileSettings /></ProtectedRoute>} />
+          <Route path="/subscription"   element={<ProtectedRoute requiredRole="user"><NonAdminRoute><SubscriptionPage /></NonAdminRoute></ProtectedRoute>} />
+          <Route path="/payment/return" element={<ProtectedRoute requiredRole="user"><PaymentReturn /></ProtectedRoute>} />
           <Route path="/map"           element={<ProtectedRoute requiredRole="user"><InteractiveMap /></ProtectedRoute>} />
           <Route path="/search"         element={<ProtectedRoute requiredRole="user"><SearchResults /></ProtectedRoute>} />
 

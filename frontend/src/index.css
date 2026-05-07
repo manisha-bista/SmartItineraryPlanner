@@ -5,6 +5,41 @@ html, body, #root {
     padding: 0;
 }
 
+/* ── Autofill override — prevents the browser's white autofill box ─────────
+   These must live in plain CSS because :webkit-autofill can't be targeted
+   via MUI's sx or styled-components (browser ignores JS-injected styles for
+   it). The .theme-dark / .theme-light classes are toggled on <body> by
+   ThemeContext whenever the user switches theme.
+   ─────────────────────────────────────────────────────────────────────── */
+.theme-dark input:-webkit-autofill,
+.theme-dark input:-webkit-autofill:hover,
+.theme-dark input:-webkit-autofill:focus,
+.theme-dark input:-webkit-autofill:active,
+.theme-dark textarea:-webkit-autofill,
+.theme-dark textarea:-webkit-autofill:hover,
+.theme-dark textarea:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #252845 inset !important;
+    box-shadow:         0 0 0 1000px #252845 inset !important;
+    -webkit-text-fill-color: #C8D0E0 !important;
+    caret-color: #C8D0E0 !important;
+    /* Delay background transition so the flash never actually shows */
+    transition: background-color 50000s ease-in-out 0s;
+}
+
+.theme-light input:-webkit-autofill,
+.theme-light input:-webkit-autofill:hover,
+.theme-light input:-webkit-autofill:focus,
+.theme-light input:-webkit-autofill:active,
+.theme-light textarea:-webkit-autofill,
+.theme-light textarea:-webkit-autofill:hover,
+.theme-light textarea:-webkit-autofill:focus {
+    -webkit-box-shadow: 0 0 0 1000px #E8EDF5 inset !important;
+    box-shadow:         0 0 0 1000px #E8EDF5 inset !important;
+    -webkit-text-fill-color: #2D3748 !important;
+    caret-color: #2D3748 !important;
+    transition: background-color 50000s ease-in-out 0s;
+}
+
 .features-container {
     display: flex;
     justify-content: center;

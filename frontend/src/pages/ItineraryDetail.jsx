@@ -292,7 +292,8 @@ export default function ItineraryDetail() {
 
     const removeCollaborator = async (collabUserId) => {
         try {
-            await axios.delete(`http://127.0.0.1:8000/itineraries/${id}/collaborators/${collabUserId}`);
+            const uid = localStorage.getItem('userId');
+            await axios.delete(`http://127.0.0.1:8000/itineraries/${id}/collaborators/${collabUserId}?user_id=${uid}`);
             setCollaborators(prev => prev.filter(c => c.user_id !== collabUserId));
             toast('Collaborator removed.');
         } catch { toast('Failed to remove.', 'error'); }

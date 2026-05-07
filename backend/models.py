@@ -13,7 +13,25 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
     role = Column(String(20), default="user", nullable=False)  # user, admin
-    
+
+    # Subscription
+    subscription_tier         = Column(String(20), default="free", nullable=False)  # free | pending | premium
+    subscription_plan         = Column(String(20), nullable=True)                    # monthly | trip_pass | yearly
+    subscription_requested_at = Column(DateTime, nullable=True)
+    premium_until             = Column(DateTime, nullable=True)
+    ai_generations_month      = Column(Integer, default=0, nullable=False)
+    ai_reset_date             = Column(DateTime, nullable=True)
+
+    # Payment (submitted alongside an upgrade request; cleared on activate/revoke)
+    payment_method            = Column(String(20), nullable=True)   # "khalti" | null
+    payment_mobile            = Column(String(20), nullable=True)   # Khalti-linked mobile number
+    payment_transaction_id    = Column(String(100), nullable=True)  # Khalti txn / pidx
+    payment_amount            = Column(Float, nullable=True)        # amount paid in NPR
+    payment_submitted_at      = Column(DateTime, nullable=True)
+
+    # Cancellation — set when user cancels but still has remaining paid time
+    subscription_canceled_at  = Column(DateTime, nullable=True)
+
     # Profile fields
     avatar_id = Column(Integer, default=1, nullable=False)  # index into predefined avatar list (1-30)
     profile_picture_url = Column(String(500), nullable=True)

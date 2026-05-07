@@ -45,7 +45,7 @@ The JSON must follow this EXACT structure:
 }
 
 Rules:
-- Base itinerary on what the user describes — do NOT default to Kathmandu unless mentioned
+- Base itinerary on what the user describes — do NOT default to Kathmandu, unless mentioned
 - Each activity must have a DIFFERENT, SPECIFIC location (not just the city/village name)
 - cost and estimated_cost are numbers in NPR, never strings or currency symbols
 - start_time is always 24hr format: "09:00", "14:30"

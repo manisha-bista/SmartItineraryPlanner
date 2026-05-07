@@ -210,7 +210,10 @@ const AdminDashboard = () => {
         setTimeout(() => setAlert(a => ({ ...a, show: false })), 3500);
     };
 
-    const loadAll = () => { fetchStats(); fetchUsers(); fetchItineraries(); fetchComplaints(); fetchPlaces(); fetchCommunityPosts(); fetchReports(); };
+    const [pendingSubs, setPendingSubs]       = useState([]);
+    const [subsLoading, setSubsLoading]       = useState(false);
+
+    const loadAll = () => { fetchStats(); fetchUsers(); fetchItineraries(); fetchComplaints(); fetchPlaces(); fetchCommunityPosts(); fetchReports(); fetchPendingSubs(); };
 
     const fetchStats = async () => {
         setStatsLoading(true);
@@ -236,6 +239,7 @@ const AdminDashboard = () => {
     const fetchPlaces = async () => { setPlacesLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/places?admin_id=${localStorage.getItem('userId')}`); setPlaces(Array.isArray(r.data.places) ? r.data.places : []); } catch { showAlert('Failed to load places', 'error'); } finally { setPlacesLoading(false); } };
     const fetchCommunityPosts = async () => { setPostsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/posts?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load posts', 'error'); } finally { setPostsLoading(false); } };
     const fetchReports = async () => { setReportsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/admin/reports?admin_id=${localStorage.getItem('userId')}`); setReports(Array.isArray(r.data) ? r.data : []); } catch { showAlert('Failed to load reports', 'error'); } finally { setReportsLoading(false); } };
+    const fetchPendingSubs = async () => { setSubsLoading(true); try { const r = await axios.get(`http://127.0.0.1:8000/subscriptions/admin/pending?admin_id=${localStorage.getItem('userId')}`); setPendingSubs(Array.isArray(r.data) ? r.data : []); } catch { } finally { setSubsLoading(false); } };
 
     const viewUserProfile = async (userId) => {
         setUserProfile({ open: true, loading: true, data: null });
@@ -258,13 +262,30 @@ const AdminDashboard = () => {
     const resolveComplaint = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/complaints/${id}`, { status: 'resolved' }); setComplaints(p => p.map(c => c.id === id ? { ...c, status: 'resolved' } : c)); showAlert('Complaint resolved'); } catch { showAlert('Failed to resolve', 'error'); } };
     const deleteComplaint  = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/complaints/${id}`); setComplaints(p => p.filter(c => c.id !== id)); setStats(s => ({ ...s, totalComplaints: s.totalComplaints - 1 })); showAlert('Complaint deleted'); } catch { showAlert('Failed to delete', 'error'); } };
     const deletePost       = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/posts/${id}?admin_id=${localStorage.getItem('userId')}`); setCommunityPosts(p => p.filter(x => x.id !== id)); showAlert('Post deleted'); } catch { showAlert('Failed to delete post', 'error'); } };
-    const promoteUser      = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=admin`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'admin' } : u)); showAlert('User promoted to admin'); } catch { showAlert('Failed to promote user', 'error'); } };
-    const demoteUser       = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=user`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'user' } : u)); showAlert('User demoted to regular user'); } catch { showAlert('Failed to demote user', 'error'); } };
+    const promoteUser      = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=admin&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'admin' } : u)); showAlert('User promoted to admin'); } catch { showAlert('Failed to promote user', 'error'); } };
+    const demoteUser       = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/users/${id}/role?role=user&admin_id=${localStorage.getItem('userId')}`); setUsers(p => p.map(u => u.id === id ? { ...u, role: 'user' } : u)); showAlert('User demoted to regular user'); } catch { showAlert('Failed to demote user', 'error'); } };
     const deletePlace      = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/places/${id}?admin_id=${localStorage.getItem('userId')}`); setPlaces(p => p.filter(x => x.id !== id)); showAlert('Place deleted'); } catch { showAlert('Failed to delete place', 'error'); } };
     const resolveReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=reviewed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Report marked as reviewed'); } catch { showAlert('Failed to update report', 'error'); } };
     const dismissReport    = async (id) => { try { await axios.patch(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}&new_status=dismissed`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'dismissed' } : r)); showAlert('Report dismissed'); } catch { showAlert('Failed to dismiss report', 'error'); } };
     const deleteReport     = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.filter(r => r.id !== id)); showAlert('Report deleted'); } catch { showAlert('Failed to delete report', 'error'); } };
     const deleteReportContent = async (id) => { try { await axios.delete(`http://127.0.0.1:8000/admin/reports/${id}/content?admin_id=${localStorage.getItem('userId')}`); setReports(p => p.map(r => r.id === id ? { ...r, status: 'reviewed' } : r)); showAlert('Reported content removed'); } catch { showAlert('Failed to remove content', 'error'); } };
+
+    const activateSub = async (userId, plan) => {
+        try {
+            await axios.post(`http://127.0.0.1:8000/subscriptions/admin/activate/${userId}`, { admin_id: admin.id, plan });
+            showAlert('Premium activated successfully');
+            fetchPendingSubs();
+            fetchUsers();
+        } catch (e) { showAlert(e.response?.data?.detail || 'Activation failed', 'error'); }
+    };
+    const revokeSub = async (userId) => {
+        try {
+            await axios.post(`http://127.0.0.1:8000/subscriptions/admin/revoke/${userId}`, { admin_id: admin.id });
+            showAlert('Subscription revoked');
+            fetchPendingSubs();
+            fetchUsers();
+        } catch (e) { showAlert(e.response?.data?.detail || 'Revoke failed', 'error'); }
+    };
 
     const handleSaveEmail = async () => {
         setSettingsError('');
@@ -313,8 +334,27 @@ const AdminDashboard = () => {
         { label: 'Complaints',  count: stats.totalComplaints,  color: '#fb923c' },
         { label: 'Places',      count: stats.totalPlaces,      color: '#4ade80' },
         { label: 'Reports',     count: reports.filter(r => r.status === 'pending').length, color: '#ff6b6b' },
+        { label: 'Subscriptions', count: pendingSubs.length, color: '#FFC107' },
     ];
     const filteredReports = reports.filter(r => r.reason?.toLowerCase().includes(search.toLowerCase()) || r.reporter_username?.toLowerCase().includes(search.toLowerCase()) || r.post_title?.toLowerCase().includes(search.toLowerCase()));
+    const filteredPendingSubs = pendingSubs.filter(s => {
+        const q = search.toLowerCase();
+        return !q
+            || s.name?.toLowerCase().includes(q)
+            || s.email?.toLowerCase().includes(q)
+            || s.plan?.toLowerCase().includes(q)
+            || s.payment_mobile?.toLowerCase().includes(q)
+            || s.payment_transaction_id?.toLowerCase().includes(q);
+    });
+
+    // Plan presentation — shared between the Subscriptions tab chips and the
+    // (later) analytics views. Keep in sync with backend PLAN_LABELS.
+    const PLAN_STYLE = {
+        monthly:   { label: 'Monthly',     price: 'NPR 299',   color: '#42A5F5' },
+        trip_pass: { label: 'Trip Pass',   price: 'NPR 199',   color: '#66BB6A' },
+        yearly:    { label: 'Annual',      price: 'NPR 1,999', color: '#AB47BC' },
+    };
+    const KHALTI_PURPLE_ADMIN = '#5C2D91';
 
     const TAG_COLORS = { Experience: '#33CCCC', Alert: '#FFB74D', Event: '#4CAF50', Tip: '#9C27B0', Question: '#42A5F5' };
 
@@ -600,6 +640,125 @@ const AdminDashboard = () => {
                                             <TableCell sx={{ ...tdSx, textAlign: 'right' }} onClick={e => e.stopPropagation()}><RowMenu COLORS={COLORS} onDelete={() => deletePlace(p.id)} deleteLabel="Delete Place" /></TableCell>
                                         </TableRow>
                                     ))}
+                                </TableBody>
+                            </Table>
+                        </TableContainer>
+                    </Box>
+                )}
+
+                {/* Subscriptions Table — activeTab === 6 */}
+                {activeTab === 6 && (
+                    <Box>
+                        <SectionHeader COLORS={COLORS} title="Pending Upgrade Requests" onRefresh={fetchPendingSubs} loading={subsLoading} />
+                        <TableContainer component={Paper} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 4, boxShadow: 'none', border: `1px solid ${COLORS.cardBorder}` }}>
+                            <Table size="small">
+                                <TableHead>
+                                    <TableRow>
+                                        {['#','User','Email','Plan','Method','Khalti Mobile','Transaction ID','Amount','Requested',''].map((h, i) => (
+                                            <TableCell key={i} sx={{ ...thSx, textAlign: i === 9 ? 'right' : 'left' }}>{h}</TableCell>
+                                        ))}
+                                    </TableRow>
+                                </TableHead>
+                                <TableBody>
+                                    {subsLoading ? <LoadingRow COLORS={COLORS} cols={10} /> :
+                                     filteredPendingSubs.length === 0 ? <EmptyRow COLORS={COLORS} cols={10} msg="No pending subscription requests." /> :
+                                     filteredPendingSubs.map((req, idx) => {
+                                        const planStyle = PLAN_STYLE[req.plan] || { label: req.plan || '—', price: '', color: COLORS.brand };
+                                        const isKhalti  = (req.payment_method || '').toLowerCase() === 'khalti';
+                                        return (
+                                            <TableRow key={req.id} sx={{ '&:hover': { bgcolor: `${COLORS.brand}0A` }, '&:last-child td': { borderBottom: 'none' } }}>
+                                                <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{idx + 1}</TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    <Stack direction="row" alignItems="center" spacing={1.5}>
+                                                        <Avatar sx={{ width: 30, height: 30, bgcolor: COLORS.brand, color: COLORS.background, fontSize: '0.75rem', fontWeight: 700 }}>
+                                                            {(req.name || 'U')[0].toUpperCase()}
+                                                        </Avatar>
+                                                        <Typography sx={{ color: COLORS.headings, fontWeight: 600, fontSize: '0.82rem' }}>{req.name || '—'}</Typography>
+                                                    </Stack>
+                                                </TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                        <EmailOutlinedIcon sx={{ fontSize: 13, color: COLORS.fadedText }} />
+                                                        <span>{req.email || '—'}</span>
+                                                    </Stack>
+                                                </TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    <Stack direction="row" spacing={0.5} alignItems="center">
+                                                        <Chip label={planStyle.label} size="small"
+                                                            sx={{ height: 20, fontSize: '0.62rem', fontWeight: 700,
+                                                                bgcolor: `${planStyle.color}18`, color: planStyle.color, border: `1px solid ${planStyle.color}44` }} />
+                                                        {planStyle.price && (
+                                                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem' }}>· {planStyle.price}</Typography>
+                                                        )}
+                                                    </Stack>
+                                                </TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    {isKhalti ? (
+                                                        <Chip
+                                                            label={
+                                                                <Stack direction="row" alignItems="center" spacing={0.5}>
+                                                                    <Box sx={{ width: 13, height: 13, borderRadius: '50%', bgcolor: '#fff', color: KHALTI_PURPLE_ADMIN, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, fontSize: '0.58rem' }}>K</Box>
+                                                                    <span>Khalti</span>
+                                                                </Stack>
+                                                            }
+                                                            size="small"
+                                                            sx={{ height: 20, fontSize: '0.62rem', fontWeight: 700, bgcolor: KHALTI_PURPLE_ADMIN, color: '#fff', '& .MuiChip-label': { px: 0.8 } }} />
+                                                    ) : req.payment_method ? (
+                                                        <Chip label={req.payment_method} size="small" sx={{ height: 20, fontSize: '0.62rem', fontWeight: 700, bgcolor: COLORS.cardSecondary, color: COLORS.text, border: `1px solid ${COLORS.cardBorder}` }} />
+                                                    ) : (
+                                                        <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem', fontStyle: 'italic' }}>—</Typography>
+                                                    )}
+                                                </TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    <Typography sx={{ color: req.payment_mobile ? COLORS.text : COLORS.fadedText, fontSize: '0.78rem', fontFamily: req.payment_mobile ? 'monospace' : 'inherit' }}>
+                                                        {req.payment_mobile || '—'}
+                                                    </Typography>
+                                                </TableCell>
+
+                                                <TableCell sx={{ ...tdSx, maxWidth: 180 }}>
+                                                    {req.payment_transaction_id ? (
+                                                        <Tooltip title={req.payment_transaction_id}>
+                                                            <Typography noWrap sx={{ color: COLORS.text, fontSize: '0.74rem', fontFamily: 'monospace', fontWeight: 600 }}>
+                                                                {req.payment_transaction_id}
+                                                            </Typography>
+                                                        </Tooltip>
+                                                    ) : (
+                                                        <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem', fontStyle: 'italic' }}>—</Typography>
+                                                    )}
+                                                </TableCell>
+
+                                                <TableCell sx={tdSx}>
+                                                    <Typography sx={{ color: req.payment_amount ? COLORS.brand : COLORS.fadedText, fontSize: '0.78rem', fontWeight: 700 }}>
+                                                        {req.payment_amount ? `NPR ${Number(req.payment_amount).toLocaleString()}` : '—'}
+                                                    </Typography>
+                                                </TableCell>
+
+                                                <TableCell sx={{ ...tdSx, color: COLORS.fadedText }}>{formatDate(req.requested_at)}</TableCell>
+
+                                                <TableCell sx={{ ...tdSx, textAlign: 'right' }}>
+                                                    <Stack direction="row" spacing={0.5} justifyContent="flex-end">
+                                                        <Tooltip title="Activate Premium">
+                                                            <IconButton size="small" onClick={() => activateSub(req.id, req.plan)}
+                                                                sx={{ color: '#4ade80', bgcolor: 'rgba(74,222,128,0.10)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(74,222,128,0.20)' } }}>
+                                                                <CheckCircleOutlineIcon sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                        <Tooltip title="Reject Request">
+                                                            <IconButton size="small" onClick={() => revokeSub(req.id)}
+                                                                sx={{ color: '#ff6b6b', bgcolor: 'rgba(255,107,107,0.10)', borderRadius: 1.5, '&:hover': { bgcolor: 'rgba(255,107,107,0.20)' } }}>
+                                                                <CloseIcon sx={{ fontSize: 16 }} />
+                                                            </IconButton>
+                                                        </Tooltip>
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
+                                        );
+                                     })}
                                 </TableBody>
                             </Table>
                         </TableContainer>

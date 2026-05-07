@@ -10,6 +10,8 @@ from sqlalchemy.orm import Session
 import models, schemas
 from database import get_db
 from routers.auth import get_password_hash, verify_password
+from routers.admin import require_admin
+from seed import DEFAULT_ADMIN_EMAIL
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/users", tags=["Users"])
@@ -113,11 +115,20 @@ def update_credentials(user_id: int, payload: dict, db: Session = Depends(get_db
 def update_user_role(
     user_id: int,
     role: str = Query(..., pattern="^(user|admin)$"),
+    admin_id: int = Query(..., description="ID of the admin performing this action"),
     db: Session = Depends(get_db),
 ):
+    """Promote / demote a user. Caller must be an admin."""
+    require_admin(admin_id, db)
+
     user = db.query(models.User).filter(models.User.id == user_id).first()
     if not user:
         raise HTTPException(404, "User not found")
+
+    # The seeded default admin must always remain an admin.
+    if user.email == DEFAULT_ADMIN_EMAIL and role != "admin":
+        raise HTTPException(400, "The default admin account cannot be demoted")
+
     try:
         user.role = role
         db.commit()

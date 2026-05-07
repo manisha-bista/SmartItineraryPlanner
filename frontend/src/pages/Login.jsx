@@ -136,6 +136,12 @@ const ForgotPasswordDialog = ({ open, onClose, COLORS }) => {
         '& .MuiInputBase-input': { py: 1.5 },
         '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
         '& .MuiFormHelperText-root': { color: '#ff6b6b', mx: 0, mt: 0.5 },
+        '& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus': {
+            WebkitBoxShadow: `0 0 0 1000px ${COLORS.inputBg} inset !important`,
+            WebkitTextFillColor: `${COLORS.text} !important`,
+            caretColor: `${COLORS.text} !important`,
+            transition: 'background-color 50000s ease-in-out 0s',
+        },
     };
 
     const btnSx = {
@@ -268,6 +274,12 @@ const Login = () => {
         '& .MuiInputBase-input': { py: 1.5 },
         '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
         '& .MuiFormHelperText-root': { color: '#ff6b6b', mx: 0, mt: 0.5 },
+        '& input:-webkit-autofill, & input:-webkit-autofill:hover, & input:-webkit-autofill:focus': {
+            WebkitBoxShadow: `0 0 0 1000px ${COLORS.inputBg} inset !important`,
+            WebkitTextFillColor: `${COLORS.text} !important`,
+            caretColor: `${COLORS.text} !important`,
+            transition: 'background-color 50000s ease-in-out 0s',
+        },
     };
 
     const [formData, setFormData]           = useState({ email: '', password: '' });
@@ -301,12 +313,13 @@ const Login = () => {
         try {
             const response = await axios.post('http://127.0.0.1:8000/login', { email: formData.email.trim().toLowerCase(), password: formData.password }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
             if (response.data.id) {
-                localStorage.setItem('userId',    response.data.id);
-                localStorage.setItem('userName',  response.data.name);
-                localStorage.setItem('userEmail', response.data.email);
-                localStorage.setItem('userRole',  response.data.role || 'user');
-                localStorage.setItem('username',  response.data.username || '');
-                localStorage.setItem('avatarId',  response.data.avatar_id || 1);
+                localStorage.setItem('userId',            response.data.id);
+                localStorage.setItem('userName',          response.data.name);
+                localStorage.setItem('userEmail',         response.data.email);
+                localStorage.setItem('userRole',          response.data.role || 'user');
+                localStorage.setItem('username',          response.data.username || '');
+                localStorage.setItem('avatarId',          response.data.avatar_id || 1);
+                localStorage.setItem('subscriptionTier',  response.data.subscription_tier || 'free');
             }
             navigate(response.data.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
         } catch (err) {
@@ -325,12 +338,13 @@ const Login = () => {
             try {
                 const response = await axios.post('http://127.0.0.1:8000/auth/google', { token: tokenResponse.access_token }, { headers: { 'Content-Type': 'application/json' }, timeout: 10000 });
                 const user = response.data;
-                localStorage.setItem('userId',    user.id);
-                localStorage.setItem('userName',  user.name);
-                localStorage.setItem('userEmail', user.email);
-                localStorage.setItem('userRole',  user.role || 'user');
-                localStorage.setItem('username',  user.username || '');
-                localStorage.setItem('avatarId',  user.avatar_id || 1);
+                localStorage.setItem('userId',            user.id);
+                localStorage.setItem('userName',          user.name);
+                localStorage.setItem('userEmail',         user.email);
+                localStorage.setItem('userRole',          user.role || 'user');
+                localStorage.setItem('username',          user.username || '');
+                localStorage.setItem('avatarId',          user.avatar_id || 1);
+                localStorage.setItem('subscriptionTier',  user.subscription_tier || 'free');
                 if (user.profile_picture_url) localStorage.setItem('userPicture', user.profile_picture_url);
                 navigate(user.role === 'admin' ? '/admin' : '/dashboard', { replace: true });
             } catch (err) {
