@@ -453,11 +453,11 @@ const PostCard = ({ post, onVote, onSave, onDelete, userId, onProfileClick, COLO
             border: highlighted ? `2px solid ${COLORS.brand}` : `1px solid ${COLORS.cardBorder}`,
             boxShadow: highlighted ? `0 0 0 2px ${COLORS.brand}40, 0 4px 24px rgba(51,204,204,0.25)` : 'none',
             transition: 'all 0.25s', overflow: 'hidden',
-            '&:hover': { border: `1px solid rgba(51,204,204,0.25)`, boxShadow: `0 4px 24px rgba(0,0,0,0.3)` },
+            '&:hover': { border: `1px solid ${COLORS.brand}40`, boxShadow: `0 4px 24px rgba(0,0,0,0.18)` },
         }}>
             <Stack direction="row">
                 {/* vote column */}
-                <Box sx={{ width: 56, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 2, pb: 2, bgcolor: 'rgba(0,0,0,0.15)', gap: 0.25 }}>
+                <Box sx={{ width: 56, flexShrink: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-start', pt: 2, pb: 2, bgcolor: COLORS.cardSecondary, gap: 0.25 }}>
                     <IconButton size="small" onClick={() => onVote(post.id, 'up')}
                         sx={{ color: voteColor('up'), p: 0.5, borderRadius: 1.5, '&:hover': { color: COLORS.brand, bgcolor: 'rgba(51,204,204,0.1)' } }}>
                         <ArrowUpwardIcon sx={{ fontSize: 18 }} />
@@ -1137,25 +1137,25 @@ const CommunityFeed = () => {
     };
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: COLORS.background, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
 
             <Navbar />
 
             <Box component="main" sx={{
-                flexGrow: 1, height: '100vh', overflow: 'auto', display: 'flex', flexDirection: 'column',
+                flexGrow: 1, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'auto', display: 'flex', flexDirection: 'column',
                 '&::-webkit-scrollbar': { width: 6 },
                 '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
                 '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 3 },
             }}>
 
                 {/* 3-column body */}
-                <Box sx={{ flex: 1, px: 4, pt: 2, pb: 3, display: 'flex', gap: 3, minHeight: 0 }}>
+                <Box sx={{ flex: 1, px: { xs: 2, md: 4 }, pt: 2, pb: { xs: '80px', md: 3 }, display: 'flex', gap: 3, minHeight: 0 }}>
 
                     {/* CENTER: posts feed */}
-                    <Box sx={{ flex: 'none', width: 850, marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                    <Box sx={{ flex: { xs: 1, md: 'none' }, width: { xs: '100%', md: 850 }, marginLeft: { xs: 0, md: 'auto' }, display: 'flex', flexDirection: 'column', gap: 2 }}>
                         {/* filter bar */}
-                        <Box sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 3, border: `1px solid ${COLORS.cardBorder}`, px: 1.5, py: 1, flexShrink: 0 }}>
-                            <Stack direction="row" spacing={1} alignItems="center">
+                        <Box sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 3, border: `1px solid ${COLORS.cardBorder}`, px: { xs: 1, md: 1.5 }, py: 1, flexShrink: 0, overflowX: { xs: 'auto', md: 'visible' }, '&::-webkit-scrollbar': { height: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 2 } }}>
+                            <Stack direction="row" spacing={1} alignItems="center" sx={{ minWidth: { xs: 'max-content', md: 'auto' } }}>
                                 <Select
                                     value={typeof filterMode === 'number' ? filterMode : 'all'}
                                     onChange={(e) => { handleFilterChange(e.target.value); setSearchedPlace(''); }}
@@ -1332,7 +1332,7 @@ const CommunityFeed = () => {
 
                     {/* RIGHT sidebar */}
                     <Box sx={{
-                        width: 300, flexShrink: 0, marginLeft: 'auto', display: 'flex', flexDirection: 'column', gap: 2,
+                        width: 300, flexShrink: 0, marginLeft: 'auto', display: { xs: 'none', md: 'flex' }, flexDirection: 'column', gap: 2,
                         overflowY: 'auto', '&::-webkit-scrollbar': { width: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 2 },
                     }}>
                         {/* welcome + create */}
@@ -1478,7 +1478,7 @@ const CommunityFeed = () => {
                 ) : (
                     <>
                         <Box sx={{ position: 'relative' }}>
-                            <Box sx={{ height: 80, background: `linear-gradient(135deg, ${getAvatarColor(profileUser.avatar_id)}40, rgba(20,22,39,0.9))` }} />
+                            <Box sx={{ height: 80, background: `linear-gradient(135deg, ${getAvatarColor(profileUser.avatar_id)}40, ${COLORS.background})` }} />
                             <IconButton onClick={() => setProfileOpen(false)}
                                 sx={{ position: 'absolute', top: 8, right: 8, color: COLORS.fadedText, '&:hover': { color: '#ff6b6b' } }}>
                                 <CloseIcon />

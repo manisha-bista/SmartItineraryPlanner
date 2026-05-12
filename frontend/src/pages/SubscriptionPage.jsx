@@ -243,7 +243,7 @@ export default function SubscriptionPage() {
         <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', fontFamily: '"Exo 2","Segoe UI",sans-serif' }}>
             <Navbar />
 
-            <Box sx={{ flexGrow: 1, ml: `${DRAWER_WIDTH}px`, px: { xs: 2, md: 5 }, py: 4, maxWidth: 960, mx: 'auto' }}>
+            <Box sx={{ flexGrow: 1, ml: { xs: 0, md: `${DRAWER_WIDTH}px` }, px: { xs: 2, md: 5 }, pt: { xs: '72px', md: 4 }, pb: 4, maxWidth: 960, mx: 'auto' }}>
 
                 {/* ── Page title ───────────────────────────────────────────── */}
                 <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 0.5 }}>
@@ -531,7 +531,8 @@ export default function SubscriptionPage() {
                     What's included
                 </Typography>
 
-                <Box sx={{ bgcolor: C.card, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden' }}>
+                <Box sx={{ overflowX: { xs: 'auto', md: 'visible' } }}>
+                <Box sx={{ bgcolor: C.card, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', minWidth: { xs: 440, md: 'auto' } }}>
                     <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 120px 140px', bgcolor: C.card2, px: 3, py: 1.5, borderBottom: `1px solid ${C.border}` }}>
                         {['Feature', 'Free', 'Premium'].map((label, i) => (
                             <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: i > 0 ? 'center' : 'flex-start' }}>
@@ -556,6 +557,7 @@ export default function SubscriptionPage() {
                         </Box>
                     ))}
                 </Box>
+                </Box>
 
                 {/* ── Community pitch ──────────────────────────────────────── */}
                 <Box sx={{ mt: 5, bgcolor: `${C.brand}0C`, border: `1px solid ${C.brand}33`, borderRadius: 3, px: 3, py: 3 }}>
@@ -570,7 +572,7 @@ export default function SubscriptionPage() {
                     </Stack>
                 </Box>
 
-                <Box sx={{ pb: 8 }} />
+                <Box sx={{ pb: { xs: '100px', md: 8 } }} />
             </Box>
 
             {/* ══════════════════════════════════════════════════════════════

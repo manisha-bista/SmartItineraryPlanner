@@ -515,12 +515,12 @@ export default function ItineraryDetail() {
     const totalActual = itinerary.days?.reduce((s, d) => s + (d.activities?.reduce((a, ac) => a + (ac.actual_cost || 0), 0) || 0), 0) || 0;
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: C.bg, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
 
             <Navbar />
 
             {/* ── Main Content ──────────────────────────────────────────────── */}
-            <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto', p: 3 }}>
+            <Box component="main" sx={{ flexGrow: 1, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'auto', p: { xs: 2, md: 3 }, pb: { xs: '80px', md: 3 } }}>
 
                 {/* Back */}
                 <Box sx={{ mb: 2.5 }}>
@@ -531,7 +531,7 @@ export default function ItineraryDetail() {
                 </Box>
 
                 {/* ── Header Strip ─────────────────────────────────────────── */}
-                <Box sx={{ bgcolor: C.card, borderRadius: 4, px: 3, py: 2, mb: 3, display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 3 }}>
+                <Box sx={{ bgcolor: C.card, borderRadius: 4, px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2 }, mb: 3, display: 'flex', flexDirection: { xs: 'column', md: 'row' }, alignItems: { xs: 'flex-start', md: 'center' }, flexWrap: { xs: 'nowrap', md: 'wrap' }, gap: { xs: 1, md: 3 } }}>
                     <Stack direction="row" alignItems="center" spacing={1}>
                         <KeyboardArrowDownIcon sx={{ color: C.brand }} />
                         {titleEditing ? (
@@ -581,59 +581,20 @@ export default function ItineraryDetail() {
 
                     <Stack direction="row" alignItems="center" spacing={0.75}>
                         <CalendarTodayIcon sx={{ fontSize: '0.95rem', color: C.faded }} />
-                        {dateEditing ? (
-                            <Stack direction="row" alignItems="center" spacing={1}>
-                                <TextField
-                                    size="small"
-                                    type="date"
-                                    value={dateDraft}
-                                    onChange={e => setDateDraft(e.target.value)}
-                                    InputLabelProps={{ shrink: true }}
-                                    sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, fontSize: '0.82rem', '& fieldset': { borderColor: C.brand }, '&:hover fieldset': { borderColor: C.brand } }, '& .MuiInputBase-input': { color: C.text, py: 0.5, px: 1 } }}
-                                />
-                                <Button size="small" onClick={async () => {
-                                    if (!dateDraft) { setDateEditing(false); return; }
-                                    try {
-                                        // Remap all day dates based on new start date
-                                        const newStart = new Date(dateDraft);
-                                        const days = itinerary.days || [];
-                                        // Update start_date (and end_date derived from days count)
-                                        const newEnd = new Date(newStart);
-                                        newEnd.setDate(newEnd.getDate() + days.length - 1);
-                                        await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`, {
-                                            start_date: dateDraft,
-                                            end_date: newEnd.toISOString().split('T')[0],
-                                        });
-                                        // Update each day's date offset
-                                        await Promise.all(days.map((day, i) => {
-                                            const d = new Date(newStart);
-                                            d.setDate(d.getDate() + i);
-                                            return axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days/${day.id}`, {
-                                                date: d.toISOString().split('T')[0],
-                                            });
-                                        }));
-                                        await reload();
-                                        toast('Start date updated — all days remapped!');
-                                    } catch (e) { toast(e.response?.data?.detail || 'Failed to update date.', 'error'); }
-                                    setDateEditing(false);
-                                }} sx={{ bgcolor: C.brand, color: C.bg, borderRadius: 2, fontWeight: 'bold', px: 2, textTransform: 'none', fontSize: '0.78rem', '&:hover': { bgcolor: '#2db8b8' } }}>Save</Button>
-                                <Button size="small" onClick={() => setDateEditing(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none', fontSize: '0.78rem' }}>Cancel</Button>
-                            </Stack>
-                        ) : (
-                            <Stack direction="row" alignItems="center" spacing={0.5}>
-                                <Typography variant="body2" sx={{ color: C.sub, fontWeight: 500 }}>
-                                    {fmtDate(itinerary.start_date)} – {fmtDate(itinerary.end_date)}
-                                </Typography>
-                                {(isOwner || isAcceptedCollaborator) && (
-                                    <IconButton size="small" onClick={() => { setDateDraft(itinerary.start_date?.split('T')[0] || ''); setDateEditing(true); }}
-                                        sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.brand, bgcolor: `${C.brand}14` } }}>
-                                        <EditIcon sx={{ fontSize: 14 }} />
-                                    </IconButton>
-                                )}
-                            </Stack>
-                        )}
+                        <Stack direction="row" alignItems="center" spacing={0.5}>
+                            <Typography variant="body2" sx={{ color: C.sub, fontWeight: 500 }}>
+                                {fmtDate(itinerary.start_date)} – {fmtDate(itinerary.end_date)}
+                            </Typography>
+                            {(isOwner || isAcceptedCollaborator) && (
+                                <IconButton size="small" onClick={() => { setDateDraft(itinerary.start_date?.split('T')[0] || ''); setDateEditing(true); }}
+                                    sx={{ color: C.faded, p: 0.4, '&:hover': { color: C.brand, bgcolor: `${C.brand}14` } }}>
+                                    <EditIcon sx={{ fontSize: 14 }} />
+                                </IconButton>
+                            )}
+                        </Stack>
                     </Stack>
 
+                    <Box sx={{ display: { xs: 'flex', md: 'contents' }, alignItems: 'center', gap: 1.5, flexWrap: 'wrap' }}>
                     <Stack direction="row" alignItems="center" spacing={0.75}>
                         <LocationOnIcon sx={{ fontSize: '0.95rem', color: C.faded }} />
                         <Typography variant="body2" sx={{ color: C.sub, fontWeight: 500 }}>
@@ -641,7 +602,7 @@ export default function ItineraryDetail() {
                         </Typography>
                     </Stack>
 
-                    <Box sx={{ flexGrow: 1 }} />
+                    <Box sx={{ flexGrow: 1, display: { xs: 'none', md: 'block' } }} />
 
                     <Stack direction="row" alignItems="center" spacing={0.75}>
                         <Typography variant="body2" sx={{ color: C.sub }}>Estimated :</Typography>
@@ -654,7 +615,9 @@ export default function ItineraryDetail() {
                         <Typography variant="body2" sx={{ color: C.faded }}>₹</Typography>
                         <Typography variant="body1" fontWeight="bold" sx={{ color: C.brand }}>{fmtNum(totalActual)}</Typography>
                     </Stack>
+                    </Box>
 
+                    <Box sx={{ display: { xs: 'flex', md: 'contents' }, alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
                     <Button size="small"
                         startIcon={weatherLoading ? <CircularProgress size={14} sx={{ color: C.brand }} /> : <WbSunnyIcon sx={{ fontSize: 16 }} />}
                         onClick={fetchWeather} disabled={weatherLoading}
@@ -707,6 +670,7 @@ export default function ItineraryDetail() {
                             {forking ? 'Forking...' : 'Fork & Edit'}
                         </Button>
                     )}
+                    </Box>
                 </Box>
 
                 {/* ── Days ─────────────────────────────────────────────────── */}
@@ -736,14 +700,14 @@ export default function ItineraryDetail() {
                             return (
                                 <Box key={day.id} sx={{ bgcolor: C.card, borderRadius: 4, overflow: 'hidden' }}>
                                     {/* Day Header */}
-                                    <Stack direction="row" alignItems="center" sx={{ px: 3, py: 2.25 }}>
+                                    <Stack direction="row" alignItems="center" sx={{ px: { xs: 1.5, md: 3 }, py: { xs: 1.5, md: 2.25 } }}>
                                         <IconButton size="small"
                                             onClick={() => setCollapsed(p => ({ ...p, [day.id]: !p[day.id] }))}
                                             sx={{ color: C.faded, mr: 0.5, '&:hover': { color: C.brand } }}>
                                             {isOpen ? <KeyboardArrowDownIcon /> : <KeyboardArrowRightIcon />}
                                         </IconButton>
 
-                                        <Typography variant="h6" fontWeight="bold" sx={{ color: C.heading }}>
+                                        <Typography variant="h6" fontWeight="bold" noWrap sx={{ color: C.heading, fontSize: { xs: '0.95rem', md: '1.25rem' }, maxWidth: { xs: 160, md: 'none' } }}>
                                             Day {day.day_number}: {fmtDateFull(day.date)}
                                         </Typography>
 
@@ -770,7 +734,7 @@ export default function ItineraryDetail() {
 
                                         <Box sx={{ flexGrow: 1 }} />
 
-                                        <Stack direction="row" alignItems="center" spacing={2} sx={{ mr: 1.5 }}>
+                                        <Stack direction="row" alignItems="center" spacing={2} sx={{ mr: 1.5, display: { xs: 'none', md: 'flex' } }}>
                                             <Stack direction="row" alignItems="center" spacing={0.5}>
                                                 <Typography variant="caption" sx={{ color: C.faded }}>Est.</Typography>
                                                 <Typography variant="body2" fontWeight="bold" sx={{ color: C.yellow }}>₹ {fmtNum(dayEst)}</Typography>
@@ -792,9 +756,16 @@ export default function ItineraryDetail() {
                                             <Button size="small" startIcon={<AddIcon />} onClick={() => openAddAct(day.id)} sx={{
                                                 ml: 1.5, bgcolor: C.brand, color: C.bg, fontWeight: 'bold', borderRadius: 3,
                                                 textTransform: 'none', px: 2, py: 0.75, fontSize: '0.82rem',
+                                                display: { xs: 'none', md: 'inline-flex' },
                                                 '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-1px)', boxShadow: `0 4px 12px ${C.brand}40` },
                                                 transition: 'all 0.25s',
                                             }}>Add Destination</Button>
+                                        )}
+                                        {canEdit && (
+                                            <IconButton size="small" onClick={() => openAddAct(day.id)}
+                                                sx={{ display: { xs: 'flex', md: 'none' }, ml: 0.5, bgcolor: C.brand, color: C.bg, borderRadius: 2, width: 32, height: 32, '&:hover': { bgcolor: '#2db8b8' } }}>
+                                                <AddIcon sx={{ fontSize: 18 }} />
+                                            </IconButton>
                                         )}
                                     </Stack>
 
@@ -824,93 +795,114 @@ export default function ItineraryDetail() {
                                                         {(dragProvided, dragSnapshot) => (
                                                         <Box ref={dragProvided.innerRef} {...dragProvided.draggableProps}
                                                             sx={{
-                                                                display: 'flex', alignItems: 'center', gap: 2,
+                                                                display: 'flex',
+                                                                flexDirection: { xs: 'column', md: 'row' },
+                                                                alignItems: { xs: 'flex-start', md: 'center' },
+                                                                gap: { xs: 0.75, md: 2 },
                                                                 bgcolor: dragSnapshot.isDragging ? C.card : C.surface,
-                                                                borderRadius: 3, px: 2.5, py: 1.75, mb: 1.5,
+                                                                borderRadius: 3, px: { xs: 1.5, md: 2.5 }, py: { xs: 1.25, md: 1.75 }, mb: 1.5,
                                                                 boxShadow: dragSnapshot.isDragging ? `0 8px 24px ${C.brand}30` : 'none',
                                                                 border: `1px solid ${dragSnapshot.isDragging ? C.brand + '40' : 'transparent'}`,
                                                                 opacity: act.is_completed ? 0.55 : 1,
                                                                 transition: 'box-shadow 0.2s, border 0.2s',
                                                             }}>
-                                                            {canEdit ? (
-                                                                <Box {...dragProvided.dragHandleProps} sx={{ color: C.faded, display: 'flex', cursor: 'grab', flexShrink: 0, '&:hover': { color: C.brand } }}>
-                                                                    <DragIndicatorIcon sx={{ fontSize: 18 }} />
-                                                                </Box>
-                                                            ) : (
-                                                                <Box sx={{ width: 18, flexShrink: 0 }} />
-                                                            )}
-                                                                {/* Time badge */}
+
+                                                            {/* Title — mobile only, first in hierarchy */}
+                                                            <Typography variant="body1" fontWeight="700"
+                                                                sx={{ display: { xs: 'block', md: 'none' }, color: C.sub, textDecoration: act.is_completed ? 'line-through' : 'none', mb: 0.25 }}>
+                                                                {act.title}
+                                                            </Typography>
+
+                                                            {/* ── Line: drag + time + icon ── */}
+                                                            <Stack direction="row" alignItems="center" spacing={1}
+                                                                sx={{ flexShrink: 0, width: { xs: '100%', md: 'auto' } }}>
+                                                                {canEdit ? (
+                                                                    <Box {...dragProvided.dragHandleProps} sx={{ color: C.faded, display: 'flex', cursor: 'grab', flexShrink: 0, '&:hover': { color: C.brand } }}>
+                                                                        <DragIndicatorIcon sx={{ fontSize: 18 }} />
+                                                                    </Box>
+                                                                ) : (
+                                                                    <Box sx={{ width: 18, flexShrink: 0 }} />
+                                                                )}
                                                                 <Box sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 'bold', fontSize: '0.72rem', px: 1.5, py: 0.5, borderRadius: 2, whiteSpace: 'nowrap', flexShrink: 0, minWidth: 68, textAlign: 'center', visibility: act.start_time ? 'visible' : 'hidden' }}>
                                                                     {fmtTime(act.start_time)}
                                                                 </Box>
-
-                                                                {/* Activity icon */}
                                                                 <Box sx={{ bgcolor: meta.bg, color: meta.color, borderRadius: 2, p: 0.875, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
                                                                     {meta.icon}
                                                                 </Box>
+                                                            </Stack>
 
-                                                                {/* Info */}
-                                                                <Box sx={{ flexGrow: 1, minWidth: 0 }}>
-                                                                    <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap">
-                                                                        <Typography variant="body1" fontWeight="600" sx={{ color: C.sub, textDecoration: act.is_completed ? 'line-through' : 'none' }}>
-                                                                            {act.title}
-                                                                        </Typography>
-                                                                        {act.location && (
-                                                                            <Stack direction="row" alignItems="center" spacing={0.4}>
-                                                                                <LocationOnIcon sx={{ fontSize: '0.8rem', color: C.red }} />
-                                                                                <Typography variant="caption" sx={{ color: C.faded }}>{act.location}</Typography>
+                                                            {/* ── Info section ── */}
+                                                            <Box sx={{ flexGrow: 1, minWidth: 0, width: { xs: '100%', md: 'auto' } }}>
+                                                                {/* Title + location — desktop only */}
+                                                                <Stack direction="row" alignItems="center" spacing={1.5} flexWrap="wrap"
+                                                                    sx={{ display: { xs: 'none', md: 'flex' } }}>
+                                                                    <Typography variant="body1" fontWeight="600" sx={{ color: C.sub, textDecoration: act.is_completed ? 'line-through' : 'none' }}>
+                                                                        {act.title}
+                                                                    </Typography>
+                                                                    {act.location && (
+                                                                        <Stack direction="row" alignItems="center" spacing={0.4}>
+                                                                            <LocationOnIcon sx={{ fontSize: '0.8rem', color: C.red }} />
+                                                                            <Typography variant="caption" sx={{ color: C.faded }}>{act.location}</Typography>
+                                                                        </Stack>
+                                                                    )}
+                                                                </Stack>
+                                                                {/* Location — mobile only */}
+                                                                {act.location && (
+                                                                    <Stack direction="row" alignItems="center" spacing={0.4}
+                                                                        sx={{ display: { xs: 'flex', md: 'none' }, mb: 0.25 }}>
+                                                                        <LocationOnIcon sx={{ fontSize: '0.8rem', color: C.red }} />
+                                                                        <Typography variant="caption" sx={{ color: C.faded }}>{act.location}</Typography>
+                                                                    </Stack>
+                                                                )}
+                                                                {/* Per-activity weather */}
+                                                                {act.weather_condition && (
+                                                                    <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 0.4, flexWrap: 'wrap' }}>
+                                                                        {(() => {
+                                                                            const { icon, color } = actWeatherIcon(act.weather_condition);
+                                                                            return (
+                                                                                <Stack direction="row" alignItems="center" spacing={0.4}>
+                                                                                    <Box sx={{ color, display: 'flex', alignItems: 'center' }}>{icon}</Box>
+                                                                                    <Typography sx={{ color, fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize' }}>
+                                                                                        {act.weather_description || act.weather_condition}
+                                                                                    </Typography>
+                                                                                </Stack>
+                                                                            );
+                                                                        })()}
+                                                                        {act.weather_temp != null && (
+                                                                            <Stack direction="row" alignItems="center" spacing={0.3}>
+                                                                                <DeviceThermostatIcon sx={{ fontSize: 13, color: C.faded }} />
+                                                                                <Typography sx={{ color: C.sub, fontSize: '0.72rem' }}>{Math.round(act.weather_temp)}°C</Typography>
+                                                                            </Stack>
+                                                                        )}
+                                                                        {act.weather_wind_speed != null && (
+                                                                            <Stack direction="row" alignItems="center" spacing={0.3}>
+                                                                                <AirIcon sx={{ fontSize: 13, color: C.faded }} />
+                                                                                <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>{act.weather_wind_speed} km/h</Typography>
+                                                                            </Stack>
+                                                                        )}
+                                                                        {act.weather_humidity != null && (
+                                                                            <Stack direction="row" alignItems="center" spacing={0.3}>
+                                                                                <WaterDropIcon sx={{ fontSize: 13, color: '#64B5F6' }} />
+                                                                                <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>{act.weather_humidity}%</Typography>
                                                                             </Stack>
                                                                         )}
                                                                     </Stack>
+                                                                )}
+                                                                {act.description && (
+                                                                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.35 }}>{act.description}</Typography>
+                                                                )}
+                                                            </Box>
 
-                                                                    {/* Per-activity weather */}
-                                                                    {act.weather_condition && (
-                                                                        <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 0.4, flexWrap: 'wrap' }}>
-                                                                            {(() => {
-                                                                                const { icon, color } = actWeatherIcon(act.weather_condition);
-                                                                                return (
-                                                                                    <Stack direction="row" alignItems="center" spacing={0.4}>
-                                                                                        <Box sx={{ color, display: 'flex', alignItems: 'center' }}>{icon}</Box>
-                                                                                        <Typography sx={{ color, fontSize: '0.72rem', fontWeight: 600, textTransform: 'capitalize' }}>
-                                                                                            {act.weather_description || act.weather_condition}
-                                                                                        </Typography>
-                                                                                    </Stack>
-                                                                                );
-                                                                            })()}
-                                                                            {act.weather_temp != null && (
-                                                                                <Stack direction="row" alignItems="center" spacing={0.3}>
-                                                                                    <DeviceThermostatIcon sx={{ fontSize: 13, color: C.faded }} />
-                                                                                    <Typography sx={{ color: C.sub, fontSize: '0.72rem' }}>{Math.round(act.weather_temp)}°C</Typography>
-                                                                                </Stack>
-                                                                            )}
-                                                                            {act.weather_wind_speed != null && (
-                                                                                <Stack direction="row" alignItems="center" spacing={0.3}>
-                                                                                    <AirIcon sx={{ fontSize: 13, color: C.faded }} />
-                                                                                    <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>{act.weather_wind_speed} km/h</Typography>
-                                                                                </Stack>
-                                                                            )}
-                                                                            {act.weather_humidity != null && (
-                                                                                <Stack direction="row" alignItems="center" spacing={0.3}>
-                                                                                    <WaterDropIcon sx={{ fontSize: 13, color: '#64B5F6' }} />
-                                                                                    <Typography sx={{ color: C.faded, fontSize: '0.72rem' }}>{act.weather_humidity}%</Typography>
-                                                                                </Stack>
-                                                                            )}
-                                                                        </Stack>
-                                                                    )}
-
-                                                                    {act.description && (
-                                                                        <Typography variant="caption" sx={{ color: C.faded, display: 'block', mt: 0.35 }}>{act.description}</Typography>
-                                                                    )}
-                                                                </Box>
-
-                                                                {/* Estimated cost pill */}
-                                                                <Box sx={{ bgcolor: 'rgba(255,183,77,0.12)', color: C.yellow, fontWeight: 'bold', fontSize: '1.05rem', borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                            {/* ── Actions row: costs + edit + delete ── */}
+                                                            <Stack direction="row" alignItems="center" spacing={0.75}
+                                                                sx={{ flexShrink: 0, width: { xs: '100%', md: 'auto' }, justifyContent: { xs: 'flex-end', md: 'flex-start' } }}>
+                                                                {/* Estimated cost */}
+                                                                <Box sx={{ bgcolor: 'rgba(255,183,77,0.12)', border: '1px solid rgba(255,183,77,0.35)', color: C.yellow, fontWeight: 'bold', fontSize: '1.05rem', borderRadius: 2.5, flexShrink: 0, flex: { xs: 1, md: 'none' }, width: { xs: 'auto', md: 114 }, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                                     {fmtNum(act.cost)}
                                                                 </Box>
-
-                                                                {/* Actual cost — inline editable for editors, read-only for viewers */}
+                                                                {/* Actual cost */}
                                                                 {canEdit ? (
-                                                                    <Box onClick={e => e.stopPropagation()} sx={{ bgcolor: `${C.brand}1A`, borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', '&:hover': { bgcolor: `${C.brand}30` }, '&:focus-within': { bgcolor: `${C.brand}38`, outline: `1.5px solid ${C.brand}` } }}>
+                                                                    <Box onClick={e => e.stopPropagation()} sx={{ bgcolor: `${C.brand}22`, border: `1px solid ${C.brand}50`, borderRadius: 2.5, flexShrink: 0, flex: { xs: 1, md: 'none' }, width: { xs: 'auto', md: 114 }, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', '&:hover': { bgcolor: `${C.brand}35` }, '&:focus-within': { bgcolor: `${C.brand}45`, outline: `1.5px solid ${C.brand}` } }}>
                                                                         <input
                                                                             type="text" inputMode="numeric"
                                                                             value={inlineActual[act.id] !== undefined ? inlineActual[act.id] : (act.actual_cost || 0)}
@@ -922,11 +914,10 @@ export default function ItineraryDetail() {
                                                                         />
                                                                     </Box>
                                                                 ) : (
-                                                                    <Box sx={{ bgcolor: `${C.brand}1A`, borderRadius: 2.5, flexShrink: 0, width: 114, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                                                    <Box sx={{ bgcolor: `${C.brand}22`, border: `1px solid ${C.brand}50`, borderRadius: 2.5, flexShrink: 0, flex: { xs: 1, md: 'none' }, width: { xs: 'auto', md: 114 }, height: 34, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                                                                         <Typography sx={{ color: C.brand, fontWeight: 700, fontSize: '1.05rem' }}>{fmtNum(act.actual_cost || 0)}</Typography>
                                                                     </Box>
                                                                 )}
-
                                                                 {canEdit && (
                                                                     <IconButton size="small" onClick={() => openEditAct(act, day.id)} sx={{ color: C.faded, '&:hover': { color: C.brand } }}>
                                                                         <EditIcon sx={{ fontSize: '1.1rem' }} />
@@ -937,6 +928,7 @@ export default function ItineraryDetail() {
                                                                         <DeleteIcon sx={{ fontSize: '1.1rem' }} />
                                                                     </IconButton>
                                                                 )}
+                                                            </Stack>
                                                         </Box>
                                                         )}
                                                         </Draggable>
@@ -1035,7 +1027,7 @@ export default function ItineraryDetail() {
                         </Box>
 
                         {/* Row 1: Activity Type + Start Time */}
-                        <Stack direction="row" spacing={2} alignItems="flex-start">
+                        <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="flex-start">
                             {/* Activity Type */}
                             <Box sx={{ flex: 1 }}>
                                 <Typography variant="caption" sx={{ color: C.faded, mb: 0.75, display: 'block', fontWeight: 600, letterSpacing: 0.4 }}>Activity Type *</Typography>
@@ -1457,6 +1449,51 @@ export default function ItineraryDetail() {
                     </Button>
                 </DialogActions>
             </Dialog>
+            {/* ── Date Edit Dialog ─────────────────────────────────────────── */}
+            <Dialog open={dateEditing} onClose={() => setDateEditing(false)} maxWidth="xs" fullWidth
+                PaperProps={{ sx: { bgcolor: C.card, border: `1px solid ${C.border}`, borderRadius: 3 } }}>
+                <DialogTitle sx={{ color: C.heading, fontWeight: 700, pb: 1 }}>Change Start Date</DialogTitle>
+                <DialogContent>
+                    <Typography variant="caption" sx={{ color: C.faded, display: 'block', mb: 2 }}>
+                        All day dates will be remapped from the new start date.
+                    </Typography>
+                    <TextField fullWidth size="small" type="date"
+                        value={dateDraft}
+                        onChange={e => setDateDraft(e.target.value)}
+                        InputLabelProps={{ shrink: true }}
+                        sx={{ '& .MuiOutlinedInput-root': { bgcolor: C.surface, borderRadius: 2, color: C.text, '& fieldset': { borderColor: C.brand }, '&:hover fieldset': { borderColor: C.brand } }, '& .MuiInputBase-input': { color: C.text } }}
+                    />
+                </DialogContent>
+                <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                    <Button onClick={() => setDateEditing(false)} sx={{ color: C.faded, borderRadius: 2, textTransform: 'none' }}>Cancel</Button>
+                    <Button variant="contained" onClick={async () => {
+                        if (!dateDraft) { setDateEditing(false); return; }
+                        try {
+                            const newStart = new Date(dateDraft);
+                            const days = itinerary.days || [];
+                            const newEnd = new Date(newStart);
+                            newEnd.setDate(newEnd.getDate() + days.length - 1);
+                            await axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itineraries/${id}`, {
+                                start_date: dateDraft,
+                                end_date: newEnd.toISOString().split('T')[0],
+                            });
+                            await Promise.all(days.map((day, i) => {
+                                const d = new Date(newStart);
+                                d.setDate(d.getDate() + i);
+                                return axios.put(`${import.meta.env.VITE_BACKEND_API_URL}itinerary-days/${day.id}`, {
+                                    date: d.toISOString().split('T')[0],
+                                });
+                            }));
+                            await reload();
+                            toast('Start date updated — all days remapped!');
+                        } catch (e) { toast(e.response?.data?.detail || 'Failed to update date.', 'error'); }
+                        setDateEditing(false);
+                    }} sx={{ bgcolor: C.brand, color: C.bg, fontWeight: 700, borderRadius: 2, px: 3, textTransform: 'none', '&:hover': { bgcolor: '#2db8b8' } }}>
+                        Save
+                    </Button>
+                </DialogActions>
+            </Dialog>
+
             {/* ── Snackbar ─────────────────────────────────────────────────── */}
             <Snackbar open={snack.open} autoHideDuration={3000} onClose={() => setSnack(p => ({ ...p, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
                 <Alert severity={snack.sev} onClose={() => setSnack(p => ({ ...p, open: false }))} sx={{ bgcolor: C.card, color: C.text, borderRadius: 3 }}>

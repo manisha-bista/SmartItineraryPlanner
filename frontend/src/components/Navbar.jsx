@@ -2,8 +2,9 @@ import React, { useState, useEffect } from 'react';
 import {
     Box, Drawer, List, ListItem, ListItemButton, ListItemIcon,
     ListItemText, Button, Avatar, Typography, Stack, Divider,
-    Badge, Popover, IconButton, Tooltip
+    Badge, Popover, IconButton, Tooltip, AppBar, Toolbar
 } from '@mui/material';
+import MenuIcon from '@mui/icons-material/Menu';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTheme } from '../context/ThemeContext';
 
@@ -212,24 +213,21 @@ const Navbar = () => {
     const activeText = COLORS.background;
     const inactiveText = COLORS.subheadings;
 
-    return (
-        <Drawer
-            variant="permanent"
-            sx={{
-                width: DRAWER_WIDTH,
-                flexShrink: 0,
-                '& .MuiDrawer-paper': {
-                    width: DRAWER_WIDTH,
-                    boxSizing: 'border-box',
-                    bgcolor: drawerBg,
-                    borderRight: 'none',
-                    backgroundImage: 'linear-gradient(to bottom, rgba(51,204,204,0.05), transparent)',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    overflow: 'hidden',
-                },
-            }}
-        >
+    const [mobileOpen, setMobileOpen] = useState(false);
+
+    const drawerPaperSx = {
+        width: DRAWER_WIDTH,
+        boxSizing: 'border-box',
+        bgcolor: drawerBg,
+        borderRight: 'none',
+        backgroundImage: 'linear-gradient(to bottom, rgba(51,204,204,0.05), transparent)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+    };
+
+    const drawerContent = (
+        <>
             {/* Logo */}
             <Box sx={{ p: 3, pb: 2 }}>
                 <Stack direction="row" alignItems="center" spacing={1}>
@@ -255,7 +253,11 @@ const Navbar = () => {
                     return (
                         <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
                             <ListItemButton
-                                onClick={() => { if (isFriends) { setFriendsInitialTab('friends'); setFriendsOpen(true); } else { navigate(item.path); } }}
+                                onClick={() => {
+                                    if (isFriends) { setFriendsInitialTab('friends'); setFriendsOpen(true); }
+                                    else { navigate(item.path); }
+                                    setMobileOpen(false);
+                                }}
                                 selected={!isFriends && active}
                                 sx={{
                                     borderRadius: 2,
@@ -296,7 +298,7 @@ const Navbar = () => {
                 {isAdmin && (
                     <ListItem disablePadding sx={{ mb: 0.5 }}>
                         <ListItemButton
-                            onClick={() => navigate('/admin')}
+                            onClick={() => { navigate('/admin'); setMobileOpen(false); }}
                             selected={isActive('/admin')}
                             sx={{
                                 borderRadius: 2,
@@ -330,7 +332,7 @@ const Navbar = () => {
                 <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mb: 1.5 }}>
                     <Avatar
                         src={getAvatarUrl(avatarId)}
-                        onClick={() => navigate('/profile')}
+                        onClick={() => { navigate('/profile'); setMobileOpen(false); }}
                         sx={{
                             width: 38, height: 38,
                             cursor: 'pointer',
@@ -413,102 +415,193 @@ const Navbar = () => {
                     </Button>
                 </Stack>
             </Box>
+        </>
+    );
+
+    const notifPopover = (
+        <Popover
+            open={notifOpen}
+            anchorEl={notifAnchor}
+            onClose={handleNotifClose}
+            anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+            transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+            PaperProps={{
+                sx: {
+                    bgcolor: COLORS.cardPrimary,
+                    borderRadius: 3,
+                    boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
+                    border: `1px solid ${COLORS.cardBorder}`,
+                    width: 320,
+                    maxHeight: 420,
+                    overflow: 'hidden',
+                    display: 'flex',
+                    flexDirection: 'column',
+                },
+            }}
+        >
+            {/* Header */}
+            <Stack direction="row" justifyContent="space-between" alignItems="center"
+                sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${COLORS.cardBorder}` }}>
+                <Typography sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '0.95rem', fontFamily: '"Exo 2", sans-serif' }}>
+                    Notifications
+                </Typography>
+                {unreadCount > 0 && (
+                    <Button size="small" onClick={handleMarkAllRead} sx={{
+                        color: COLORS.brand, textTransform: 'none', fontSize: '0.75rem', p: 0,
+                        '&:hover': { bgcolor: 'transparent', opacity: 0.75 }
+                    }}>
+                        Mark all read
+                    </Button>
+                )}
+            </Stack>
+
+            {/* List */}
+            <Box sx={{ overflowY: 'auto', flex: 1 }}>
+                {notifications.length === 0 ? (
+                    <Box sx={{ py: 4, textAlign: 'center' }}>
+                        <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem' }}>
+                            No notifications yet
+                        </Typography>
+                    </Box>
+                ) : (
+                    notifications.map((n) => (
+                        <Box
+                            key={n.id}
+                            onClick={() => handleNotifAction(n)}
+                            sx={{
+                                px: 2, py: 1.5,
+                                cursor: 'pointer',
+                                bgcolor: n.is_read ? 'transparent' : `${COLORS.brand}0D`,
+                                borderBottom: `1px solid ${COLORS.cardBorder}`,
+                                '&:hover': { bgcolor: COLORS.cardSecondary },
+                                transition: 'background 0.15s',
+                            }}
+                        >
+                            <Stack direction="row" spacing={1.5} alignItems="flex-start">
+                                <Box sx={{
+                                    color: COLORS.brand, mt: 0.25, flexShrink: 0,
+                                    opacity: n.is_read ? 0.5 : 1,
+                                }}>
+                                    {NOTIF_ICON[n.type] || <NotificationsIcon sx={{ fontSize: 18 }} />}
+                                </Box>
+                                <Box sx={{ minWidth: 0 }}>
+                                    <Typography sx={{
+                                        color: n.is_read ? COLORS.fadedText : COLORS.text,
+                                        fontSize: '0.82rem', lineHeight: 1.4,
+                                    }}>
+                                        {n.message}
+                                    </Typography>
+                                    <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem', mt: 0.25 }}>
+                                        {new Date(n.created_at).toLocaleDateString('en-US', {
+                                            month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
+                                        })}
+                                    </Typography>
+                                </Box>
+                                {!n.is_read && (
+                                    <Box sx={{
+                                        width: 7, height: 7, borderRadius: '50%',
+                                        bgcolor: COLORS.brand, flexShrink: 0, mt: 0.75, ml: 'auto'
+                                    }} />
+                                )}
+                            </Stack>
+                        </Box>
+                    ))
+                )}
+            </Box>
+        </Popover>
+    );
+
+    return (
+        <>
+            {/* Mobile top bar — hidden on desktop */}
+            <AppBar
+                position="fixed"
+                elevation={0}
+                sx={{
+                    display: { xs: 'flex', md: 'none' },
+                    bgcolor: drawerBg,
+                    borderBottom: `1px solid ${COLORS.cardBorder}`,
+                    zIndex: 1250,
+                }}
+            >
+                <Toolbar>
+                    <IconButton
+                        edge="start"
+                        onClick={() => setMobileOpen(true)}
+                        sx={{ color: COLORS.icons, mr: 1 }}
+                    >
+                        <MenuIcon />
+                    </IconButton>
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                        <Box component="span" sx={{ color: COLORS.brand, fontSize: '1.2rem' }}>✈</Box>
+                        <Typography variant="h6" fontWeight="bold" sx={{
+                            color: COLORS.headings,
+                            fontFamily: '"Exo 2", sans-serif',
+                            letterSpacing: 0.5,
+                            lineHeight: 1,
+                        }}>
+                            Smart <Box component="span" sx={{ color: COLORS.brand }}>Itinerary</Box>
+                        </Typography>
+                    </Stack>
+                    <Box sx={{ ml: 'auto', display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                        <Tooltip title={isDark ? 'Switch to light mode' : 'Switch to dark mode'}>
+                            <IconButton
+                                onClick={toggleTheme}
+                                size="small"
+                                sx={{ color: COLORS.fadedText }}
+                            >
+                                {isDark ? <LightModeIcon sx={{ fontSize: 20 }} /> : <DarkModeIcon sx={{ fontSize: 20 }} />}
+                            </IconButton>
+                        </Tooltip>
+                        <Tooltip title="Notifications">
+                            <IconButton
+                                size="small"
+                                onClick={handleNotifOpen}
+                                sx={{ color: COLORS.icons }}
+                            >
+                                <Badge badgeContent={unreadCount || null} color="error" max={9}>
+                                    <NotificationsIcon sx={{ fontSize: 20 }} />
+                                </Badge>
+                            </IconButton>
+                        </Tooltip>
+                    </Box>
+                </Toolbar>
+            </AppBar>
+
+            {/* Mobile slide-in Drawer */}
+            <Drawer
+                variant="temporary"
+                open={mobileOpen}
+                onClose={() => setMobileOpen(false)}
+                ModalProps={{ keepMounted: true }}
+                sx={{
+                    display: { xs: 'block', md: 'none' },
+                    '& .MuiDrawer-paper': drawerPaperSx,
+                }}
+            >
+                {drawerContent}
+            </Drawer>
+
+            {/* Desktop permanent Drawer */}
+            <Drawer
+                variant="permanent"
+                open
+                sx={{
+                    display: { xs: 'none', md: 'block' },
+                    width: DRAWER_WIDTH,
+                    flexShrink: 0,
+                    '& .MuiDrawer-paper': drawerPaperSx,
+                }}
+            >
+                {drawerContent}
+            </Drawer>
 
             {/* Friends Popup Drawer */}
             <FriendsPopup open={friendsOpen} onClose={() => setFriendsOpen(false)} initialTab={friendsInitialTab} />
 
             {/* Notifications Popover */}
-            <Popover
-                open={notifOpen}
-                anchorEl={notifAnchor}
-                onClose={handleNotifClose}
-                anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-                transformOrigin={{ vertical: 'bottom', horizontal: 'left' }}
-                PaperProps={{
-                    sx: {
-                        bgcolor: COLORS.cardPrimary,
-                        borderRadius: 3,
-                        boxShadow: `0 8px 32px rgba(0,0,0,0.4)`,
-                        border: `1px solid ${COLORS.cardBorder}`,
-                        width: 320,
-                        maxHeight: 420,
-                        overflow: 'hidden',
-                        display: 'flex',
-                        flexDirection: 'column',
-                    },
-                }}
-            >
-                {/* Header */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center"
-                    sx={{ px: 2, py: 1.5, borderBottom: `1px solid ${COLORS.cardBorder}` }}>
-                    <Typography sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '0.95rem', fontFamily: '"Exo 2", sans-serif' }}>
-                        Notifications
-                    </Typography>
-                    {unreadCount > 0 && (
-                        <Button size="small" onClick={handleMarkAllRead} sx={{
-                            color: COLORS.brand, textTransform: 'none', fontSize: '0.75rem', p: 0,
-                            '&:hover': { bgcolor: 'transparent', opacity: 0.75 }
-                        }}>
-                            Mark all read
-                        </Button>
-                    )}
-                </Stack>
-
-                {/* List */}
-                <Box sx={{ overflowY: 'auto', flex: 1 }}>
-                    {notifications.length === 0 ? (
-                        <Box sx={{ py: 4, textAlign: 'center' }}>
-                            <Typography sx={{ color: COLORS.fadedText, fontSize: '0.85rem' }}>
-                                No notifications yet
-                            </Typography>
-                        </Box>
-                    ) : (
-                        notifications.map((n) => (
-                            <Box
-                                key={n.id}
-                                onClick={() => handleNotifAction(n)}
-                                sx={{
-                                    px: 2, py: 1.5,
-                                    cursor: 'pointer',
-                                    bgcolor: n.is_read ? 'transparent' : `${COLORS.brand}0D`,
-                                    borderBottom: `1px solid ${COLORS.cardBorder}`,
-                                    '&:hover': { bgcolor: COLORS.cardSecondary },
-                                    transition: 'background 0.15s',
-                                }}
-                            >
-                                <Stack direction="row" spacing={1.5} alignItems="flex-start">
-                                    <Box sx={{
-                                        color: COLORS.brand, mt: 0.25, flexShrink: 0,
-                                        opacity: n.is_read ? 0.5 : 1,
-                                    }}>
-                                        {NOTIF_ICON[n.type] || <NotificationsIcon sx={{ fontSize: 18 }} />}
-                                    </Box>
-                                    <Box sx={{ minWidth: 0 }}>
-                                        <Typography sx={{
-                                            color: n.is_read ? COLORS.fadedText : COLORS.text,
-                                            fontSize: '0.82rem', lineHeight: 1.4,
-                                        }}>
-                                            {n.message}
-                                        </Typography>
-                                        <Typography sx={{ color: COLORS.fadedText, fontSize: '0.72rem', mt: 0.25 }}>
-                                            {new Date(n.created_at).toLocaleDateString('en-US', {
-                                                month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit'
-                                            })}
-                                        </Typography>
-                                    </Box>
-                                    {!n.is_read && (
-                                        <Box sx={{
-                                            width: 7, height: 7, borderRadius: '50%',
-                                            bgcolor: COLORS.brand, flexShrink: 0, mt: 0.75, ml: 'auto'
-                                        }} />
-                                    )}
-                                </Stack>
-                            </Box>
-                        ))
-                    )}
-                </Box>
-            </Popover>
-        </Drawer>
+            {notifPopover}
+        </>
     );
 };
 

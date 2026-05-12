@@ -464,21 +464,21 @@ const MyItineraries = () => {
     };
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
 
             <Navbar />
 
-            <Box component="main" sx={{ flexGrow: 1, p: 3, height: '100vh', overflow: 'auto', bgcolor: COLORS.background }}>
+            <Box component="main" sx={{ flexGrow: 1, p: { xs: 2, md: 3 }, pb: { xs: '80px', md: 3 }, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'auto', bgcolor: COLORS.background }}>
                 {/* Topbar */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-                    <Box sx={{ width: 200 }} />
+                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: { xs: 2, md: 4 } }}>
+                    <Box sx={{ width: 200, display: { xs: 'none', md: 'block' } }} />
                     <TextField
                         placeholder="Search trips..."
                         variant="outlined"
                         value={search}
                         onChange={e => setSearch(e.target.value)}
                         sx={{
-                            maxWidth: 500, flex: 1,
+                            maxWidth: { xs: '100%', md: 500 }, flex: 1,
                             '& .MuiOutlinedInput-root': {
                                 bgcolor: COLORS.cardPrimary, borderRadius: 5, color: COLORS.text,
                                 '& fieldset': { borderColor: 'transparent' },
@@ -490,14 +490,29 @@ const MyItineraries = () => {
                         }}
                         InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon sx={{ color: COLORS.fadedText }} /></InputAdornment> }}
                     />
-                    <Stack direction="row" spacing={2} alignItems="center">
-                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)} sx={{
-                            bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
-                            borderRadius: 5, px: 3, py: 1.25, textTransform: 'uppercase',
-                            '&:hover': { bgcolor: '#2db8b8' },
-                        }}>
+                    <Stack direction="row" spacing={2} alignItems="center" sx={{ ml: 1 }}>
+                        {/* Desktop: full button */}
+                        <Button variant="contained" startIcon={<AddIcon />} onClick={() => setCreateOpen(true)}
+                            sx={{
+                                display: { xs: 'none', md: 'inline-flex' },
+                                bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
+                                borderRadius: 5, px: 3, py: 1.25, textTransform: 'uppercase',
+                                '&:hover': { bgcolor: '#2db8b8' },
+                            }}>
                             New Trip
                         </Button>
+                        {/* Mobile: icon-only button */}
+                        <Tooltip title="New Trip">
+                            <IconButton onClick={() => setCreateOpen(true)}
+                                sx={{
+                                    display: { xs: 'flex', md: 'none' },
+                                    bgcolor: COLORS.brand, color: COLORS.background,
+                                    width: 40, height: 40,
+                                    '&:hover': { bgcolor: '#2db8b8' },
+                                }}>
+                                <AddIcon sx={{ fontSize: 22 }} />
+                            </IconButton>
+                        </Tooltip>
                     </Stack>
                 </Stack>
 
@@ -527,7 +542,7 @@ const MyItineraries = () => {
                                 </Typography>
                             </Box>
                         ) : (
-                            <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3, mb: 5 }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: { xs: 2, md: 3 }, mb: 5 }}>
                                 {current.map(trip => (
                                     <TripCard key={`${trip._isCollab ? 'collab' : 'own'}-${trip.id}`} trip={trip} />
                                 ))}
@@ -548,7 +563,7 @@ const MyItineraries = () => {
                                         ({past.length})
                                     </Typography>
                                 </Typography>
-                                <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 3 }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: 'repeat(1, 1fr)', sm: 'repeat(2, 1fr)', lg: 'repeat(4, 1fr)' }, gap: { xs: 2, md: 3 } }}>
                                     {past.map(trip => (
                                         <TripCard key={`${trip._isCollab ? 'collab' : 'own'}-${trip.id}`} trip={trip} faded />
                                     ))}
@@ -581,11 +596,11 @@ const MyItineraries = () => {
                                 </Stack>
                                 <Stack spacing={1.5}>
                                     {pendingCollabs.map(itin => (
-                                        <Box key={itin.id} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 3, px: 3, py: 2, border: `1px solid rgba(255,183,77,0.25)`, borderLeft: '3px solid #FFB74D' }}>
-                                            <Stack direction="row" alignItems="center">
+                                        <Box key={itin.id} sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 3, px: { xs: 2, md: 3 }, py: 2, border: `1px solid rgba(255,183,77,0.25)`, borderLeft: '3px solid #FFB74D' }}>
+                                            <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={{ xs: 1.5, sm: 0 }}>
                                                 <Box sx={{ flex: 1 }}>
                                                     <Typography sx={{ color: COLORS.headings, fontWeight: 700, fontSize: '0.95rem' }}>{itin.title}</Typography>
-                                                    <Stack direction="row" spacing={1} alignItems="center" sx={{ mt: 0.5 }}>
+                                                    <Stack direction="row" spacing={1} alignItems="center" flexWrap="wrap" sx={{ mt: 0.5 }}>
                                                         <LocationOnIcon sx={{ fontSize: 12, color: '#ff6b6b' }} />
                                                         <Typography variant="caption" sx={{ color: COLORS.fadedText }}>{itin.destination}</Typography>
                                                         <Typography variant="caption" sx={{ color: COLORS.fadedText }}>·</Typography>

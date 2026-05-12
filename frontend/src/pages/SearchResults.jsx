@@ -352,16 +352,16 @@ const SearchResults = () => {
     );
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
             <Navbar />
-            <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto', pl: 0 }}>
+            <Box component="main" sx={{ flexGrow: 1, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'hidden', display: 'flex', flexDirection: 'column', pl: 0 }}>
 
                 {/* ── Search bar — same layout as Dashboard top bar ─────── */}
                 <Stack direction="row" justifyContent="space-between" alignItems="center"
-                    sx={{ px: 3, mb: 0, pt: 3, pb: 2, borderBottom: `1px solid ${COLORS.cardBorder}` }}>
+                    sx={{ px: { xs: 1.5, md: 3 }, mb: 0, pt: { xs: 1.5, md: 3 }, pb: { xs: 1.5, md: 2 }, borderBottom: `1px solid ${COLORS.cardBorder}`, flexShrink: 0 }}>
 
                     {/* Left spacer — matches Dashboard's 200px spacer so field is centred */}
-                    <Box sx={{ width: 200, display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ width: { xs: 'auto', md: 200 }, display: 'flex', alignItems: 'center', flexShrink: 0 }}>
                         <IconButton onClick={() => navigate('/dashboard')}
                             sx={{ color: COLORS.fadedText, '&:hover': { color: COLORS.brand } }}>
                             <CloseIcon />
@@ -398,7 +398,7 @@ const SearchResults = () => {
                         />
                         <Button variant="contained" onClick={handleSearch} disabled={loading} sx={{
                             bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
-                            px: 4, py: 1.75, borderRadius: 5, textTransform: 'uppercase',
+                            px: { xs: 2, md: 4 }, py: 1.75, borderRadius: 5, textTransform: 'uppercase',
                             fontSize: '0.875rem', whiteSpace: 'nowrap',
                             '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
                             transition: 'all 0.3s',
@@ -408,7 +408,7 @@ const SearchResults = () => {
                     </Stack>
 
                     {/* Right — quick destination chips aligned to match New Trip button space */}
-                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ width: 200, justifyContent: 'flex-end', flexWrap: 'wrap', gap: 0.5 }}>
+                    <Stack direction="row" spacing={0.75} alignItems="center" sx={{ width: { xs: 0, md: 200 }, display: { xs: 'none', md: 'flex' }, justifyContent: 'flex-end', flexWrap: 'wrap', gap: 0.5 }}>
                         {QUICK_DESTINATIONS.slice(0, 3).map(d => (
                             <Chip key={d} label={d} size="small" clickable
                                 onClick={() => { setInputVal(d); setQuery(d); setSearchParams({ q: d }); fetchResults(d); fetchPopular(d); }}
@@ -424,12 +424,13 @@ const SearchResults = () => {
                     </Stack>
                 </Stack>
 
-                <Box sx={{ display: 'flex', height: 'calc(100vh - 130px)', overflow: 'hidden' }}>
+                <Box sx={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
 
                     {/* ── Left sidebar filters ─────────────────────────────── */}
                     <Box sx={{
                         width: 220, flexShrink: 0, borderRight: `1px solid ${COLORS.cardBorder}`,
                         overflow: 'auto', px: 2.5, py: 2.5,
+                        display: { xs: 'none', md: 'block' },
                         '&::-webkit-scrollbar': { width: 4 },
                         '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardBorder, borderRadius: 4 },
                     }}>
@@ -509,15 +510,15 @@ const SearchResults = () => {
                     </Box>
 
                     {/* ── Main results area ────────────────────────────────── */}
-                    <Box sx={{ flex: 1, overflow: 'auto', px: 3, py: 2.5,
+                    <Box sx={{ flex: 1, overflow: 'auto', px: { xs: 2, md: 3 }, py: { xs: 1.5, md: 2.5 }, pb: { xs: '80px', md: 2.5 },
                         '&::-webkit-scrollbar': { width: 5 },
                         '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardBorder, borderRadius: 4 },
                     }}>
 
                         {/* Toolbar row */}
-                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5 }}>
-                            <Box>
-                                <Typography variant="h6" fontWeight={700} sx={{ color: COLORS.headings, lineHeight: 1.2 }}>
+                        <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2.5, gap: 1 }}>
+                            <Box sx={{ minWidth: 0 }}>
+                                <Typography variant="h6" fontWeight={700} noWrap sx={{ color: COLORS.headings, lineHeight: 1.2, fontSize: { xs: '0.88rem', md: '1.25rem' } }}>
                                     {query ? `Results for "${query}"` : 'Explore Itineraries'}
                                 </Typography>
                                 {!loading && (
@@ -527,11 +528,11 @@ const SearchResults = () => {
                                 )}
                             </Box>
                             <Stack direction="row" spacing={1.5} alignItems="center">
-                                <FormControl size="small" sx={{ minWidth: 140 }}>
+                                <FormControl size="small" sx={{ minWidth: { xs: 110, md: 140 } }}>
                                     <Select
                                         value={sortBy} onChange={e => setSortBy(e.target.value)}
                                         sx={{
-                                            fontSize: '0.78rem', color: COLORS.text, borderRadius: 2,
+                                            fontSize: { xs: '0.72rem', md: '0.78rem' }, color: COLORS.text, borderRadius: 2,
                                             '& .MuiOutlinedInput-notchedOutline': { borderColor: COLORS.cardBorder },
                                             '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: COLORS.brand },
                                             bgcolor: COLORS.cardPrimary,
@@ -580,7 +581,7 @@ const SearchResults = () => {
                                 {ownTrips.length > 0 && (
                                     <Box sx={{ mb: 4 }}>
                                         <SectionHeader icon={<StarIcon sx={{ fontSize: 18 }} />} title="Your Matching Trips" count={ownTrips.length} />
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: 2 }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? { xs: 'repeat(auto-fill, minmax(155px, 1fr))', md: 'repeat(auto-fill, minmax(220px, 1fr))' } : '1fr', gap: 2 }}>
                                             {ownTrips.map(r => renderCard(r))}
                                         </Box>
                                     </Box>
@@ -590,7 +591,7 @@ const SearchResults = () => {
                                 {recommended.length > 0 && (
                                     <Box sx={{ mb: 4 }}>
                                         <SectionHeader icon={<AutoAwesomeIcon sx={{ fontSize: 18 }} />} title="Recommended for You" count={recommended.length} />
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: 2 }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? { xs: 'repeat(auto-fill, minmax(155px, 1fr))', md: 'repeat(auto-fill, minmax(220px, 1fr))' } : '1fr', gap: 2 }}>
                                             {recommended.map(r => renderCard(r))}
                                         </Box>
                                     </Box>
@@ -600,7 +601,7 @@ const SearchResults = () => {
                                 {publicOnes.length > 0 && (
                                     <Box sx={{ mb: 4 }}>
                                         <SectionHeader icon={<WhatshotIcon sx={{ fontSize: 18 }} />} title="Popular Itineraries" count={publicOnes.length} />
-                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: 2 }}>
+                                        <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? { xs: 'repeat(auto-fill, minmax(155px, 1fr))', md: 'repeat(auto-fill, minmax(220px, 1fr))' } : '1fr', gap: 2 }}>
                                             {publicOnes.map(r => renderCard(r))}
                                         </Box>
                                     </Box>
@@ -608,7 +609,7 @@ const SearchResults = () => {
                             </Box>
                         ) : (
                             // Flat filtered view
-                            <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: 2 }}>
+                            <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? { xs: 'repeat(auto-fill, minmax(155px, 1fr))', md: 'repeat(auto-fill, minmax(220px, 1fr))' } : '1fr', gap: 2 }}>
                                 {filtered.map(r => renderCard(r))}
                             </Box>
                         )}
@@ -617,7 +618,7 @@ const SearchResults = () => {
                         {!query && popular.length > 0 && (
                             <Box>
                                 <SectionHeader icon={<WhatshotIcon sx={{ fontSize: 18 }} />} title="Trending in Nepal" count={popular.length} />
-                                <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? 'repeat(auto-fill, minmax(220px, 1fr))' : '1fr', gap: 2 }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: viewMode === 'grid' ? { xs: 'repeat(auto-fill, minmax(155px, 1fr))', md: 'repeat(auto-fill, minmax(220px, 1fr))' } : '1fr', gap: 2 }}>
                                     {popular.map(r => renderCard(r))}
                                 </Box>
                             </Box>

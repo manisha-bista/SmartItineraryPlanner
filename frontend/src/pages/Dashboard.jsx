@@ -12,7 +12,8 @@ import {
     InputAdornment,
     Chip,
     Alert,
-    CircularProgress
+    CircularProgress,
+    Tooltip
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -78,6 +79,7 @@ const Dashboard = () => {
     const [recsLoading, setRecsLoading]         = useState(false);
     const [searchQuery, setSearchQuery]         = useState('');
     const [leafletLib, setLeafletLib]       = useState(null);
+    const [calendarOpen, setCalendarOpen]    = useState(false);
 
     const miniMapRef     = useRef(null);
     const miniMapInst    = useRef(null);
@@ -154,6 +156,7 @@ const Dashboard = () => {
             center: [28.3949, 84.1240], zoom: 7,
             zoomControl: false, scrollWheelZoom: false,
             dragging: false, doubleClickZoom: false, attributionControl: false,
+            touchZoom: false, tap: false, keyboard: false, boxZoom: false,
         });
         const tileUrl = isDark
             ? 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
@@ -161,6 +164,9 @@ const Dashboard = () => {
         miniTileRef.current = leafletLib.tileLayer(tileUrl, { maxZoom: 19 });
         miniTileRef.current.addTo(map);
         miniMapInst.current = map;
+        // Leaflet sets touch-action:none on the container even with dragging disabled,
+        // which swallows touch-scroll events. Override it so the page can scroll freely.
+        miniMapRef.current.style.touchAction = 'pan-y';
     }, [leafletLib]);
 
     // swap tile when theme changes
@@ -270,10 +276,10 @@ const Dashboard = () => {
         <Box sx={{
             display: 'flex',
             bgcolor: COLORS.background,
-            minHeight: '100vh',
+            height: { xs: 'calc(100vh - 56px)', md: '100vh' },
             width: '100vw',
             position: 'fixed',
-            top: 0, left: 0,
+            top: { xs: '56px', md: 0 }, left: 0,
             overflow: 'hidden',
         }}>
             {/* shared sidebar */}
@@ -282,79 +288,139 @@ const Dashboard = () => {
             {/* main content */}
             <Box component="main" sx={{
                 flexGrow: 1,
-                p: 3,
-                height: '100vh',
+                p: { xs: 2, md: 3 },
+                pb: { xs: '120px', md: 3 },
+                height: { xs: 'calc(100vh - 56px)', md: '100vh' },
                 overflow: 'auto',
                 bgcolor: COLORS.background,
                 ml: 0,
             }}>
                 {/* Top Bar */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
-                    <Box sx={{ width: 200 }} />
+                <Stack direction="row" justifyContent="space-between" alignItems="center" spacing={1.5} sx={{ mb: { xs: 2, md: 4 } }}>
+                    <Box sx={{ width: 200, display: { xs: 'none', md: 'block' } }} />
 
                     {/* Search */}
-                    <Stack direction="row" spacing={2} alignItems="center" sx={{ flex: 1, maxWidth: 650 }}>
-                        <TextField
-                            placeholder="Search destinations, e.g. Pokhara"
-                            variant="outlined"
-                            fullWidth
-                            value={searchQuery}
-                            onChange={e => setSearchQuery(e.target.value)}
-                            onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
-                            sx={{
-                                '& .MuiOutlinedInput-root': {
-                                    bgcolor: COLORS.cardPrimary, borderRadius: 5, color: COLORS.text,
-                                    '& fieldset': { borderColor: COLORS.cardBorder },
-                                    '&:hover fieldset': { borderColor: COLORS.brand },
-                                    '&.Mui-focused fieldset': { borderColor: COLORS.brand },
-                                },
-                                '& .MuiInputBase-input': { padding: '14px 16px' },
-                                '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
-                            }}
-                            InputProps={{
-                                startAdornment: (
-                                    <InputAdornment position="start">
-                                        <SearchIcon sx={{ color: COLORS.fadedText }} />
-                                    </InputAdornment>
-                                ),
-                            }}
-                        />
-                        <Button variant="contained" onClick={handleSearch} sx={{
-                            bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
-                            px: 4, py: 1.75, borderRadius: 5, textTransform: 'uppercase',
-                            fontSize: '0.875rem', whiteSpace: 'nowrap',
-                            '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
-                            transition: 'all 0.3s',
-                        }}>
-                            Search
-                        </Button>
-                    </Stack>
+                    <Box sx={{ flex: 1, maxWidth: { xs: '100%', md: 650 } }}>
+
+                        {/* Mobile: left-rounded input + flush right-rounded button — two siblings sharing the pill */}
+                        <Box sx={{ display: { xs: 'flex', md: 'none' }, alignItems: 'stretch' }}>
+                            <TextField
+                                placeholder="Search destinations…"
+                                variant="outlined"
+                                fullWidth
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        bgcolor: COLORS.cardPrimary,
+                                        borderRadius: '20px 0 0 20px',
+                                        color: COLORS.text,
+                                        '& fieldset': { borderColor: COLORS.cardBorder, borderRight: 'none' },
+                                        '&:hover fieldset': { borderColor: COLORS.brand, borderRight: 'none' },
+                                        '&.Mui-focused fieldset': { borderColor: COLORS.brand, borderRight: 'none' },
+                                    },
+                                    '& .MuiInputBase-input': { padding: '10px 14px' },
+                                    '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
+                                }}
+                            />
+                            <Box
+                                component="button"
+                                onClick={handleSearch}
+                                sx={{
+                                    bgcolor: COLORS.brand, color: '#fff',
+                                    border: 'none', outline: 'none', cursor: 'pointer',
+                                    borderRadius: '0 20px 20px 0',
+                                    px: '14px',
+                                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                    flexShrink: 0,
+                                    '&:hover': { bgcolor: '#2db8b8' },
+                                    transition: 'background-color 0.2s',
+                                }}
+                            >
+                                <SearchIcon sx={{ fontSize: 20, color: '#fff' }} />
+                            </Box>
+                        </Box>
+
+                        {/* Desktop: full pill input + external Search button */}
+                        <Stack direction="row" spacing={2} alignItems="center" sx={{ display: { xs: 'none', md: 'flex' } }}>
+                            <TextField
+                                placeholder="Search destinations, e.g. Pokhara"
+                                variant="outlined"
+                                fullWidth
+                                value={searchQuery}
+                                onChange={e => setSearchQuery(e.target.value)}
+                                onKeyDown={e => { if (e.key === 'Enter') handleSearch(); }}
+                                sx={{
+                                    '& .MuiOutlinedInput-root': {
+                                        bgcolor: COLORS.cardPrimary, borderRadius: 5, color: COLORS.text,
+                                        '& fieldset': { borderColor: COLORS.cardBorder },
+                                        '&:hover fieldset': { borderColor: COLORS.brand },
+                                        '&.Mui-focused fieldset': { borderColor: COLORS.brand },
+                                    },
+                                    '& .MuiInputBase-input': { padding: '14px 16px' },
+                                    '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
+                                }}
+                                InputProps={{
+                                    startAdornment: (
+                                        <InputAdornment position="start">
+                                            <SearchIcon sx={{ color: COLORS.fadedText }} />
+                                        </InputAdornment>
+                                    ),
+                                }}
+                            />
+                            <Button variant="contained" onClick={handleSearch} sx={{
+                                bgcolor: COLORS.brand, color: COLORS.background, fontWeight: 'bold',
+                                px: 4, py: 1.75, borderRadius: 5, textTransform: 'uppercase',
+                                fontSize: '0.875rem', whiteSpace: 'nowrap',
+                                '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
+                                transition: 'all 0.3s',
+                            }}>
+                                Search
+                            </Button>
+                        </Stack>
+                    </Box>
 
                     {/* New Trip button */}
-                    <Stack direction="row" spacing={2} alignItems="center">
-                        <Button
-                            variant="contained"
-                            startIcon={<AddIcon />}
+                    {/* Desktop: full labelled button */}
+                    <Button
+                        variant="contained"
+                        startIcon={<AddIcon />}
+                        onClick={() => setDialogOpen(true)}
+                        sx={{
+                            display: { xs: 'none', md: 'inline-flex' },
+                            bgcolor: COLORS.brand, color: COLORS.background,
+                            fontWeight: 'bold', borderRadius: 5, px: 3, py: 1.25,
+                            textTransform: 'uppercase',
+                            '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
+                            transition: 'all 0.3s',
+                        }}
+                    >
+                        New Trip
+                    </Button>
+                    {/* Mobile: compact icon button */}
+                    <Tooltip title="New Trip">
+                        <IconButton
                             onClick={() => setDialogOpen(true)}
                             sx={{
+                                display: { xs: 'flex', md: 'none' },
                                 bgcolor: COLORS.brand, color: COLORS.background,
-                                fontWeight: 'bold', borderRadius: 5, px: 3, py: 1.25,
-                                textTransform: 'uppercase',
-                                '&:hover': { bgcolor: '#2db8b8', transform: 'translateY(-2px)', boxShadow: `0 4px 12px ${COLORS.brand}40` },
+                                borderRadius: 2, flexShrink: 0,
+                                '&:hover': { bgcolor: '#2db8b8' },
                                 transition: 'all 0.3s',
                             }}
                         >
-                            New Trip
-                        </Button>
-                    </Stack>
+                            <AddIcon />
+                        </IconButton>
+                    </Tooltip>
                 </Stack>
 
-                {/* 2-column layout */}
-                <Box sx={{ display: 'flex', gap: 3 }}>
+                {/* 2-column layout: side-by-side on desktop, stacked on mobile */}
+                <Box sx={{ display: 'flex', gap: 3, flexDirection: { xs: 'column', md: 'row' } }}>
                     {/* Left: trips + similar */}
                     <Box sx={{ flex: 1, minWidth: 0 }}>
-                        <Box sx={{ mb: 4 }}>
-                            <Typography variant="h4" fontWeight="bold" sx={{ color: COLORS.headings, mb: 0.5 }}>
+                        <Box sx={{ mb: { xs: 2, md: 4 } }}>
+                            <Typography variant="h4" fontWeight="bold" sx={{ color: COLORS.headings, mb: 0.5, fontSize: { xs: '1.5rem', md: undefined } }}>
                                 Hello {user.username || user.name}!
                             </Typography>
                             <Typography variant="body1" sx={{ color: COLORS.fadedText }}>
@@ -363,7 +429,7 @@ const Dashboard = () => {
                         </Box>
 
                         {/* Your Trips */}
-                        <Box sx={{ mb: 4 }}>
+                        <Box sx={{ mb: { xs: 3, md: 4 } }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 3 }}>
                                 <Typography variant="h5" fontWeight="bold" sx={{ color: COLORS.headings }}>Your Trips</Typography>
                                 <Button onClick={() => navigate('/itineraries')} sx={{ color: COLORS.brand, textTransform: 'none', '&:hover': { bgcolor: 'transparent', color: '#2db8b8' } }}>
@@ -389,11 +455,15 @@ const Dashboard = () => {
                                     <Typography variant="body2" sx={{ color: COLORS.fadedText }}>Click anywhere to get started</Typography>
                                 </Card>
                             ) : (
-                                <Stack direction="row" spacing={2.5}>
+                                <Stack direction="row" spacing={2.5} sx={{ overflowX: { xs: 'auto', md: 'visible' }, pb: { xs: 1, md: 0 }, '&::-webkit-scrollbar': { height: 4 }, '&::-webkit-scrollbar-thumb': { bgcolor: COLORS.cardSecondary, borderRadius: 2 } }}>
                                     {itineraries.slice(0, 3).map((trip) => (
                                         <Card key={trip.id} onClick={() => navigate(`/itinerary/${trip.id}`)} sx={{
                                             bgcolor: COLORS.cardPrimary, borderRadius: 4, overflow: 'hidden',
-                                            cursor: 'pointer', flex: '1 1 0', minWidth: 0, maxWidth: '33.33%',
+                                            cursor: 'pointer',
+                                            flex: { xs: '0 0 auto', md: '1 1 0' },
+                                            width: { xs: 260, md: 'auto' },
+                                            minWidth: { xs: 260, md: 0 },
+                                            maxWidth: { xs: 260, md: '33.33%' },
                                             transition: 'all 0.3s',
                                             '&:hover': { transform: 'translateY(-6px)', boxShadow: `0 8px 24px ${COLORS.brand}20` },
                                         }}>
@@ -546,9 +616,28 @@ const Dashboard = () => {
                     </Box>
 
                     {/* Right sidebar: Calendar + Mini Map */}
-                    <Box sx={{ width: 400, flexShrink: 0 }}>
+                    <Box sx={{ width: { xs: '100%', md: 400 }, flexShrink: { xs: 1, md: 0 } }}>
+
+                        {/* Mobile-only calendar toggle button */}
+                        <Box sx={{ display: { xs: 'flex', md: 'none' }, justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
+                            <Typography variant="subtitle1" fontWeight="bold" sx={{ color: COLORS.headings }}>Trip Calendar</Typography>
+                            <Button
+                                startIcon={<CalendarTodayIcon sx={{ fontSize: 15 }} />}
+                                onClick={() => setCalendarOpen(o => !o)}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                    color: COLORS.brand, borderColor: COLORS.brand, borderRadius: 3,
+                                    textTransform: 'none', fontSize: '0.78rem',
+                                    '&:hover': { bgcolor: `${COLORS.brand}10`, borderColor: COLORS.brand },
+                                }}
+                            >
+                                {calendarOpen ? 'Hide Calendar' : 'View Calendar'}
+                            </Button>
+                        </Box>
+
                         {/* Calendar */}
-                        <Card sx={{ bgcolor: COLORS.cardPrimary, borderRadius: 5, p: 3, mb: 3 }}>
+                        <Card sx={{ display: { xs: calendarOpen ? 'block' : 'none', md: 'block' }, bgcolor: COLORS.cardPrimary, borderRadius: 5, p: 3, mb: 3 }}>
                             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: latestDetail ? 1 : 3 }}>
                                 <Box>
                                     <Typography variant="body1" fontWeight="bold" sx={{ color: COLORS.subheadings }}>
@@ -649,7 +738,7 @@ const Dashboard = () => {
                                     Full Map →
                                 </Button>
                             </Stack>
-                            <Box ref={miniMapRef} sx={{ width: '100%', height: 330, cursor: 'pointer' }} onClick={() => navigate('/map')} />
+                            <Box ref={miniMapRef} sx={{ width: '100%', height: { xs: 220, md: 330 }, cursor: 'pointer', touchAction: 'pan-y' }} onClick={() => navigate('/map')} />
                         </Card>
                     </Box>
                 </Box>

@@ -154,15 +154,16 @@ export default function Friends() {
     );
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
             <Navbar />
 
-            <Box component="main" sx={{ flexGrow: 1, height: '100vh', overflow: 'auto', display: 'flex', gap: 0, minWidth: 0 }}>
+            <Box component="main" sx={{ flexGrow: 1, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'auto', display: 'flex', flexDirection: { xs: 'column', md: 'row' }, gap: 0, minWidth: 0 }}>
 
                 {/* ── LEFT PANEL ─────────────────────────────────────────────── */}
                 <Box sx={{
-                    width: 320, flexShrink: 0, height: '100vh', overflowY: 'auto', p: 3,
-                    borderRight: `1px solid ${C.border}`,
+                    width: { xs: '100%', md: 320 }, flexShrink: 0, height: { xs: 'auto', md: '100vh' }, overflowY: { xs: 'visible', md: 'auto' }, p: { xs: 2, md: 3 },
+                    borderRight: { xs: 'none', md: `1px solid ${C.border}` },
+                    borderBottom: { xs: `1px solid ${C.border}`, md: 'none' },
                     '&::-webkit-scrollbar': { width: 4 },
                     '&::-webkit-scrollbar-thumb': { bgcolor: C.surface, borderRadius: 2 },
                 }}>
@@ -310,7 +311,7 @@ export default function Friends() {
                 </Box>
 
                 {/* ── RIGHT MAIN AREA ────────────────────────────────────────── */}
-                <Box sx={{ flex: 1, height: '100vh', overflowY: 'auto', p: 3,
+                <Box sx={{ flex: 1, height: { xs: 'auto', md: '100vh' }, overflowY: { xs: 'visible', md: 'auto' }, p: { xs: 2, md: 3 }, pb: { xs: '80px', md: 3 },
                     '&::-webkit-scrollbar': { width: 5 },
                     '&::-webkit-scrollbar-thumb': { bgcolor: C.surface, borderRadius: 2 },
                 }}>
@@ -324,7 +325,7 @@ export default function Friends() {
                             </Typography>
                         </Typography>
                         <Box sx={{ flex: 1 }} />
-                        <Box sx={{ position: 'relative', width: 220 }}>
+                        <Box sx={{ position: 'relative', width: { xs: 160, md: 220 } }}>
                             <SearchIcon sx={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: C.faded, fontSize: 18, pointerEvents: 'none' }} />
                             <input
                                 value={search}
@@ -360,7 +361,7 @@ export default function Friends() {
                         /* Friends grid */
                         <Box sx={{
                             display: 'grid',
-                            gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))',
+                            gridTemplateColumns: { xs: 'repeat(auto-fill, minmax(150px, 1fr))', md: 'repeat(auto-fill, minmax(200px, 1fr))' },
                             gap: 2,
                         }}>
                             {filteredFriends.map(f => {

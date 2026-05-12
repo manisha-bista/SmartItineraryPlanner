@@ -37,7 +37,7 @@ import VisibilityOff              from '@mui/icons-material/VisibilityOff';
 
 const StatCard = ({ icon, label, value, trend, trendUp, color, loading, COLORS }) => (
     <Card sx={{
-        bgcolor: COLORS.cardPrimary, borderRadius: 4, p: 3, flex: 1,
+        bgcolor: COLORS.cardPrimary, borderRadius: 4, p: 3, flex: 1, minWidth: 175,
         border: `1px solid ${COLORS.cardBorder}`,
         transition: 'all 0.25s',
         '&:hover': { transform: 'translateY(-4px)', boxShadow: `0 10px 28px ${color}25`, borderColor: `${color}40` },
@@ -359,25 +359,25 @@ const AdminDashboard = () => {
     const TAG_COLORS = { Experience: '#33CCCC', Alert: '#FFB74D', Event: '#4CAF50', Tip: '#9C27B0', Question: '#42A5F5' };
 
     return (
-        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: COLORS.background, minHeight: '100vh', width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
 
             {/* The shared Navbar shows admin link automatically for admin role */}
             <Navbar />
 
             {/* ── MAIN CONTENT ───────────────────────────────────────────── */}
-            <Box component="main" sx={{ flexGrow: 1, p: 3, height: '100vh', overflow: 'auto', bgcolor: COLORS.background }}>
+            <Box component="main" sx={{ flexGrow: 1, p: { xs: 1.5, md: 3 }, pb: { xs: '80px', md: 3 }, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, overflow: 'auto', bgcolor: COLORS.background }}>
 
                 {/* Top Bar */}
-                <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 4 }}>
+                <Stack direction={{ xs: 'column', md: 'row' }} justifyContent="space-between" alignItems={{ xs: 'stretch', md: 'center' }} sx={{ mb: { xs: 2, md: 4 }, gap: { xs: 1.5, md: 0 } }}>
                     <Box>
-                        <Typography variant="h4" fontWeight={800} sx={{ color: COLORS.headings, lineHeight: 1.1 }}>Admin Dashboard</Typography>
+                        <Typography variant="h4" fontWeight={800} sx={{ color: COLORS.headings, lineHeight: 1.1, fontSize: { xs: '1.5rem', md: '2.125rem' } }}>Admin Dashboard</Typography>
                         <Typography variant="body2" sx={{ color: COLORS.fadedText, mt: 0.3 }}>Manage users, itineraries and complaints</Typography>
                     </Box>
-                    <Stack direction="row" spacing={2} alignItems="center">
+                    <Stack direction="row" spacing={{ xs: 1, md: 2 }} alignItems="center">
                         <TextField placeholder="Search across all tables…" variant="outlined" size="small"
                             value={search} onChange={e => setSearch(e.target.value)}
                             sx={{
-                                width: 280,
+                                flex: { xs: 1, md: 'none' }, width: { xs: 'auto', md: 280 },
                                 '& .MuiOutlinedInput-root': { bgcolor: COLORS.cardPrimary, borderRadius: 4, color: COLORS.text, '& fieldset': { borderColor: 'transparent' }, '&:hover fieldset': { borderColor: COLORS.brand }, '&.Mui-focused fieldset': { borderColor: COLORS.brand } },
                                 '& .MuiInputBase-input': { py: '10px' },
                                 '& .MuiInputBase-input::placeholder': { color: COLORS.fadedText, opacity: 1 },
@@ -403,17 +403,19 @@ const AdminDashboard = () => {
                 {alert.show && <Alert severity={alert.type} sx={{ mb: 3, borderRadius: 3 }} onClose={() => setAlert(a => ({ ...a, show: false }))}>{alert.msg}</Alert>}
 
                 {/* Stat Cards */}
-                <Stack direction="row" spacing={2.5} sx={{ mb: 4 }}>
+                <Box sx={{ overflowX: { xs: 'auto', md: 'visible' }, mb: { xs: 2, md: 4 } }}>
+                <Stack direction="row" spacing={2.5} sx={{ minWidth: { xs: 'max-content', md: 'auto' }, pb: { xs: 0.5, md: 0 } }}>
                     <StatCard COLORS={COLORS} icon={<PeopleAltIcon sx={{ fontSize: 24, color: COLORS.brand }} />} label="Total Users" value={stats.totalUsers.toLocaleString()} trend="+12%" trendUp color={COLORS.brand} loading={statsLoading} />
                     <StatCard COLORS={COLORS} icon={<MapOutlinedIcon sx={{ fontSize: 24, color: '#a78bfa' }} />} label="Total Itineraries" value={stats.totalItineraries.toLocaleString()} trend="+8%" trendUp color="#a78bfa" loading={statsLoading} />
                     <StatCard COLORS={COLORS} icon={<ReportProblemOutlinedIcon sx={{ fontSize: 24, color: '#fb923c' }} />} label="Total Complaints" value={stats.totalComplaints.toLocaleString()} trend="-3%" trendUp={false} color="#fb923c" loading={statsLoading} />
                     <StatCard COLORS={COLORS} icon={<CheckCircleOutlineIcon sx={{ fontSize: 24, color: '#4ade80' }} />} label="Resolved" value={complaints.filter(c => c.status === 'resolved').length.toLocaleString()} trend="+5%" trendUp color="#4ade80" loading={statsLoading} />
                     <StatCard COLORS={COLORS} icon={<LocationOnIcon sx={{ fontSize: 24, color: '#38bdf8' }} />} label="Cached Places" value={stats.totalPlaces.toLocaleString()} color="#38bdf8" loading={statsLoading} />
                 </Stack>
+                </Box>
 
                 {/* Tabs */}
                 <Box sx={{ mb: 3 }}>
-                    <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} sx={{
+                    <Tabs value={activeTab} onChange={(_, v) => setActiveTab(v)} variant="scrollable" scrollButtons="auto" sx={{
                         '& .MuiTab-root': { color: COLORS.fadedText, textTransform: 'none', fontWeight: 600, fontSize: '0.88rem', minHeight: 44 },
                         '& .Mui-selected': { color: COLORS.brand },
                         '& .MuiTabs-indicator': { bgcolor: COLORS.brand, height: 3, borderRadius: 2 },

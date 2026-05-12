@@ -5,6 +5,7 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 import { useLocation } from 'react-router-dom';
+import { useTheme } from '../context/ThemeContext';
 
 import ChatIcon from '@mui/icons-material/Chat';
 import CloseIcon from '@mui/icons-material/Close';
@@ -14,13 +15,6 @@ import PeopleIcon from '@mui/icons-material/People';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import SearchIcon from '@mui/icons-material/Search';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
-
-const C = {
-    brand: '#33CCCC', bg: '#141627', card: '#252845',
-    surface: 'rgba(255,255,255,0.06)', heading: '#B0D2EB',
-    sub: '#C0D2EB', text: '#D0D2EB', faded: '#7B809A',
-    error: '#ff6b6b', border: 'rgba(255,255,255,0.08)',
-};
 
 const AVATAR_LIST = [
     { id: 1, emoji: '🏔️', color: '#33CCCC' }, { id: 2, emoji: '🌄', color: '#FF7043' },
@@ -52,10 +46,24 @@ const timeAgo = (dateStr) => {
 const ChatWidget = () => {
     const userId = parseInt(localStorage.getItem('userId'));
     const { pathname } = useLocation();
+    const { COLORS } = useTheme();
 
     // hide on public/auth pages
     const isPublicPage = ['/', '/login', '/register'].includes(pathname) || pathname.startsWith('/place/');
     if (!userId || isPublicPage) return null;
+
+    const C = {
+        brand:   COLORS.brand,
+        bg:      COLORS.background,
+        card:    COLORS.cardSecondary,
+        surface: COLORS.inputBg,
+        heading: COLORS.headings,
+        sub:     COLORS.subheadings,
+        text:    COLORS.text,
+        faded:   COLORS.fadedText,
+        error:   '#ff6b6b',
+        border:  COLORS.cardBorder,
+    };
 
     const [open, setOpen] = useState(false);
     const [view, setView] = useState('list');
@@ -323,9 +331,9 @@ const ChatWidget = () => {
                                                 <Box sx={{ bgcolor: isMine ? C.brand : C.card, color: isMine ? C.bg : C.text, borderRadius: 3, borderBottomRightRadius: isMine ? 4 : 12, borderBottomLeftRadius: isMine ? 12 : 4, px: 1.5, py: 0.8 }}>
                                                     <Typography sx={{ fontSize: '0.82rem', lineHeight: 1.45, wordBreak: 'break-word' }}>{msg.content}</Typography>
                                                     {msg.shared_itinerary_id && (
-                                                        <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${isMine ? 'rgba(20,22,39,0.2)' : C.border}`, display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
+                                                        <Box sx={{ mt: 0.5, pt: 0.5, borderTop: `1px solid ${isMine ? 'rgba(0,0,0,0.15)' : C.border}`, display: 'flex', alignItems: 'center', gap: 0.5, cursor: 'pointer' }}
                                                             onClick={() => window.location.href = `/itinerary/${msg.shared_itinerary_id}`}>
-                                                            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: isMine ? 'rgba(20,22,39,0.7)' : C.brand }}>📍 View shared itinerary</Typography>
+                                                            <Typography sx={{ fontSize: '0.68rem', fontWeight: 600, color: isMine ? 'rgba(0,0,0,0.55)' : C.brand }}>📍 View shared itinerary</Typography>
                                                         </Box>
                                                     )}
                                                 </Box>

@@ -270,13 +270,13 @@ export default function ProfileSettings() {
 
     // ─────────────────────────────────────────────────────────────────────────
     return (
-        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: C.bg, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
             <Navbar />
 
-            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: '100vh' }}>
+            <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', height: { xs: 'calc(100vh - 56px)', md: '100vh' } }}>
 
                 {/* ── Page header ──────────────────────────────────────── */}
-                <Box sx={{ px: 4, pt: 3.5, pb: 0, flexShrink: 0 }}>
+                <Box sx={{ px: { xs: 2, md: 4 }, pt: { xs: 2, md: 3.5 }, pb: 0, flexShrink: 0 }}>
                     <Typography variant="h5" fontWeight={800} sx={{ color: C.white }}>Settings</Typography>
                     <Typography sx={{ color: C.dim, fontSize: '0.8rem', mt: 0.3 }}>
                         Manage your account, subscription and appearance.
@@ -285,7 +285,7 @@ export default function ProfileSettings() {
 
                 {/* ── Tab bar ──────────────────────────────────────────── */}
                 <Box sx={{
-                    px: 4, mt: 2.5, flexShrink: 0,
+                    px: { xs: 2, md: 4 }, mt: { xs: 1.5, md: 2.5 }, flexShrink: 0,
                     borderBottom: `1px solid ${C.border}`,
                     display: 'flex', alignItems: 'flex-end', gap: 0.5,
                 }}>
@@ -296,7 +296,7 @@ export default function ProfileSettings() {
 
                 {/* ── Scrollable content ───────────────────────────────── */}
                 <Box sx={{
-                    flex: 1, overflowY: 'auto', px: 4, py: 4,
+                    flex: 1, overflowY: 'auto', px: { xs: 2, md: 4 }, pt: { xs: 2, md: 4 }, pb: { xs: '80px', md: 4 },
                     '&::-webkit-scrollbar': { width: 5 },
                     '&::-webkit-scrollbar-thumb': { bgcolor: C.border, borderRadius: 3 },
                 }}>
@@ -308,10 +308,10 @@ export default function ProfileSettings() {
                         <Box sx={{ maxWidth: 680 }}>
 
                             {/* Profile card */}
-                            <Box sx={{ bgcolor: C.card, borderRadius: 4, p: 4, boxShadow: `0 4px 24px ${C.glow}`, mb: 3 }}>
+                            <Box sx={{ bgcolor: C.card, borderRadius: 4, p: { xs: 2.5, md: 4 }, boxShadow: `0 4px 24px ${C.glow}`, mb: 3 }}>
 
                                 {/* Avatar + name + edit button */}
-                                <Stack direction="row" alignItems="flex-start" justifyContent="space-between" sx={{ mb: 4 }}>
+                                <Stack direction={{ xs: 'column', sm: 'row' }} alignItems="flex-start" justifyContent="space-between" gap={{ xs: 2, sm: 0 }} sx={{ mb: { xs: 2.5, md: 4 } }}>
                                     <Stack direction="row" alignItems="center" spacing={2.5}>
                                         <Box sx={{ position: 'relative' }}>
                                             <Box sx={{ width: 80, height: 80, borderRadius: 4, overflow: 'hidden', bgcolor: `${getAvatarColor(form.avatarId)}20`, border: `3px solid ${getAvatarColor(form.avatarId)}55`, boxShadow: `0 4px 18px ${getAvatarColor(form.avatarId)}30` }}>
@@ -354,8 +354,8 @@ export default function ProfileSettings() {
                                             {AVATAR_LIST.map(av => (
                                                 <Box key={av.id} onClick={() => setForm(p => ({ ...p, avatarId: av.id }))} sx={{
                                                     width: 52, height: 52, borderRadius: 2.5, cursor: 'pointer', flexShrink: 0, overflow: 'hidden',
-                                                    bgcolor: form.avatarId === av.id ? `${av.color}20` : 'rgba(255,255,255,0.03)',
-                                                    border: `2px solid ${form.avatarId === av.id ? av.color : 'rgba(255,255,255,0.07)'}`,
+                                                    bgcolor: form.avatarId === av.id ? `${av.color}20` : C.card2,
+                                                    border: `2px solid ${form.avatarId === av.id ? av.color : C.border}`,
                                                     boxShadow: form.avatarId === av.id ? `0 0 12px ${av.color}50` : 'none',
                                                     transition: 'all 0.15s',
                                                     '&:hover': { border: `2px solid ${av.color}90`, transform: 'scale(1.08)' },
@@ -376,7 +376,7 @@ export default function ProfileSettings() {
                                     <TextField fullWidth multiline rows={2} placeholder="Tell us about yourself…" value={form.bio} onChange={set('bio')} disabled={!editing} sx={fieldSx(editing)} />
                                 </Box>
 
-                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 3, mb: 4 }}>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', md: '1fr 1fr' }, gap: 3, mb: { xs: 3, md: 4 } }}>
                                     <Box>
                                         <Typography sx={labelSx}>Full Name</Typography>
                                         <TextField fullWidth value={form.fullName} onChange={set('fullName')} disabled={!editing} placeholder="Your full name" sx={fieldSx(editing)} />
@@ -496,7 +496,8 @@ export default function ProfileSettings() {
 
                             {/* Feature table */}
                             <Typography fontWeight={700} sx={{ color: C.white, mb: 2, fontSize: '0.95rem' }}>What's Included</Typography>
-                            <Box sx={{ bgcolor: C.card, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', mb: 4 }}>
+                            <Box sx={{ overflowX: { xs: 'auto', md: 'visible' }, mb: 4, '&::-webkit-scrollbar': { height: 3 }, '&::-webkit-scrollbar-thumb': { bgcolor: C.border, borderRadius: 2 } }}>
+                            <Box sx={{ bgcolor: C.card, border: `1px solid ${C.border}`, borderRadius: 3, overflow: 'hidden', minWidth: { xs: 420, md: 'auto' } }}>
                                 <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 110px 130px', bgcolor: C.card2, px: 3, py: 1.5, borderBottom: `1px solid ${C.border}` }}>
                                     <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.8 }}>Feature</Typography>
                                     <Typography sx={{ fontSize: '0.72rem', fontWeight: 700, color: C.dim, textTransform: 'uppercase', letterSpacing: 0.8, textAlign: 'center' }}>Free</Typography>
@@ -513,6 +514,7 @@ export default function ProfileSettings() {
                                     </Box>
                                 ))}
                             </Box>
+                            </Box>{/* end scrollable table wrapper */}
 
                             {/* Community pitch */}
                             <Box sx={{ bgcolor: `${C.brand}0A`, border: `1px solid ${C.brand}30`, borderRadius: 3, px: 3, py: 3 }}>
@@ -534,7 +536,7 @@ export default function ProfileSettings() {
                     ════════════════════════════════════════ */}
                     {activeTab === 'appearance' && (
                         <Box sx={{ maxWidth: 540 }}>
-                            <Box sx={{ bgcolor: C.card, borderRadius: 4, p: 4, boxShadow: `0 4px 24px ${C.glow}` }}>
+                            <Box sx={{ bgcolor: C.card, borderRadius: 4, p: { xs: 2.5, md: 4 }, boxShadow: `0 4px 24px ${C.glow}` }}>
                                 <Typography sx={{ color: C.dim, mb: 3, fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Interface Theme</Typography>
 
                                 {/* Toggle row */}

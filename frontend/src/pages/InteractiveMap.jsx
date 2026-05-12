@@ -289,6 +289,8 @@ export default function InteractiveMap() {
             { attribution: '&copy; OpenStreetMap &copy; CARTO', maxZoom: 19 });
         tileLayerRef.current.addTo(map);
         leafletMap.current = map;
+        // force Leaflet to re-read container dimensions after layout settles
+        setTimeout(() => map.invalidateSize(), 150);
     }, [leaflet]);
 
     // swap tile layer when theme changes
@@ -407,14 +409,19 @@ export default function InteractiveMap() {
 
     return (
     <>
-        <Box sx={{ display: 'flex', bgcolor: C.bg, minHeight: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, overflow: 'hidden' }}>
+        <Box sx={{ display: 'flex', bgcolor: C.bg, height: { xs: 'calc(100vh - 56px)', md: '100vh' }, width: '100vw', position: 'fixed', top: { xs: '56px', md: 0 }, left: 0, overflow: 'hidden' }}>
 
             <Navbar />
 
-            {/* Left panel — itinerary list + day details */}
+            {/* Left panel — itinerary list + day details (desktop only) */}
             <Box sx={{
-                width: 300, flexShrink: 0, height: '100vh', overflow: 'auto',
-                borderRight: `1px solid ${C.border}`, bgcolor: C.bg,
+                width: 300,
+                flexShrink: 0,
+                height: '100vh',
+                overflow: 'auto',
+                borderRight: `1px solid ${C.border}`,
+                bgcolor: C.bg,
+                display: { xs: 'none', md: 'block' },
                 '&::-webkit-scrollbar': { width: 4 },
                 '&::-webkit-scrollbar-thumb': { bgcolor: C.border, borderRadius: 4 },
             }}>
@@ -677,14 +684,98 @@ export default function InteractiveMap() {
             </Box>
 
             {/* Map */}
-            <Box sx={{ flex: 1, position: 'relative', height: '100vh' }}>
+            <Box sx={{ flex: 1, position: 'relative', height: { xs: 'calc(100vh - 56px)', md: '100vh' } }}>
                 <Box ref={mapRef} sx={{ width: '100%', height: '100%' }} />
+
+                {/* ── Mobile: two floating dropdowns ─────────────────── */}
+                <Box sx={{
+                    display: { xs: 'flex', md: 'none' },
+                    position: 'absolute', top: 12, left: 12, right: 12,
+                    zIndex: 1100, gap: 1,
+                }}>
+                    {/* Itinerary — always half width */}
+                    <Select
+                        size="small"
+                        value={selected?.id ?? ''}
+                        onChange={(e) => {
+                            const itin = itineraries.find(i => i.id === e.target.value);
+                            setSelected(itin ?? null);
+                            setSelectedDay(null);
+                        }}
+                        displayEmpty
+                        sx={{
+                            flex: 1,
+                            bgcolor: C.card,
+                            borderRadius: 2,
+                            fontFamily: 'inherit',
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: C.brand },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand },
+                            '& .MuiSelect-icon': { color: selected ? C.brand : C.faded },
+                            '& .MuiSelect-select': {
+                                py: 1.1, px: 1.5,
+                                fontSize: '0.82rem', fontWeight: 600,
+                                color: selected ? C.brand : C.faded,
+                                fontFamily: 'inherit',
+                            },
+                        }}
+                        MenuProps={{ PaperProps: { sx: { bgcolor: C.card, border: `1px solid ${C.border}`, '& .MuiMenuItem-root': { color: C.text, fontSize: '0.82rem', fontFamily: 'inherit' }, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}18` }, '& .MuiMenuItem-root.Mui-selected': { bgcolor: `${C.brand}22`, color: C.brand } }, maxHeight: 280 } }}
+                    >
+                        <MenuItem value="" disabled sx={{ color: C.faded, fontSize: '0.82rem', fontFamily: 'inherit' }}>Select itinerary…</MenuItem>
+                        {itineraries.map(itin => (
+                            <MenuItem key={itin.id} value={itin.id}>
+                                {itin.title}
+                            </MenuItem>
+                        ))}
+                    </Select>
+
+                    {/* Day — always half width, disabled until itinerary is selected */}
+                    <Select
+                        size="small"
+                        value={selectedDay ?? ''}
+                        onChange={(e) => setSelectedDay(e.target.value || null)}
+                        displayEmpty
+                        disabled={!detail?.days?.length}
+                        sx={{
+                            flex: 1,
+                            bgcolor: C.card,
+                            borderRadius: 2,
+                            fontFamily: 'inherit',
+                            opacity: detail?.days?.length ? 1 : 0.5,
+                            boxShadow: '0 2px 12px rgba(0,0,0,0.18)',
+                            '& .MuiOutlinedInput-notchedOutline': { borderColor: C.border },
+                            '&:hover .MuiOutlinedInput-notchedOutline': { borderColor: detail?.days?.length ? C.brand : C.border },
+                            '&.Mui-focused .MuiOutlinedInput-notchedOutline': { borderColor: C.brand },
+                            '& .MuiSelect-icon': { color: selectedDay ? C.brand : C.faded },
+                            '& .MuiSelect-select': {
+                                py: 1.1, px: 1.5,
+                                fontSize: '0.82rem', fontWeight: 600,
+                                color: selectedDay ? C.brand : C.faded,
+                                fontFamily: 'inherit',
+                            },
+                        }}
+                        MenuProps={{ PaperProps: { sx: { bgcolor: C.card, border: `1px solid ${C.border}`, '& .MuiMenuItem-root': { color: C.text, fontSize: '0.82rem', fontFamily: 'inherit' }, '& .MuiMenuItem-root:hover': { bgcolor: `${C.brand}18` }, '& .MuiMenuItem-root.Mui-selected': { bgcolor: `${C.brand}22`, color: C.brand } } } }}
+                    >
+                        <MenuItem value="" sx={{ color: C.faded, fontSize: '0.82rem', fontFamily: 'inherit' }}>All days</MenuItem>
+                        {(detail?.days || []).map((d, idx) => (
+                            <MenuItem key={d.id} value={d.id}>
+                                <Stack direction="row" alignItems="center" spacing={0.8}>
+                                    <Box sx={{ width: 8, height: 8, borderRadius: '50%', bgcolor: DAY_COLORS[idx % DAY_COLORS.length], flexShrink: 0 }} />
+                                    <span>Day {d.day_number}</span>
+                                </Stack>
+                            </MenuItem>
+                        ))}
+                    </Select>
+                </Box>
 
                 {!selected && !loadingList && (
                     <Box sx={{
+                        display: { xs: 'none', md: 'flex' },
                         position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)',
-                        bgcolor: 'rgba(20,22,39,0.88)', borderRadius: 4, px: 5, py: 4, textAlign: 'center',
-                        border: `1px solid ${C.border}`, backdropFilter: 'blur(8px)', pointerEvents: 'none',
+                        bgcolor: C.card, borderRadius: 4, px: 5, py: 4, textAlign: 'center',
+                        border: `1px solid ${C.border}`, boxShadow: '0 8px 32px rgba(0,0,0,0.18)', pointerEvents: 'none',
+                        flexDirection: 'column', alignItems: 'center',
                     }}>
                         <MapIcon sx={{ fontSize: 48, color: C.brand, mb: 1.5, opacity: 0.7 }} />
                         <Typography variant="h6" fontWeight="bold" sx={{ color: C.heading, mb: 0.5 }}>Select an itinerary</Typography>
@@ -692,9 +783,9 @@ export default function InteractiveMap() {
                     </Box>
                 )}
 
-                {/* Day legend + distances */}
+                {/* Day legend + distances (desktop only) */}
                 {detail?.days?.length > 0 && (
-                    <Box sx={{ position: 'absolute', top: 16, right: 16, bgcolor: 'rgba(20,22,39,0.88)', borderRadius: 3, px: 2, py: 1.5, border: `1px solid ${C.border}`, backdropFilter: 'blur(6px)', zIndex: 1000, minWidth: 140 }}>
+                    <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'absolute', top: 16, right: 16, bgcolor: C.card, borderRadius: 3, px: 2, py: 1.5, border: `1px solid ${C.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1000, minWidth: 140 }}>
                         <Typography sx={{ color: C.faded, fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8, mb: 1 }}>Days</Typography>
                         <Stack spacing={0.6}>
                             {detail.days.map((day, idx) => {
@@ -725,9 +816,9 @@ export default function InteractiveMap() {
                     </Box>
                 )}
 
-                {/* Itinerary badge */}
+                {/* Itinerary badge (desktop only — mobile uses the dropdown) */}
                 {detail && (
-                    <Box sx={{ position: 'absolute', top: 16, left: 16, bgcolor: 'rgba(20,22,39,0.88)', borderRadius: 3, px: 2, py: 1.2, border: `1px solid ${C.border}`, backdropFilter: 'blur(6px)', zIndex: 1000 }}>
+                    <Box sx={{ display: { xs: 'none', md: 'block' }, position: 'absolute', top: 16, left: 16, bgcolor: C.card, borderRadius: 3, px: 2, py: 1.2, border: `1px solid ${C.border}`, boxShadow: '0 4px 16px rgba(0,0,0,0.15)', zIndex: 1000 }}>
                         <Typography sx={{ color: C.brand, fontSize: '0.72rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.8 }}>{detail.destination}</Typography>
                         <Typography sx={{ color: C.heading, fontSize: '0.85rem', fontWeight: 700 }}>{detail.title}</Typography>
                         <Typography sx={{ color: C.faded, fontSize: '0.68rem' }}>{fmtDate(detail.start_date)} – {fmtDate(detail.end_date)}</Typography>
